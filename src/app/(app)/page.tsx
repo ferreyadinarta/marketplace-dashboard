@@ -93,7 +93,7 @@ export default async function DashboardPage({
           value={summary.fee}
           icon={<Receipt size={18} />}
           accent="red"
-          help="Total potongan/komisi yang diambil marketplace dari penjualan kakak."
+          help="Total potongan/komisi yang diambil marketplace."
         />
         <StatCard
           label="Total HPP"

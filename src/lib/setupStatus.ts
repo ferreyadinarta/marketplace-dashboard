@@ -17,7 +17,7 @@ export async function getSetupStatus() {
       key: "toko",
       done: storeCount > 0,
       title: "Tambah toko",
-      desc: "Daftarkan toko & marketplace tempat kakak jualan.",
+      desc: "Daftarkan toko & marketplace.",
       href: "/master/toko",
     },
     {

@@ -1,6 +1,6 @@
 import { Package, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProduct, deleteProduct, createGroup } from "./actions";
+import { createProduct, updateProduct, deleteProduct, createGroup, deleteGroup } from "./actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
 import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
@@ -70,7 +70,7 @@ export default async function MasterProductPage({
         {/* form tambah grup */}
         <Card>
           <CardHeader title="Grup Pembukuan" subtitle="Kelompok untuk tabel pembukuan." />
-          <AddGroupForm groups={groups} action={createGroup} />
+          <AddGroupForm groups={groups} action={createGroup} deleteAction={deleteGroup} />
         </Card>
       </div>
 

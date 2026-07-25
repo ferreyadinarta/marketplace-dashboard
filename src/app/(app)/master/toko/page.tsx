@@ -43,7 +43,7 @@ export default async function MasterTokoPage() {
           <EmptyState
             icon={<StoreIcon size={40} />}
             title="Belum ada toko"
-            description="Tambahkan toko pertama kakak lewat form di atas."
+            description="Tambahkan toko pertama lewat form di atas."
           />
         </Card>
       ) : (

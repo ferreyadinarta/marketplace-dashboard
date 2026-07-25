@@ -43,3 +43,12 @@ export async function createGroup(formData: FormData) {
   await prisma.bookkeepingGroup.create({ data: { name } });
   revalidatePath("/master/product");
 }
+
+export async function deleteGroup(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  // product di grup ini otomatis jadi "tanpa grup" (schema onDelete: SetNull)
+  await prisma.bookkeepingGroup.delete({ where: { id } });
+  revalidatePath("/master/product");
+  revalidatePath("/pembukuan");
+}

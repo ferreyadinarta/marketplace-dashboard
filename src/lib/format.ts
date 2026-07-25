@@ -27,6 +27,7 @@ export const MARKETPLACE_LABEL: Record<string, string> = {
   SHOPEE: "Shopee",
   TIKTOK: "TikTok Shop",
   TOKOPEDIA: "Tokopedia",
+  KONSINYASI: "Konsinyasi",
 };
 
 export const STATUS_LABEL: Record<string, string> = {
