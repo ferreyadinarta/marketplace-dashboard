@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== MASTER DATA =====
+
+model Store {
+  id          String   @id @default(cuid())
+  name        String
+  marketplace String // SHOPEE | TIKTOK | TOKOPEDIA
+  apiKey      String?
+  apiSecret   String?
+  shopIdApi   String? // id toko di sisi marketplace
+  isActive    Boolean  @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  mappings ProductMapping[]
+  orders   Order[]
+  payouts  Payout[]
+}
+
+model BookkeepingGroup {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  name      String
+  sku       String   @unique // SKU internal
+  hpp       Int      @default(0) // harga pokok penjualan, rupiah
+  groupId   String?
+  group     BookkeepingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  mappings   ProductMapping[]
+  orderItems OrderItem[]
+}
+
+// SKU di marketplace bisa beda dengan SKU internal → mapping
+model ProductMapping {
+  id                     String  @id @default(cuid())
+  storeId                String
+  store                  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  marketplaceSku         String
+  marketplaceProductName String
+  productId              String?
+  product                Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, marketplaceSku])
+}
+
+// ===== TRANSAKSI =====
+
+model Order {
+  id                 String   @id @default(cuid())
+  storeId            String
+  store              Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  marketplaceOrderId String
+  orderDate          DateTime
+  status             String // PENDING | SHIPPED | COMPLETED | CANCELLED | RETURNED
+  totalAmount        Int      @default(0) // total dibayar pembeli
+  marketplaceFee     Int      @default(0) // total potongan fee marketplace
+  shippingSubsidy    Int      @default(0)
+  netAmount          Int      @default(0) // yang seharusnya cair ke seller
+  payoutId           String?
+  payout             Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  createdAt          DateTime @default(now())
+
+  items OrderItem[]
+
+  @@unique([storeId, marketplaceOrderId])
+  @@index([orderDate])
+  @@index([status])
+}
+
+model OrderItem {
+  id             String  @id @default(cuid())
+  orderId        String
+  order          Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  marketplaceSku String // simpan SKU asli, walau belum ter-mapping
+  productName    String
+  qty            Int
+  price          Int // harga satuan
+  subtotal       Int
+}
+
+// pencairan dana dari marketplace → untuk rekonsiliasi
+model Payout {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  payoutDate DateTime
+  amount     Int
+  reference  String? // no. referensi pencairan
+  createdAt  DateTime @default(now())
+
+  orders Order[]
+}
