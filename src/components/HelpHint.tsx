@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 
 // Tooltip bantuan. Di-render lewat PORTAL ke document.body + posisi fixed,
-// jadi tidak pernah terpotong container yang overflow-hidden/auto (mis. tabel).
+// jadi tidak pernah terpotong container yang overflow-hidden/auto (ex: tabel).
 export function HelpHint({ text }: { text: string }) {
   const [show, setShow] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -38,12 +38,17 @@ export function HelpHint({ text }: { text: string }) {
         pos &&
         createPortal(
           <span
-            style={{ position: "fixed", left: pos.left, top: pos.top, transform: "translateX(-50%)" }}
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top,
+              transform: "translateX(-50%)",
+            }}
             className="pointer-events-none z-[300] block w-56 max-w-[80vw] rounded-lg bg-slate-900 px-3 py-2 text-xs font-normal normal-case leading-relaxed tracking-normal text-white shadow-lg"
           >
             {text}
           </span>,
-          document.body
+          document.body,
         )}
     </span>
   );

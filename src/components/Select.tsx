@@ -8,7 +8,7 @@ export type SelectOption = { value: string; label: string };
 
 // Dropdown custom penuh: tombol + daftar opsi yang kita render sendiri.
 // Daftar opsi di-render lewat PORTAL ke document.body + posisi fixed, supaya
-// TIDAK terpotong oleh container yang overflow-hidden/auto (mis. tabel).
+// TIDAK terpotong oleh container yang overflow-hidden/auto (ex: tabel).
 export function Select({
   options,
   name,
@@ -31,7 +31,13 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [internal, setInternal] = useState(defaultValue ?? "");
-  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxH: number }>();
+  const [pos, setPos] = useState<{
+    left: number;
+    width: number;
+    top?: number;
+    bottom?: number;
+    maxH: number;
+  }>();
 
   const btnRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -136,17 +142,21 @@ export function Select({
                     type="button"
                     onClick={() => choose(o.value)}
                     className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm ${
-                      active ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+                      active
+                        ? "bg-indigo-50 font-medium text-indigo-700"
+                        : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <span className="whitespace-nowrap">{o.label}</span>
-                    {active && <Check size={15} className="shrink-0 text-indigo-600" />}
+                    {active && (
+                      <Check size={15} className="shrink-0 text-indigo-600" />
+                    )}
                   </button>
                 </li>
               );
             })}
           </ul>,
-          document.body
+          document.body,
         )}
     </div>
   );

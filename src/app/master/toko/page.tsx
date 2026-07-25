@@ -2,7 +2,16 @@ import { Store as StoreIcon, CheckCircle2, AlertCircle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
-import { Card, CardHeader, PageHeader, Field, inputClass, Checkbox, Badge, EmptyState } from "@/components/ui";
+import {
+  Card,
+  CardHeader,
+  PageHeader,
+  Field,
+  inputClass,
+  Checkbox,
+  Badge,
+  EmptyState,
+} from "@/components/ui";
 import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -55,7 +64,9 @@ export default async function MasterTokoPage() {
                           {MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace}
                         </Badge>
                         <span className="text-xs text-slate-400">
-                          {s.lastSyncAt ? `Sync: ${tanggal(s.lastSyncAt)}` : "Belum pernah sync"}
+                          {s.lastSyncAt
+                            ? `Sync: ${tanggal(s.lastSyncAt)}`
+                            : "Belum pernah sync"}
                         </span>
                       </div>
                     </div>
@@ -72,24 +83,51 @@ export default async function MasterTokoPage() {
                     )}
                     <form action={deleteStore}>
                       <input type="hidden" name="id" value={s.id} />
-                      <button className="text-xs font-medium text-red-500 hover:underline">Hapus</button>
+                      <button className="text-xs font-medium text-red-500 hover:underline">
+                        Hapus
+                      </button>
                     </form>
                   </div>
                 </div>
                 <AdvancedApiSection connected={connected}>
-                  <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">
+                  <form
+                    action={updateStoreCredentials}
+                    className="grid gap-3 sm:grid-cols-3"
+                  >
                     <input type="hidden" name="id" value={s.id} />
                     <Field label="API Key">
-                      <input name="apiKey" defaultValue={s.apiKey ?? ""} placeholder="dari developer marketplace" className={inputClass} />
+                      <input
+                        name="apiKey"
+                        defaultValue={s.apiKey ?? ""}
+                        placeholder="dari developer marketplace"
+                        className={inputClass}
+                      />
                     </Field>
                     <Field label="API Secret">
-                      <input name="apiSecret" defaultValue={s.apiSecret ?? ""} placeholder="rahasia, jangan dibagikan" className={inputClass} />
+                      <input
+                        name="apiSecret"
+                        defaultValue={s.apiSecret ?? ""}
+                        placeholder="rahasia, jangan dibagikan"
+                        className={inputClass}
+                      />
                     </Field>
-                    <Field label="Shop ID" hint="ID toko di sisi marketplace, biasanya angka.">
-                      <input name="shopIdApi" defaultValue={s.shopIdApi ?? ""} placeholder="mis. 1029384756" className={inputClass} />
+                    <Field
+                      label="Shop ID"
+                      hint="ID toko di sisi marketplace, biasanya angka."
+                    >
+                      <input
+                        name="shopIdApi"
+                        defaultValue={s.shopIdApi ?? ""}
+                        placeholder="ex: 1029384756"
+                        className={inputClass}
+                      />
                     </Field>
                     <div className="flex items-center">
-                      <Checkbox name="isActive" defaultChecked={s.isActive} label="Toko aktif (ikut sync)" />
+                      <Checkbox
+                        name="isActive"
+                        defaultChecked={s.isActive}
+                        label="Toko aktif (ikut sync)"
+                      />
                     </div>
                     <div className="sm:col-span-2 sm:flex sm:justify-end">
                       <SubmitButton variant="outline" pendingText="Menyimpan…">

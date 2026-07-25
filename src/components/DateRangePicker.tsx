@@ -34,7 +34,12 @@ function buildPresets() {
     { key: "30d", label: "30 hari terakhir", from: minus(29), to: today },
     { key: "90d", label: "90 hari terakhir", from: minus(89), to: today },
     { key: "month", label: "Bulan ini", from: firstThisMonth, to: today },
-    { key: "lastmonth", label: "Bulan lalu", from: firstLastMonth, to: lastLastMonth },
+    {
+      key: "lastmonth",
+      label: "Bulan lalu",
+      from: firstLastMonth,
+      to: lastLastMonth,
+    },
   ];
 }
 
@@ -60,16 +65,20 @@ export default function DateRangePicker({
   const [month, setMonth] = useState<Date>(new Date(`${toStr}T00:00:00`));
   const [days, setDays] = useState("");
 
-  // sinkronkan kalender dengan rentang aktif (mis. setelah preset diterapkan)
+  // sinkronkan kalender dengan rentang aktif (ex: setelah preset diterapkan)
   useEffect(() => {
-    setRange({ from: new Date(`${fromStr}T00:00:00`), to: new Date(`${toStr}T00:00:00`) });
+    setRange({
+      from: new Date(`${fromStr}T00:00:00`),
+      to: new Date(`${toStr}T00:00:00`),
+    });
     setMonth(new Date(`${toStr}T00:00:00`));
   }, [fromStr, toStr]);
 
   // tutup saat klik di luar
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -114,7 +123,10 @@ export default function DateRangePicker({
   }
 
   function cancel() {
-    setRange({ from: new Date(`${fromStr}T00:00:00`), to: new Date(`${toStr}T00:00:00`) });
+    setRange({
+      from: new Date(`${fromStr}T00:00:00`),
+      to: new Date(`${toStr}T00:00:00`),
+    });
     setMonth(new Date(`${toStr}T00:00:00`));
     setDays("");
     setOpen(false);
@@ -122,7 +134,7 @@ export default function DateRangePicker({
 
   const presets = buildPresets();
   const buttonLabel = `${labelDate(new Date(`${fromStr}T00:00:00`))} – ${labelDate(
-    new Date(`${toStr}T00:00:00`)
+    new Date(`${toStr}T00:00:00`),
   )}`;
 
   const rdpStyle = {
@@ -184,7 +196,7 @@ export default function DateRangePicker({
                   min="1"
                   value={days}
                   onChange={(e) => previewLastNDays(e.target.value)}
-                  placeholder="mis. 14"
+                  placeholder="ex: 14"
                   className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
                 <span className="shrink-0 text-xs text-slate-400">hari</span>
@@ -216,7 +228,9 @@ export default function DateRangePicker({
               <button
                 type="button"
                 disabled={!range?.from || !range?.to}
-                onClick={() => range?.from && range?.to && commit(range.from, range.to, true)}
+                onClick={() =>
+                  range?.from && range?.to && commit(range.from, range.to, true)
+                }
                 className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
               >
                 Terapkan

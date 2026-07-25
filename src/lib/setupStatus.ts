@@ -2,13 +2,14 @@ import { prisma } from "./prisma";
 
 // Cek progres setup untuk memandu user (tanpa perlu tutorial).
 export async function getSetupStatus() {
-  const [storeCount, productCount, productWithHpp, groupCount, unmappedCount] = await Promise.all([
-    prisma.store.count(),
-    prisma.product.count(),
-    prisma.product.count({ where: { hpp: { gt: 0 } } }),
-    prisma.bookkeepingGroup.count(),
-    prisma.productMapping.count({ where: { productId: null } }),
-  ]);
+  const [storeCount, productCount, productWithHpp, groupCount, unmappedCount] =
+    await Promise.all([
+      prisma.store.count(),
+      prisma.product.count(),
+      prisma.product.count({ where: { hpp: { gt: 0 } } }),
+      prisma.bookkeepingGroup.count(),
+      prisma.productMapping.count({ where: { productId: null } }),
+    ]);
 
   // Langkah yang tampil ke user hanya yang halamannya ada di menu.
   // Setup toko & API marketplace ditangani manual (halaman Master Toko disembunyikan).
@@ -17,7 +18,7 @@ export async function getSetupStatus() {
       key: "grup",
       done: groupCount > 0,
       title: "Buat grup pembukuan",
-      desc: "Kelompokkan product per brand (mis. Flimty, Hotto) untuk tabel pembukuan.",
+      desc: "Kelompokkan product per brand (ex: Flimty, Hotto) untuk tabel pembukuan.",
       href: "/master/product",
     },
     {

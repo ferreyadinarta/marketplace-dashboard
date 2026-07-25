@@ -9,7 +9,13 @@ type Action = (formData: FormData) => void | Promise<void>;
 
 // Bagian pengaturan API yang bisa dilipat. Default tertutup supaya tidak
 // membingungkan user yang cuma perlu atur nama & marketplace.
-export function AdvancedApiSection({ connected, children }: { connected: boolean; children: ReactNode }) {
+export function AdvancedApiSection({
+  connected,
+  children,
+}: {
+  connected: boolean;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-4 border-t border-slate-100 pt-3">
@@ -27,13 +33,17 @@ export function AdvancedApiSection({ connected, children }: { connected: boolean
             </span>
           )}
         </span>
-        <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={16}
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && (
         <div className="mt-3">
           <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
-            Bagian ini untuk menghubungkan toko ke API marketplace (diisi oleh yang mengatur teknis).
-            Cukup kosongkan kalau belum punya kredensial, nama & marketplace tetap tersimpan.
+            Bagian ini untuk menghubungkan toko ke API marketplace (diisi oleh
+            yang mengatur teknis). Cukup kosongkan kalau belum punya kredensial,
+            nama & marketplace tetap tersimpan.
           </p>
           {children}
         </div>
@@ -67,7 +77,7 @@ export function AddStoreForm({ action }: { action: Action }) {
         <input
           name="name"
           onInput={() => error && setError(undefined)}
-          placeholder="mis. Luxe Supplement Store — Shopee"
+          placeholder="ex: Luxe Supplement Store — Shopee"
           className={`${inputClass} ${error ? inputErrorClass : ""}`}
         />
       </Field>
