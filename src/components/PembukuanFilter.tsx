@@ -29,8 +29,10 @@ export default function PembukuanFilter({
     router.push(`/pembukuan?${next.toString()}`);
   }
 
-  // export ikut rentang efektif (default bulan ini; atau semua data bila all=1)
-  const isAll = params.get("all") === "1";
+  // Default halaman = semua data. Export ikut itu (tanpa from/to) kecuali
+  // user pilih rentang. all=1 juga berarti semua data.
+  const isAll =
+    params.get("all") === "1" || (!params.get("from") && !params.get("to"));
   const exportParams = new URLSearchParams(params.toString());
   if (!isAll) {
     if (!exportParams.get("from")) exportParams.set("from", initialFrom);
@@ -43,7 +45,7 @@ export default function PembukuanFilter({
     <div className="flex flex-wrap items-end gap-3">
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-600">Rentang tanggal</span>
-        <DateRangePicker initialFrom={initialFrom} initialTo={initialTo} />
+        <DateRangePicker initialFrom={initialFrom} initialTo={initialTo} defaultAll />
       </label>
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-600">Marketplace</span>
@@ -56,6 +58,7 @@ export default function PembukuanFilter({
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
+            { value: "KONSINYASI", label: "Konsinyasi" },
           ]}
         />
       </label>
@@ -74,7 +77,11 @@ export default function PembukuanFilter({
           className="min-w-44"
           value={params.get("groupId") ?? ""}
           onValueChange={(v) => update("groupId", v)}
-          options={[{ value: "", label: "Semua grup" }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
+          options={[
+            { value: "", label: "Semua grup" },
+            ...groups.map((g) => ({ value: g.id, label: g.name })),
+            { value: "__none__", label: "Tanpa Grup" }, // bucket product tanpa grup
+          ]}
         />
       </label>
 

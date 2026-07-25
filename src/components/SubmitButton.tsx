@@ -9,6 +9,7 @@ const variants: Record<string, string> = {
   success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
   outline: "border border-slate-300 text-slate-700 bg-white hover:bg-slate-50",
   danger: "bg-red-600 text-white hover:bg-red-700",
+  ghost: "text-slate-600 hover:bg-slate-100",
 };
 
 // Tombol submit dengan status loading otomatis (pakai useFormStatus).

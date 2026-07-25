@@ -47,10 +47,12 @@ export default function DateRangePicker({
   initialFrom,
   initialTo,
   basePath = "/pembukuan",
+  defaultAll = false,
 }: {
   initialFrom: string;
   initialTo: string;
   basePath?: string;
+  defaultAll?: boolean;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -58,7 +60,8 @@ export default function DateRangePicker({
   const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const isAll = params.get("all") === "1";
+  const isAll =
+    params.get("all") === "1" || (defaultAll && !params.get("from") && !params.get("to"));
   const fromStr = params.get("from") ?? initialFrom;
   const toStr = params.get("to") ?? initialTo;
 

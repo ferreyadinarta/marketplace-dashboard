@@ -8,10 +8,14 @@ export type DashboardFilter = {
   groupId?: string; // filter grup pembukuan (khusus halaman Pembukuan)
 };
 
-// bangun where clause order dari filter, hanya order tidak batal/retur
+// bangun where clause order dari filter.
+// HANYA hitung order yang SELESAI (COMPLETED) = penjualan benar-benar terjadi &
+// dana cair. Otomatis mengecualikan yang batal/retur (CANCELLED/RETURNED) —
+// termasuk paket yang sudah dikirim tapi akhirnya dibatalkan/dikembalikan —
+// dan yang belum final (PENDING/SHIPPED), supaya pembukuan tidak over-hitung.
 function orderWhere(f: DashboardFilter) {
   const where: Record<string, unknown> = {
-    status: { in: ["PENDING", "SHIPPED", "COMPLETED"] },
+    status: "COMPLETED",
   };
   if (f.from || f.to) {
     where.orderDate = {
@@ -88,28 +92,36 @@ export async function getByMarketplace(f: DashboardFilter) {
   return Array.from(map.entries()).map(([marketplace, v]) => ({ marketplace, ...v }));
 }
 
-// pembukuan dikelompokkan per grup, tiap baris = product
+// id semu untuk bucket product tanpa grup
+export const NO_GROUP = "__none__";
+
+type ProdLite = { id: string; name: string; sku: string; hpp: number };
+
+// pembukuan dikelompokkan per grup, tiap baris = product.
+// Product tanpa grup dikumpulkan di bucket "Tanpa Grup".
 export async function getPembukuanByGroup(f: DashboardFilter) {
-  const groups = await prisma.bookkeepingGroup.findMany({
-    where: f.groupId ? { id: f.groupId } : undefined,
-    include: { products: true },
-    orderBy: { name: "asc" },
-  });
+  const onlyNone = f.groupId === NO_GROUP;
+  const groups = onlyNone
+    ? []
+    : await prisma.bookkeepingGroup.findMany({
+        where: f.groupId ? { id: f.groupId } : undefined,
+        include: { products: true },
+        orderBy: { name: "asc" },
+      });
+
   const orders = await prisma.order.findMany({
     where: orderWhere(f),
     include: { items: { include: { product: true } } },
   });
 
   // akumulasi per productId
-  type Row = { productId: string; terjual: number; omzet: number; fee: number; hpp: number };
-  const perProduct = new Map<string, Row>();
+  type Agg = { terjual: number; omzet: number; fee: number; hpp: number };
+  const perProduct = new Map<string, Agg>();
   for (const o of orders) {
     const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
     for (const it of o.items) {
       if (!it.productId) continue;
-      const r =
-        perProduct.get(it.productId) ??
-        { productId: it.productId, terjual: 0, omzet: 0, fee: 0, hpp: 0 };
+      const r = perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
       r.terjual += it.qty;
       r.omzet += it.subtotal;
       r.fee += feePerItem;
@@ -118,8 +130,8 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
     }
   }
 
-  return groups.map((g) => {
-    const rows = g.products.map((p) => {
+  const buildGroup = (groupId: string, groupName: string, products: ProdLite[]) => {
+    const rows = products.map((p) => {
       const r = perProduct.get(p.id) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
       const profit = r.omzet - r.fee - r.hpp;
       return {
@@ -142,12 +154,83 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
       }),
       { terjual: 0, omzet: 0, fee: 0, profit: 0 }
     );
-    return { groupId: g.id, groupName: g.name, rows, subtotal };
-  });
+    return { groupId, groupName, rows, subtotal };
+  };
+
+  const result = groups.map((g) => buildGroup(g.id, g.name, g.products));
+
+  // bucket "Tanpa Grup" — tampil saat tanpa filter grup, atau filter = __none__
+  if (!f.groupId || onlyNone) {
+    const ungrouped = await prisma.product.findMany({
+      where: { groupId: null },
+      orderBy: { name: "asc" },
+    });
+    if (ungrouped.length) result.push(buildGroup(NO_GROUP, "Tanpa Grup", ungrouped));
+  }
+
+  return result;
 }
 
 export async function getStores() {
   return prisma.store.findMany({ orderBy: { name: "asc" } });
+}
+
+export type LedgerRow = {
+  orderDate: Date;
+  buyerName: string;
+  marketplace: string;
+  storeName: string;
+  groupName: string; // brand / grup pembukuan (atau "Tanpa Grup")
+  sku: string; // kolom "Order" di format kakak
+  productName: string;
+  qty: number;
+  price: number;
+  fee: number; // ongkir/adm (fee proporsional per item)
+  total: number; // net per item (omzet - fee + subsidi ongkir)
+  modal: number; // HPP x qty (untuk hitung laba)
+};
+
+// Ledger per-order untuk sheet ledger per brand. Satu baris = satu item order.
+// Hanya order selesai (via orderWhere). Menghormati filter grup (brand).
+export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> {
+  const orders = await prisma.order.findMany({
+    where: orderWhere(f),
+    include: {
+      store: true,
+      items: { include: { product: { include: { group: true } } } },
+    },
+    orderBy: [{ orderDate: "asc" }, { createdAt: "asc" }],
+  });
+
+  const rows: LedgerRow[] = [];
+  for (const o of orders) {
+    const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
+    const shipPerItem = o.items.length ? o.shippingSubsidy / o.items.length : 0;
+    for (const it of o.items) {
+      const gId = it.product?.groupId ?? null;
+      // hormati filter grup
+      if (f.groupId === NO_GROUP) {
+        if (gId !== null) continue;
+      } else if (f.groupId) {
+        if (gId !== f.groupId) continue;
+      }
+      rows.push({
+        orderDate: o.orderDate,
+        buyerName: o.buyerName ?? "-",
+        marketplace: o.store.marketplace,
+        storeName: o.store.name,
+        groupName: it.product?.group?.name ?? "Tanpa Grup",
+        sku: it.product?.sku ?? it.marketplaceSku,
+        productName: it.productName,
+        qty: it.qty,
+        price: it.price,
+        fee: Math.round(feePerItem),
+        total: Math.round(it.subtotal - feePerItem + shipPerItem),
+        modal: (it.product?.hpp ?? 0) * it.qty,
+      });
+    }
+  }
+  return rows;
 }
 
 export async function getGroups() {

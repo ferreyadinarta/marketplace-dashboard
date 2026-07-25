@@ -103,6 +103,13 @@ async function main() {
   // supaya filter "bulan ini" / "N hari terakhir" selalu ada datanya.
   const now = new Date();
   now.setHours(0, 0, 0, 0);
+  // nama pembeli contoh (kolom "Data" di ledger)
+  const buyers = [
+    "nuri", "ewy", "ahmad", "fortune", "bss", "indri", "maria", "galen", "amina",
+    "lyaa", "cikkim", "meida", "dian", "faw", "julia", "yume", "danti", "rina",
+    "lille", "dapur", "seftia", "eter", "hanny", "putri", "wawan",
+  ];
+
   let orderCount = 0;
   for (let day = 0; day < 90; day++) {
     const date = new Date(now);
@@ -120,6 +127,7 @@ async function main() {
         const shipping = ((day + o) % 2) * 5000;
         const net = subtotal - fee + shipping;
         const status = day < 5 ? "SHIPPED" : "COMPLETED";
+        const buyerName = buyers[(day * 3 + o + store.name.length) % buyers.length];
 
         await prisma.order.create({
           data: {
@@ -127,6 +135,7 @@ async function main() {
             marketplaceOrderId: `${store.marketplace}-${day}-${o}`,
             orderDate: date,
             status,
+            buyerName,
             totalAmount: subtotal,
             marketplaceFee: fee,
             shippingSubsidy: shipping,
@@ -191,8 +200,47 @@ async function main() {
   });
   mappingCount += 2;
 
+  // Konsinyasi / titip jual — contoh: 1 toko titipan + beberapa penjualan.
+  const konsinyasiStore = await prisma.store.create({
+    data: { name: "Istana Buah SA", marketplace: "KONSINYASI", isActive: true },
+  });
+  let konsCount = 0;
+  for (let i = 0; i < 14; i++) {
+    const product = products[i % products.length];
+    const date = new Date(now);
+    date.setDate(date.getDate() - i * 2);
+    const qty = (i % 3) + 1;
+    const price = product.hpp * 2 + 10000;
+    const subtotal = price * qty;
+    const komisi = Math.round(subtotal * 0.1); // toko titipan ambil 10%
+    await prisma.order.create({
+      data: {
+        storeId: konsinyasiStore.id,
+        marketplaceOrderId: `KONS-SEED-${i}`,
+        orderDate: date,
+        status: "COMPLETED",
+        buyerName: buyers[i % buyers.length],
+        totalAmount: subtotal,
+        marketplaceFee: komisi,
+        shippingSubsidy: 0,
+        netAmount: subtotal - komisi,
+        items: {
+          create: {
+            productId: product.id,
+            marketplaceSku: product.sku,
+            productName: product.name,
+            qty,
+            price,
+            subtotal,
+          },
+        },
+      },
+    });
+    konsCount++;
+  }
+
   console.log(
-    `Seed selesai: ${stores.length} toko, ${products.length} product, ${orderCount} order, ${mappingCount} mapping SKU.`,
+    `Seed selesai: ${stores.length + 1} toko, ${products.length} product, ${orderCount} order, ${mappingCount} mapping SKU, ${konsCount} penjualan konsinyasi.`,
   );
 }
 

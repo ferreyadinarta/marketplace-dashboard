@@ -101,7 +101,17 @@ export function AddProductForm({
 // chip grup dengan tombol hapus + konfirmasi kecil
 function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  function toggle() {
+    if (!open && ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      // popover ~240px; kalau mepet kanan layar, rata-kanan biar tidak terpotong
+      setAlignRight(r.left + 240 > window.innerWidth - 8);
+    }
+    setOpen((o) => !o);
+  }
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -112,21 +122,25 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
   }, []);
 
   return (
-    <div ref={ref} className="relative inline-flex">
-      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-3 pr-1 text-xs font-medium text-indigo-700">
-        {group.name}
+    <div ref={ref} className="relative inline-flex max-w-full">
+      <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-indigo-50 py-0.5 pl-3 pr-1 text-xs font-medium text-indigo-700">
+        <span className="truncate">{group.name}</span>
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={toggle}
           aria-label={`Hapus grup ${group.name}`}
-          className="rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-red-600"
+          className="shrink-0 rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-red-600"
         >
           <X size={12} />
         </button>
       </span>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg">
-          <p className="text-xs leading-relaxed text-slate-600">
+        <div
+          className={`absolute top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg ${
+            alignRight ? "right-0" : "left-0"
+          }`}
+        >
+          <p className="text-xs leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
             Hapus grup <span className="font-semibold text-slate-800">{group.name}</span>? Product-nya
             jadi <span className="font-medium">tanpa grup</span> (tidak ikut terhapus).
           </p>

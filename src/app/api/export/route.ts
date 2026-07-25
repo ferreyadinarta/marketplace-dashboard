@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
-import { getPembukuanByGroup } from "@/lib/queries";
+import { getPembukuanByGroup, getOrdersDetail } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { prisma } from "@/lib/prisma";
 import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
@@ -14,6 +14,8 @@ const INT = "#,##0";
 
 const HEADER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
 const SUBTOTAL_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+// oranye ala sheet kakak untuk baris TOTAL / LABA
+const SUMMARY_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8A87C" } };
 const thin: Partial<ExcelJS.Borders> = {
   top: { style: "thin", color: { argb: "FFE2E8F0" } },
   bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
   const period = resolvePeriod(sp);
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
   const groups = await getPembukuanByGroup(filter);
+  const detailRows = await getOrdersDetail(filter);
 
   // label filter untuk sheet ringkasan
   const mpLabel = sp.marketplace ? MARKETPLACE_LABEL[sp.marketplace] ?? sp.marketplace : "Semua";
@@ -129,62 +132,129 @@ export async function GET(req: NextRequest) {
   totalRow.getCell(6).numFmt = CURRENCY_NEG;
   totalRow.getCell(7).numFmt = PERCENT;
 
-  // ---------- Sheet per grup ----------
+  // ---------- Satu sheet LEDGER per brand (grup) ----------
+  // Format ala kakak: setiap BULAN = tabel sendiri, disusun ke KANAN
+  // (bulan berikutnya di sebelah kanan), dipisah 4 kolom kosong.
+  // Kolom "Order" = SKU. Baris per tanggal, tanggal ditulis sekali per hari.
+  const monthLabel = (d: Date) =>
+    new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(d).toUpperCase();
+  const monthKeyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+
+  const rowsByGroup = new Map<string, typeof detailRows>();
+  for (const r of detailRows) {
+    const arr = rowsByGroup.get(r.groupName) ?? [];
+    arr.push(r);
+    rowsByGroup.set(r.groupName, arr);
+  }
+
+  const LEDGER_HEADERS = [
+    "No", "Tanggal", "Pembeli", "Marketplace", "Order (SKU)", "Qty", "Harga", "Ongkir/Adm", "Total",
+  ];
+  const LEDGER_WIDTHS = [6, 13, 16, 13, 20, 7, 14, 14, 16];
+  const COLS = 9;
+  const GAP = 4;
+  const BLOCK = COLS + GAP; // lebar 1 tabel bulan + jarak
+
   for (const g of groups) {
-    const ws = wb.addWorksheet(safeSheetName(g.groupName), { views: [{ state: "frozen", ySplit: 1 }] });
-    ws.columns = [
-      { header: "Product", key: "name", width: 34 },
-      { header: "SKU", key: "sku", width: 18 },
-      { header: "Terjual", key: "terjual", width: 10, style: { numFmt: INT } },
-      { header: "Omzet", key: "omzet", width: 16, style: { numFmt: CURRENCY } },
-      { header: "Fee", key: "fee", width: 14, style: { numFmt: CURRENCY } },
-      { header: "Modal (Total)", key: "modal", width: 16, style: { numFmt: CURRENCY } },
-      { header: "HPP/unit", key: "hpp", width: 14, style: { numFmt: CURRENCY } },
-      { header: "Profit Bersih", key: "profit", width: 16, style: { numFmt: CURRENCY_NEG } },
-      { header: "Margin", key: "margin", width: 10, style: { numFmt: PERCENT } },
-    ];
-
-    const head = ws.getRow(1);
-    head.eachCell((c) => {
-      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      c.fill = HEADER_FILL;
-      c.alignment = { vertical: "middle" };
-    });
-
-    for (const r of g.rows) {
-      const modal = r.hpp * r.terjual;
-      const margin = r.omzet ? r.profit / r.omzet : 0;
-      const row = ws.addRow({
-        name: r.name,
-        sku: r.sku,
-        terjual: r.terjual,
-        omzet: r.omzet,
-        fee: r.fee,
-        modal,
-        hpp: r.hpp,
-        profit: r.profit,
-        margin,
-      });
-      row.eachCell((c) => (c.border = thin));
+    const ws = wb.addWorksheet(safeSheetName(g.groupName));
+    const rows = rowsByGroup.get(g.groupName) ?? [];
+    if (rows.length === 0) {
+      ws.getCell(1, 1).value = "Belum ada penjualan (selesai) untuk filter ini.";
+      continue;
     }
 
-    const subModal = g.subtotal.omzet - g.subtotal.fee - g.subtotal.profit;
-    const subMargin = g.subtotal.omzet ? g.subtotal.profit / g.subtotal.omzet : 0;
-    const sub = ws.addRow({
-      name: `SUBTOTAL ${g.groupName}`,
-      sku: "",
-      terjual: g.subtotal.terjual,
-      omzet: g.subtotal.omzet,
-      fee: g.subtotal.fee,
-      modal: subModal,
-      hpp: "",
-      profit: g.subtotal.profit,
-      margin: subMargin,
-    });
-    sub.eachCell((c) => {
-      c.font = { bold: true };
-      c.fill = SUBTOTAL_FILL;
-      c.border = { top: { style: "thin", color: { argb: "FF94A3B8" } } };
+    // kelompokkan per bulan (urut kronologis) — rows sudah urut tanggal asc
+    const byMonth = new Map<string, typeof detailRows>();
+    for (const r of rows) {
+      const k = monthKeyOf(r.orderDate);
+      const arr = byMonth.get(k) ?? [];
+      arr.push(r);
+      byMonth.set(k, arr);
+    }
+    const monthKeys = [...byMonth.keys()].sort();
+
+    monthKeys.forEach((mk, mIdx) => {
+      const c0 = mIdx * BLOCK + 1; // kolom awal tabel bulan ini (1-based)
+      const monthRows = byMonth.get(mk)!;
+
+      // lebar kolom
+      for (let i = 0; i < COLS; i++) ws.getColumn(c0 + i).width = LEDGER_WIDTHS[i];
+
+      // baris 1: judul "SELLING <BULAN>" (merge selebar tabel)
+      ws.mergeCells(1, c0, 1, c0 + COLS - 1);
+      const title = ws.getCell(1, c0);
+      title.value = `SELLING ${monthLabel(monthRows[0].orderDate)}`;
+      title.font = { bold: true, size: 12, color: { argb: "FF4338CA" } };
+      title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF2FF" } };
+      title.alignment = { vertical: "middle" };
+
+      // baris 2: header kolom
+      LEDGER_HEADERS.forEach((h, i) => {
+        const cell = ws.getCell(2, c0 + i);
+        cell.value = h;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = HEADER_FILL;
+        cell.alignment = { vertical: "middle" };
+      });
+
+      // baris data mulai baris 3
+      let r = 3;
+      let no = 0;
+      let curDate = "";
+      let monthTotal = 0;
+      let monthModal = 0;
+      for (const row of monthRows) {
+        no += 1;
+        const dLabel = tanggal(row.orderDate);
+        const showDate = dLabel !== curDate ? dLabel : "";
+        curDate = dLabel;
+        // Konsinyasi: tampilkan nama toko titipan, bukan "Konsinyasi".
+        const channel =
+          row.marketplace === "KONSINYASI"
+            ? row.storeName
+            : MARKETPLACE_LABEL[row.marketplace] ?? row.marketplace;
+        const vals = [
+          no,
+          showDate,
+          row.buyerName,
+          channel,
+          row.sku,
+          row.qty,
+          row.price,
+          row.fee,
+          row.total,
+        ];
+        vals.forEach((v, i) => {
+          const cell = ws.getCell(r, c0 + i);
+          cell.value = v as string | number;
+          cell.border = thin;
+        });
+        ws.getCell(r, c0 + 5).numFmt = INT; // qty
+        ws.getCell(r, c0 + 6).numFmt = CURRENCY; // harga
+        ws.getCell(r, c0 + 7).numFmt = CURRENCY; // ongkir/adm
+        ws.getCell(r, c0 + 8).numFmt = CURRENCY_NEG; // total
+        monthTotal += row.total;
+        monthModal += row.modal;
+        r += 1;
+      }
+
+      // baris TOTAL (net penjualan) & LABA (profit setelah modal)
+      const summary: [string, number][] = [
+        ["TOTAL", monthTotal],
+        ["LABA", monthTotal - monthModal],
+      ];
+      for (const [label, value] of summary) {
+        const labelCell = ws.getCell(r, c0 + 7);
+        labelCell.value = label;
+        labelCell.font = { bold: true };
+        labelCell.fill = SUMMARY_FILL;
+        const valueCell = ws.getCell(r, c0 + 8);
+        valueCell.value = value;
+        valueCell.numFmt = CURRENCY_NEG;
+        valueCell.font = { bold: true };
+        valueCell.fill = SUMMARY_FILL;
+        r += 1;
+      }
     });
   }
 

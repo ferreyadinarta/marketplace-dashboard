@@ -14,8 +14,8 @@ export default async function PembukuanPage({
 }) {
   const sp = await searchParams;
 
-  // Periode aktif: bulan berjalan (default), rentang custom, atau semua data.
-  const period = resolvePeriod(sp);
+  // Periode aktif: default "Semua data"; bisa dipersempit ke rentang custom.
+  const period = resolvePeriod(sp, true);
   const def = currentMonthRange();
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
   const [groups, stores, groupList] = await Promise.all([

@@ -10,6 +10,7 @@ import {
   Package,
   Store,
   Link2,
+  Handshake,
   Menu,
   X,
   LogOut,
@@ -23,6 +24,7 @@ const groups = [
     items: [
       { href: "/", label: "Dashboard", desc: "Ringkasan & profit", icon: LayoutDashboard },
       { href: "/pembukuan", label: "Pembukuan", desc: "Per grup product", icon: BookOpen },
+      { href: "/konsinyasi", label: "Konsinyasi", desc: "Titip jual di toko lain", icon: Handshake },
       { href: "/rekonsiliasi", label: "Rekonsiliasi Dana", desc: "Cek dana cair", icon: Wallet },
     ],
   },

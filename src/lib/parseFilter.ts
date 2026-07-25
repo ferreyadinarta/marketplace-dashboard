@@ -22,12 +22,18 @@ export function parseFilter(sp: Record<string, string | string[] | undefined>): 
 // - ?all=1        → semua data (tanpa batas tanggal), tanpa pembanding.
 // - from/to ada   → pakai itu.
 // - keduanya kosong → default: bulan berjalan.
-export function resolvePeriod(sp: Record<string, string | string[] | undefined>): {
+export function resolvePeriod(
+  sp: Record<string, string | string[] | undefined>,
+  defaultAll = false
+): {
   isAll: boolean;
   from?: string;
   to?: string;
 } {
   if (one(sp.all) === "1") return { isAll: true };
+  const from = one(sp.from);
+  const to = one(sp.to);
+  if (!from && !to && defaultAll) return { isAll: true };
   const def = currentMonthRange();
-  return { isAll: false, from: one(sp.from) || def.from, to: one(sp.to) || def.to };
+  return { isAll: false, from: from || def.from, to: to || def.to };
 }

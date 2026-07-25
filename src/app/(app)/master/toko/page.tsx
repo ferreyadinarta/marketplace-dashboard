@@ -49,10 +49,11 @@ export default async function MasterTokoPage() {
       ) : (
         <div className="space-y-4">
           {stores.map((s) => {
+            const isKonsinyasi = s.marketplace === "KONSINYASI";
             const connected = !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
               <Card key={s.id} className="p-5">
-                <div className="mb-4 flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                       <StoreIcon size={18} />
@@ -63,24 +64,27 @@ export default async function MasterTokoPage() {
                         <Badge color={mpColor[s.marketplace] ?? "slate"}>
                           {MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace}
                         </Badge>
-                        <span className="text-xs text-slate-400">
-                          {s.lastSyncAt
-                            ? `Sync: ${tanggal(s.lastSyncAt)}`
-                            : "Belum pernah sync"}
-                        </span>
+                        {isKonsinyasi ? (
+                          <span className="text-xs text-slate-400">Input manual (tanpa API)</span>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            {s.lastSyncAt ? `Sync: ${tanggal(s.lastSyncAt)}` : "Belum pernah sync"}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {connected ? (
-                      <Badge color="green">
-                        <CheckCircle2 size={13} /> Terhubung
-                      </Badge>
-                    ) : (
-                      <Badge color="amber">
-                        <AlertCircle size={13} /> Belum terhubung
-                      </Badge>
-                    )}
+                    {!isKonsinyasi &&
+                      (connected ? (
+                        <Badge color="green">
+                          <CheckCircle2 size={13} /> Terhubung
+                        </Badge>
+                      ) : (
+                        <Badge color="amber">
+                          <AlertCircle size={13} /> Belum terhubung
+                        </Badge>
+                      ))}
                     <form action={deleteStore}>
                       <input type="hidden" name="id" value={s.id} />
                       <button className="text-xs font-medium text-red-500 hover:underline">
@@ -89,53 +93,49 @@ export default async function MasterTokoPage() {
                     </form>
                   </div>
                 </div>
-                <AdvancedApiSection connected={connected}>
-                  <form
-                    action={updateStoreCredentials}
-                    className="grid gap-3 sm:grid-cols-3"
-                  >
-                    <input type="hidden" name="id" value={s.id} />
-                    <Field label="API Key">
-                      <input
-                        name="apiKey"
-                        defaultValue={s.apiKey ?? ""}
-                        placeholder="dari developer marketplace"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="API Secret">
-                      <input
-                        name="apiSecret"
-                        defaultValue={s.apiSecret ?? ""}
-                        placeholder="rahasia, jangan dibagikan"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field
-                      label="Shop ID"
-                      hint="ID toko di sisi marketplace, biasanya angka."
-                    >
-                      <input
-                        name="shopIdApi"
-                        defaultValue={s.shopIdApi ?? ""}
-                        placeholder="ex: 1029384756"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <div className="flex items-center">
-                      <Checkbox
-                        name="isActive"
-                        defaultChecked={s.isActive}
-                        label="Toko aktif (ikut sync)"
-                      />
-                    </div>
-                    <div className="sm:col-span-2 sm:flex sm:justify-end">
-                      <SubmitButton variant="outline" pendingText="Menyimpan…">
-                        Simpan Kredensial
-                      </SubmitButton>
-                    </div>
-                  </form>
-                </AdvancedApiSection>
+
+                {/* Konsinyasi = manual, tidak perlu pengaturan API */}
+                {!isKonsinyasi && (
+                  <div>
+                    <AdvancedApiSection connected={connected}>
+                      <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">
+                        <input type="hidden" name="id" value={s.id} />
+                        <Field label="API Key">
+                          <input
+                            name="apiKey"
+                            defaultValue={s.apiKey ?? ""}
+                            placeholder="dari developer marketplace"
+                            className={inputClass}
+                          />
+                        </Field>
+                        <Field label="API Secret">
+                          <input
+                            name="apiSecret"
+                            defaultValue={s.apiSecret ?? ""}
+                            placeholder="rahasia, jangan dibagikan"
+                            className={inputClass}
+                          />
+                        </Field>
+                        <Field label="Shop ID" hint="ID toko di sisi marketplace, biasanya angka.">
+                          <input
+                            name="shopIdApi"
+                            defaultValue={s.shopIdApi ?? ""}
+                            placeholder="ex: 1029384756"
+                            className={inputClass}
+                          />
+                        </Field>
+                        <div className="flex items-center">
+                          <Checkbox name="isActive" defaultChecked={s.isActive} label="Toko aktif (ikut sync)" />
+                        </div>
+                        <div className="sm:col-span-2 sm:flex sm:justify-end">
+                          <SubmitButton variant="outline" pendingText="Menyimpan…">
+                            Simpan Kredensial
+                          </SubmitButton>
+                        </div>
+                      </form>
+                    </AdvancedApiSection>
+                  </div>
+                )}
               </Card>
             );
           })}

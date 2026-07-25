@@ -68,6 +68,7 @@ model Order {
   marketplaceOrderId String
   orderDate          DateTime
   status             String // PENDING | SHIPPED | COMPLETED | CANCELLED | RETURNED
+  buyerName          String? // username/nama pembeli (dari marketplace); kolom "Data" di ledger
   totalAmount        Int      @default(0) // total dibayar pembeli
   marketplaceFee     Int      @default(0) // total potongan fee marketplace
   shippingSubsidy    Int      @default(0)
