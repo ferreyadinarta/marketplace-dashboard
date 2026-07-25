@@ -14,6 +14,7 @@ export function parseFilter(sp: Record<string, string | string[] | undefined>): 
     to: to ? new Date(`${to}T23:59:59`) : undefined,
     marketplace: one(sp.marketplace) || undefined,
     storeId: one(sp.storeId) || undefined,
+    groupId: one(sp.groupId) || undefined,
   };
 }
 

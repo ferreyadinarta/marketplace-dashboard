@@ -6,13 +6,16 @@ import { Select } from "@/components/ui";
 import DateRangePicker from "@/components/DateRangePicker";
 
 type Store = { id: string; name: string; marketplace: string };
+type Group = { id: string; name: string };
 
 export default function PembukuanFilter({
   stores,
+  groups,
   initialFrom,
   initialTo,
 }: {
   stores: Store[];
+  groups: Group[];
   initialFrom: string;
   initialTo: string;
 }) {
@@ -65,6 +68,15 @@ export default function PembukuanFilter({
           options={[{ value: "", label: "Semua" }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
         />
       </label>
+      <label className="block">
+        <span className="mb-1 block text-xs font-medium text-slate-600">Grup / Brand</span>
+        <Select
+          className="min-w-44"
+          value={params.get("groupId") ?? ""}
+          onValueChange={(v) => update("groupId", v)}
+          options={[{ value: "", label: "Semua grup" }, ...groups.map((g) => ({ value: g.id, label: g.name }))]}
+        />
+      </label>
 
       {hasFilter && (
         <button
@@ -79,7 +91,7 @@ export default function PembukuanFilter({
         href={`/api/export?${qs}`}
         className="ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
       >
-        <Download size={16} /> Export ke Excel
+        <Download size={16} /> Export Excel
       </a>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Boxes } from "lucide-react";
-import { getPembukuanByGroup, getStores } from "@/lib/queries";
+import { getPembukuanByGroup, getStores, getGroups } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange } from "@/lib/format";
 import PembukuanFilter from "@/components/PembukuanFilter";
@@ -18,7 +18,11 @@ export default async function PembukuanPage({
   const period = resolvePeriod(sp);
   const def = currentMonthRange();
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
-  const [groups, stores] = await Promise.all([getPembukuanByGroup(filter), getStores()]);
+  const [groups, stores, groupList] = await Promise.all([
+    getPembukuanByGroup(filter),
+    getStores(),
+    getGroups(),
+  ]);
 
   const adaProduct = groups.some((g) => g.rows.length > 0);
   const totalProfit = groups.reduce((a, g) => a + g.subtotal.profit, 0);
@@ -31,7 +35,7 @@ export default async function PembukuanPage({
       />
 
       <Card className="p-5">
-        <PembukuanFilter stores={stores} initialFrom={def.from} initialTo={def.to} />
+        <PembukuanFilter stores={stores} groups={groupList} initialFrom={def.from} initialTo={def.to} />
       </Card>
 
       {!adaProduct ? (

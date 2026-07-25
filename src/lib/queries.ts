@@ -5,6 +5,7 @@ export type DashboardFilter = {
   to?: Date;
   marketplace?: string; // SHOPEE | TIKTOK | TOKOPEDIA
   storeId?: string;
+  groupId?: string; // filter grup pembukuan (khusus halaman Pembukuan)
 };
 
 // bangun where clause order dari filter, hanya order tidak batal/retur
@@ -90,6 +91,7 @@ export async function getByMarketplace(f: DashboardFilter) {
 // pembukuan dikelompokkan per grup, tiap baris = product
 export async function getPembukuanByGroup(f: DashboardFilter) {
   const groups = await prisma.bookkeepingGroup.findMany({
+    where: f.groupId ? { id: f.groupId } : undefined,
     include: { products: true },
     orderBy: { name: "asc" },
   });
@@ -146,6 +148,10 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
 
 export async function getStores() {
   return prisma.store.findMany({ orderBy: { name: "asc" } });
+}
+
+export async function getGroups() {
+  return prisma.bookkeepingGroup.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 }
 
 // product terlaris (top N) berdasarkan profit dalam periode filter
