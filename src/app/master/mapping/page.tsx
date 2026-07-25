@@ -1,6 +1,8 @@
+import { Link2, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { MARKETPLACE_LABEL } from "@/lib/format";
 import { assignMapping } from "./actions";
+import { Card, CardHeader, PageHeader, Select, Badge, EmptyState } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -17,65 +19,81 @@ export default async function MappingPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Mapping SKU</h1>
-        <p className="text-sm text-slate-500">
-          Hubungkan SKU dari tiap marketplace ke product internal. SKU yang belum dipetakan tidak masuk pembukuan.
-        </p>
-      </div>
+      <PageHeader
+        title="Mapping SKU"
+        description="Satu product bisa punya SKU berbeda di tiap marketplace. Hubungkan tiap SKU ke product internal supaya penjualannya masuk pembukuan."
+      />
 
       {unmapped.length > 0 && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-800">
-          <strong>{unmapped.length} SKU belum ter-mapping.</strong> Petakan agar penjualannya masuk pembukuan.
+        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+          <AlertTriangle size={18} className="shrink-0 text-amber-500" />
+          <span>
+            <strong>{unmapped.length} SKU belum dipetakan.</strong> Penjualannya belum dihitung sampai dipetakan.
+          </span>
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <th className="px-5 py-2">Toko</th>
-              <th className="px-5 py-2">SKU Marketplace</th>
-              <th className="px-5 py-2">Nama di Marketplace</th>
-              <th className="px-5 py-2">Product Internal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mappings.map((m) => (
-              <tr key={m.id} className={`border-b border-slate-100 ${!m.productId ? "bg-amber-50/40" : ""}`}>
-                <td className="px-5 py-2">
-                  <span className="text-slate-500">{MARKETPLACE_LABEL[m.store.marketplace]}</span>
-                  <br />
-                  <span className="text-xs text-slate-400">{m.store.name}</span>
-                </td>
-                <td className="px-5 py-2 font-mono text-xs">{m.marketplaceSku}</td>
-                <td className="px-5 py-2 text-slate-600">{m.marketplaceProductName}</td>
-                <td className="px-5 py-2">
-                  <form action={assignMapping} className="flex items-center gap-2">
-                    <input type="hidden" name="mappingId" value={m.id} />
-                    <select name="productId" defaultValue={m.productId ?? ""} className="rounded-lg border border-slate-300 px-2 py-1 text-sm">
-                      <option value="">— Belum dipetakan —</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                      ))}
-                    </select>
-                    <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-100">
-                      Simpan
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-            {mappings.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-5 py-6 text-center text-slate-400">
-                  Belum ada SKU. Mapping terisi otomatis saat order pertama masuk dari sync.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={`SKU Marketplace (${mappings.length})`}
+          subtitle="Baris kuning = belum dipetakan."
+        />
+        {mappings.length === 0 ? (
+          <EmptyState
+            icon={<Link2 size={40} />}
+            title="Belum ada SKU"
+            description="Daftar SKU terisi otomatis saat order pertama masuk dari sync marketplace."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 font-medium">Toko</th>
+                  <th className="px-5 py-3 font-medium">SKU Marketplace</th>
+                  <th className="px-5 py-3 font-medium">Nama di Marketplace</th>
+                  <th className="px-5 py-3 font-medium">Product Internal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mappings.map((m) => (
+                  <tr
+                    key={m.id}
+                    className={`border-b border-slate-50 last:border-0 ${
+                      !m.productId ? "bg-amber-50/50" : "hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <td className="px-5 py-3">
+                      <Badge color="slate">{MARKETPLACE_LABEL[m.store.marketplace]}</Badge>
+                      <p className="mt-1 text-xs text-slate-400">{m.store.name}</p>
+                    </td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-600">{m.marketplaceSku}</td>
+                    <td className="px-5 py-3 text-slate-600">{m.marketplaceProductName}</td>
+                    <td className="px-5 py-3">
+                      <form action={assignMapping} className="flex items-center gap-2">
+                        <input type="hidden" name="mappingId" value={m.id} />
+                        <Select
+                          name="productId"
+                          defaultValue={m.productId ?? ""}
+                          placeholder="— Belum dipetakan —"
+                          className="min-w-52"
+                          options={[
+                            { value: "", label: "— Belum dipetakan —" },
+                            ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
+                          ]}
+                        />
+                        <button className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                          Simpan
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

@@ -46,12 +46,18 @@ export async function GET(req: NextRequest) {
   }
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  const stamp = filter.from || filter.to ? "-terfilter" : "";
+
+  // Nama file: Pembukuan_<marketplace>_<dari>_sd_<sampai>.xlsx
+  const from = sp.from ?? "";
+  const to = sp.to ?? "";
+  const mp = sp.marketplace ? `_${sp.marketplace.toLowerCase()}` : "";
+  const range = from && to ? `_${from}_sd_${to}` : from ? `_sejak_${from}` : "";
+  const filename = `Pembukuan${mp}${range}.xlsx`;
 
   return new Response(new Uint8Array(buf), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="pembukuan${stamp}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 }

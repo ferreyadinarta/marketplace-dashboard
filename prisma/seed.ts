@@ -12,32 +12,34 @@ async function main() {
   await prisma.bookkeepingGroup.deleteMany();
   await prisma.store.deleteMany();
 
-  // grup pembukuan
-  const skincare = await prisma.bookkeepingGroup.create({ data: { name: "Skincare" } });
-  const fashion = await prisma.bookkeepingGroup.create({ data: { name: "Fashion" } });
-  const aksesoris = await prisma.bookkeepingGroup.create({ data: { name: "Aksesoris" } });
+  // grup pembukuan — dikelompokkan per brand
+  const flimty = await prisma.bookkeepingGroup.create({ data: { name: "Flimty" } });
+  const hotto = await prisma.bookkeepingGroup.create({ data: { name: "Hotto" } });
+  const spencers = await prisma.bookkeepingGroup.create({ data: { name: "Spencers Lab" } });
 
-  // product + HPP
+  // product + HPP (contoh, angka bisa disesuaikan)
   const products = await Promise.all([
-    prisma.product.create({ data: { name: "Serum Vitamin C 20ml", sku: "SC-SERUM-VITC", hpp: 25000, groupId: skincare.id } }),
-    prisma.product.create({ data: { name: "Sunscreen SPF50 30ml", sku: "SC-SUNSCREEN", hpp: 32000, groupId: skincare.id } }),
-    prisma.product.create({ data: { name: "Kaos Polos Cotton Combed", sku: "FS-KAOS-COMBED", hpp: 35000, groupId: fashion.id } }),
-    prisma.product.create({ data: { name: "Hoodie Oversize", sku: "FS-HOODIE-OS", hpp: 78000, groupId: fashion.id } }),
-    prisma.product.create({ data: { name: "Tali Kacamata Rantai", sku: "AK-TALI-KCM", hpp: 8000, groupId: aksesoris.id } }),
+    prisma.product.create({ data: { name: "Flimty Fiber Blackcurrant", sku: "FLM-FIBER-BC", hpp: 95000, groupId: flimty.id } }),
+    prisma.product.create({ data: { name: "Flimty Fiber Mango", sku: "FLM-FIBER-MG", hpp: 95000, groupId: flimty.id } }),
+    prisma.product.create({ data: { name: "Hotto Purto Multigrain", sku: "HTT-PURTO", hpp: 155000, groupId: hotto.id } }),
+    prisma.product.create({ data: { name: "Hotto Malt Choco", sku: "HTT-MALT", hpp: 150000, groupId: hotto.id } }),
+    prisma.product.create({ data: { name: "Spencers Lab Gluta Drink", sku: "SPL-GLUTA", hpp: 120000, groupId: spencers.id } }),
   ]);
 
-  // toko per marketplace
+  // toko per marketplace — nama toko konsisten antar platform
   const stores = await Promise.all([
-    prisma.store.create({ data: { name: "Toko Utama Shopee", marketplace: "SHOPEE", isActive: true } }),
-    prisma.store.create({ data: { name: "Toko Utama TikTok", marketplace: "TIKTOK", isActive: true } }),
-    prisma.store.create({ data: { name: "Toko Utama Tokopedia", marketplace: "TOKOPEDIA", isActive: true } }),
+    prisma.store.create({ data: { name: "Sehat Alami — Shopee", marketplace: "SHOPEE", isActive: true } }),
+    prisma.store.create({ data: { name: "Sehat Alami — TikTok", marketplace: "TIKTOK", isActive: true } }),
+    prisma.store.create({ data: { name: "Sehat Alami — Tokopedia", marketplace: "TOKOPEDIA", isActive: true } }),
   ]);
 
   // fee rate per marketplace (kira-kira, buat contoh)
   const feeRate: Record<string, number> = { SHOPEE: 0.08, TIKTOK: 0.06, TOKOPEDIA: 0.07 };
 
-  // generate order 90 hari terakhir
-  const now = new Date("2026-07-25T00:00:00Z");
+  // generate order 90 hari terakhir — relatif ke tanggal nyata sekarang,
+  // supaya filter "bulan ini" / "N hari terakhir" selalu ada datanya.
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
   let orderCount = 0;
   for (let day = 0; day < 90; day++) {
     const date = new Date(now);
@@ -83,7 +85,48 @@ async function main() {
     }
   }
 
-  console.log(`Seed selesai: ${stores.length} toko, ${products.length} product, ${orderCount} order.`);
+  // Mapping SKU marketplace → product internal.
+  // Di dunia nyata baris ini terisi otomatis saat order sync; di seed kita
+  // buat manual biar halaman Mapping SKU ada isinya untuk demo.
+  const mpPrefix: Record<string, string> = { SHOPEE: "SHP", TIKTOK: "TT", TOKOPEDIA: "TKP" };
+  let mappingCount = 0;
+  for (const store of stores) {
+    const pfx = mpPrefix[store.marketplace];
+    for (const p of products) {
+      await prisma.productMapping.create({
+        data: {
+          storeId: store.id,
+          marketplaceSku: `${pfx}-${p.sku}`,
+          marketplaceProductName: p.name,
+          productId: p.id,
+        },
+      });
+      mappingCount++;
+    }
+  }
+
+  // 2 SKU sengaja belum dipetakan → contoh product baru yang perlu di-mapping.
+  await prisma.productMapping.create({
+    data: {
+      storeId: stores[0].id,
+      marketplaceSku: "SHP-BUNDLE-PROMO",
+      marketplaceProductName: "Paket Bundle Flimty + Hotto (baru)",
+      productId: null,
+    },
+  });
+  await prisma.productMapping.create({
+    data: {
+      storeId: stores[1].id,
+      marketplaceSku: "TT-VARIAN-2026",
+      marketplaceProductName: "Hotto Malt Varian Baru",
+      productId: null,
+    },
+  });
+  mappingCount += 2;
+
+  console.log(
+    `Seed selesai: ${stores.length} toko, ${products.length} product, ${orderCount} order, ${mappingCount} mapping SKU.`
+  );
 }
 
 main()

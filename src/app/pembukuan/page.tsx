@@ -1,7 +1,9 @@
+import { Boxes } from "lucide-react";
 import { getPembukuanByGroup, getStores } from "@/lib/queries";
 import { parseFilter } from "@/lib/parseFilter";
-import { rupiah } from "@/lib/format";
+import { rupiah, currentMonthRange } from "@/lib/format";
 import PembukuanFilter from "@/components/PembukuanFilter";
+import { Card, PageHeader, EmptyState, LinkButton, HelpHint } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -11,75 +13,112 @@ export default async function PembukuanPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const filter = parseFilter(sp);
+
+  // Default rentang: awal bulan → hari ini, kecuali user set sendiri.
+  const def = currentMonthRange();
+  const rawFrom = Array.isArray(sp.from) ? sp.from[0] : sp.from;
+  const rawTo = Array.isArray(sp.to) ? sp.to[0] : sp.to;
+  const effFrom = rawFrom || def.from;
+  const effTo = rawTo || def.to;
+
+  const filter = parseFilter({ ...sp, from: effFrom, to: effTo });
   const [groups, stores] = await Promise.all([getPembukuanByGroup(filter), getStores()]);
+
+  const adaProduct = groups.some((g) => g.rows.length > 0);
+  const totalProfit = groups.reduce((a, g) => a + g.subtotal.profit, 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Pembukuan</h1>
-        <p className="text-sm text-slate-500">Product dikelompokkan per grup. Filter & export sesuai kebutuhan.</p>
-      </div>
+      <PageHeader
+        title="Pembukuan"
+        description="Penjualan tiap product dikelompokkan per grup. Atur rentang tanggal & marketplace, lalu export ke Excel."
+      />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <PembukuanFilter stores={stores} />
-      </div>
+      <Card className="p-5">
+        <PembukuanFilter stores={stores} initialFrom={effFrom} initialTo={effTo} />
+      </Card>
 
-      {groups.map((g) => (
-        <div key={g.groupId} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
-            <h2 className="font-semibold">{g.groupName}</h2>
-            <span className="text-sm text-slate-500">
-              Profit grup: <span className="font-semibold text-emerald-600">{rupiah(g.subtotal.profit)}</span>
-            </span>
+      {!adaProduct ? (
+        <Card>
+          <EmptyState
+            icon={<Boxes size={40} />}
+            title="Belum ada product untuk dibukukan"
+            description="Tambahkan product beserta HPP dan kelompokkan ke grup pembukuan dulu."
+            action={<LinkButton href="/master/product">Ke Master Product</LinkButton>}
+          />
+        </Card>
+      ) : (
+        <>
+          {/* ringkas total */}
+          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <span className="text-sm text-slate-500">Total profit bersih (sesuai filter)</span>
+            <span className="text-xl font-bold text-emerald-600">{rupiah(totalProfit)}</span>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                <th className="px-5 py-2">Product</th>
-                <th className="px-5 py-2">SKU</th>
-                <th className="px-5 py-2 text-right">Terjual</th>
-                <th className="px-5 py-2 text-right">Omzet</th>
-                <th className="px-5 py-2 text-right">Fee</th>
-                <th className="px-5 py-2 text-right">HPP/unit</th>
-                <th className="px-5 py-2 text-right">Profit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {g.rows.map((r) => (
-                <tr key={r.productId} className="border-b border-slate-100">
-                  <td className="px-5 py-2 font-medium">{r.name}</td>
-                  <td className="px-5 py-2 text-slate-500">{r.sku}</td>
-                  <td className="px-5 py-2 text-right">{r.terjual}</td>
-                  <td className="px-5 py-2 text-right">{rupiah(r.omzet)}</td>
-                  <td className="px-5 py-2 text-right text-red-500">{rupiah(r.fee)}</td>
-                  <td className="px-5 py-2 text-right text-slate-500">{rupiah(r.hpp)}</td>
-                  <td className="px-5 py-2 text-right font-semibold text-emerald-600">{rupiah(r.profit)}</td>
-                </tr>
-              ))}
-              {g.rows.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-4 text-center text-slate-400">
-                    Belum ada product di grup ini
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-50 font-semibold">
-                <td className="px-5 py-2" colSpan={2}>
-                  Subtotal {g.groupName}
-                </td>
-                <td className="px-5 py-2 text-right">{g.subtotal.terjual}</td>
-                <td className="px-5 py-2 text-right">{rupiah(g.subtotal.omzet)}</td>
-                <td className="px-5 py-2 text-right text-red-500">{rupiah(g.subtotal.fee)}</td>
-                <td className="px-5 py-2"></td>
-                <td className="px-5 py-2 text-right text-emerald-600">{rupiah(g.subtotal.profit)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      ))}
+
+          {groups.map((g) => (
+            <Card key={g.groupId} className="overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+                <h2 className="font-semibold text-slate-900">{g.groupName}</h2>
+                <span className="text-sm text-slate-500">
+                  Profit:{" "}
+                  <span className="font-semibold text-emerald-600">{rupiah(g.subtotal.profit)}</span>
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-2.5 font-medium">Product</th>
+                      <th className="px-5 py-2.5 font-medium">SKU</th>
+                      <th className="px-5 py-2.5 text-right font-medium">Terjual</th>
+                      <th className="px-5 py-2.5 text-right font-medium">Omzet</th>
+                      <th className="px-5 py-2.5 text-right font-medium">
+                        Fee<HelpHint text="Potongan marketplace, dibagi rata per item dalam order." />
+                      </th>
+                      <th className="px-5 py-2.5 text-right font-medium">
+                        HPP/unit<HelpHint text="Modal per satu unit product." />
+                      </th>
+                      <th className="px-5 py-2.5 text-right font-medium">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.rows.map((r) => (
+                      <tr key={r.productId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                        <td className="px-5 py-2.5 font-medium text-slate-900">{r.name}</td>
+                        <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.sku}</td>
+                        <td className="px-5 py-2.5 text-right text-slate-600">{r.terjual}</td>
+                        <td className="px-5 py-2.5 text-right text-slate-600">{rupiah(r.omzet)}</td>
+                        <td className="px-5 py-2.5 text-right text-red-500">{rupiah(r.fee)}</td>
+                        <td className="px-5 py-2.5 text-right text-slate-400">{rupiah(r.hpp)}</td>
+                        <td className="px-5 py-2.5 text-right font-semibold text-emerald-600">{rupiah(r.profit)}</td>
+                      </tr>
+                    ))}
+                    {g.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
+                          Belum ada product di grup ini
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 text-sm font-semibold text-slate-700">
+                      <td className="px-5 py-2.5" colSpan={2}>
+                        Subtotal {g.groupName}
+                      </td>
+                      <td className="px-5 py-2.5 text-right">{g.subtotal.terjual}</td>
+                      <td className="px-5 py-2.5 text-right">{rupiah(g.subtotal.omzet)}</td>
+                      <td className="px-5 py-2.5 text-right text-red-500">{rupiah(g.subtotal.fee)}</td>
+                      <td className="px-5 py-2.5"></td>
+                      <td className="px-5 py-2.5 text-right text-emerald-600">{rupiah(g.subtotal.profit)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card>
+          ))}
+        </>
+      )}
     </div>
   );
 }

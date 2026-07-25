@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
+import { APP_ENV } from "@/lib/config";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,40 +8,17 @@ export const metadata: Metadata = {
   description: "Pembukuan terpadu Shopee, TikTok Shop, Tokopedia",
 };
 
-const nav = [
-  { href: "/", label: "Dashboard" },
-  { href: "/pembukuan", label: "Pembukuan" },
-  { href: "/rekonsiliasi", label: "Rekonsiliasi Dana" },
-  { href: "/master/product", label: "Master Product" },
-  { href: "/master/toko", label: "Master Toko" },
-  { href: "/master/mapping", label: "Mapping SKU" },
-];
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id">
-      <body className="bg-slate-50 text-slate-900 antialiased">
-        <div className="flex min-h-screen">
-          <aside className="w-60 shrink-0 border-r border-slate-200 bg-white">
-            <div className="px-5 py-5 border-b border-slate-200">
-              <h1 className="text-lg font-bold">Marketplace</h1>
-              <p className="text-xs text-slate-500">Pembukuan Terpadu</p>
-            </div>
-            <nav className="p-3 space-y-1">
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="block rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </aside>
-          <main className="flex-1 p-8 max-w-[1400px]">{children}</main>
+      <body>
+        <Sidebar env={APP_ENV} />
+        <div className="lg:pl-64">
+          <main className="mx-auto max-w-[1400px] px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8">
+            {children}
+          </main>
         </div>
       </body>
     </html>
