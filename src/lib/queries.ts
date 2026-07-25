@@ -147,3 +147,39 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
 export async function getStores() {
   return prisma.store.findMany({ orderBy: { name: "asc" } });
 }
+
+// product terlaris (top N) berdasarkan profit dalam periode filter
+export async function getBestSellers(f: DashboardFilter, limit = 5) {
+  const orders = await prisma.order.findMany({
+    where: orderWhere(f),
+    include: { items: { include: { product: true } } },
+  });
+
+  type Row = { productId: string; name: string; sku: string; qty: number; omzet: number; profit: number };
+  const map = new Map<string, Row>();
+  for (const o of orders) {
+    const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
+    for (const it of o.items) {
+      if (!it.productId || !it.product) continue;
+      const r =
+        map.get(it.productId) ??
+        { productId: it.productId, name: it.product.name, sku: it.product.sku, qty: 0, omzet: 0, profit: 0 };
+      r.qty += it.qty;
+      r.omzet += it.subtotal;
+      r.profit += it.subtotal - feePerItem - it.product.hpp * it.qty;
+      map.set(it.productId, r);
+    }
+  }
+  return Array.from(map.values())
+    .map((r) => ({ ...r, profit: Math.round(r.profit) }))
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, limit);
+}
+
+// hitung periode sebelumnya dengan panjang sama, tepat sebelum [from, to]
+export function previousPeriod(from: Date, to: Date): { from: Date; to: Date } {
+  const span = to.getTime() - from.getTime();
+  const prevTo = new Date(from.getTime() - 1);
+  const prevFrom = new Date(prevTo.getTime() - span);
+  return { from: prevFrom, to: prevTo };
+}

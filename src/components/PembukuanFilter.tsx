@@ -26,10 +26,13 @@ export default function PembukuanFilter({
     router.push(`/pembukuan?${next.toString()}`);
   }
 
-  // export ikut rentang efektif (default bulan ini kalau user belum pilih)
+  // export ikut rentang efektif (default bulan ini; atau semua data bila all=1)
+  const isAll = params.get("all") === "1";
   const exportParams = new URLSearchParams(params.toString());
-  if (!exportParams.get("from")) exportParams.set("from", initialFrom);
-  if (!exportParams.get("to")) exportParams.set("to", initialTo);
+  if (!isAll) {
+    if (!exportParams.get("from")) exportParams.set("from", initialFrom);
+    if (!exportParams.get("to")) exportParams.set("to", initialTo);
+  }
   const qs = exportParams.toString();
   const hasFilter = params.toString().length > 0;
 

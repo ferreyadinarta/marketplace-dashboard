@@ -1,11 +1,11 @@
-import Link from "next/link";
-import { Package, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Package, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { createProduct, updateProduct, deleteProduct, createGroup } from "./actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
 import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
 import { ProductRow } from "@/components/EditableRows";
+import { Pagination, PaginationControls } from "@/components/Pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +79,12 @@ export default async function MasterProductPage({
         <CardHeader
           title={`Daftar Product (${total})`}
           subtitle="Edit HPP atau grup langsung di baris, lalu klik Update."
-          action={<ProductSearch defaultValue={q} />}
+          action={
+            <div className="flex items-center gap-2">
+              <ProductSearch defaultValue={q} />
+              <PaginationControls page={page} totalPages={totalPages} hrefFor={pageHref} />
+            </div>
+          }
         />
         {products.length === 0 ? (
           q ? (
@@ -131,43 +136,15 @@ export default async function MasterProductPage({
           </div>
         )}
 
-        {/* pagination */}
-        {total > 0 && (
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm sm:flex-row">
-            <span className="text-slate-500">
-              Menampilkan {from}–{to} dari {total} product
-            </span>
-            <div className="flex items-center gap-1">
-              {page > 1 ? (
-                <Link
-                  href={pageHref(page - 1)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <ChevronLeft size={15} /> Sebelumnya
-                </Link>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-300">
-                  <ChevronLeft size={15} /> Sebelumnya
-                </span>
-              )}
-              <span className="px-3 text-slate-500">
-                Halaman {page} / {totalPages}
-              </span>
-              {page < totalPages ? (
-                <Link
-                  href={pageHref(page + 1)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Berikutnya <ChevronRight size={15} />
-                </Link>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-300">
-                  Berikutnya <ChevronRight size={15} />
-                </span>
-              )}
-            </div>
-          </div>
-        )}
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          from={from}
+          to={to}
+          hrefFor={pageHref}
+          unit="product"
+        />
       </Card>
     </div>
   );

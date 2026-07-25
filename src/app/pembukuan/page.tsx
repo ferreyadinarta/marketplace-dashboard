@@ -1,6 +1,6 @@
 import { Boxes } from "lucide-react";
 import { getPembukuanByGroup, getStores } from "@/lib/queries";
-import { parseFilter } from "@/lib/parseFilter";
+import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange } from "@/lib/format";
 import PembukuanFilter from "@/components/PembukuanFilter";
 import { Card, PageHeader, EmptyState, LinkButton, HelpHint } from "@/components/ui";
@@ -14,14 +14,10 @@ export default async function PembukuanPage({
 }) {
   const sp = await searchParams;
 
-  // Default rentang: awal bulan → hari ini, kecuali user set sendiri.
+  // Periode aktif: bulan berjalan (default), rentang custom, atau semua data.
+  const period = resolvePeriod(sp);
   const def = currentMonthRange();
-  const rawFrom = Array.isArray(sp.from) ? sp.from[0] : sp.from;
-  const rawTo = Array.isArray(sp.to) ? sp.to[0] : sp.to;
-  const effFrom = rawFrom || def.from;
-  const effTo = rawTo || def.to;
-
-  const filter = parseFilter({ ...sp, from: effFrom, to: effTo });
+  const filter = parseFilter({ ...sp, from: period.from, to: period.to });
   const [groups, stores] = await Promise.all([getPembukuanByGroup(filter), getStores()]);
 
   const adaProduct = groups.some((g) => g.rows.length > 0);
@@ -35,7 +31,7 @@ export default async function PembukuanPage({
       />
 
       <Card className="p-5">
-        <PembukuanFilter stores={stores} initialFrom={effFrom} initialTo={effTo} />
+        <PembukuanFilter stores={stores} initialFrom={def.from} initialTo={def.to} />
       </Card>
 
       {!adaProduct ? (

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { rupiah } from "@/lib/format";
 import { HelpHint } from "@/components/ui";
 
@@ -17,6 +18,8 @@ export default function StatCard({
   accent = "blue",
   hint,
   help,
+  deltaPct,
+  deltaGoodWhenUp = true,
 }: {
   label: string;
   value: number;
@@ -25,8 +28,16 @@ export default function StatCard({
   accent?: keyof typeof accents;
   hint?: string;
   help?: string;
+  deltaPct?: number | null; // % perubahan vs periode sebelumnya (null = tak ada pembanding)
+  deltaGoodWhenUp?: boolean; // naik = bagus? (profit ya, fee tidak)
 }) {
   const a = accents[accent];
+
+  const hasDelta = deltaPct !== undefined && deltaPct !== null && Number.isFinite(deltaPct);
+  const up = hasDelta && (deltaPct as number) >= 0;
+  const good = hasDelta && (up ? deltaGoodWhenUp : !deltaGoodWhenUp);
+  const deltaColor = good ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50";
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
@@ -41,7 +52,15 @@ export default function StatCard({
       <p className={`mt-3 text-2xl font-bold tracking-tight ${a.value}`}>
         {isCurrency ? rupiah(value) : value.toLocaleString("id-ID")}
       </p>
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+      <div className="mt-1.5 flex items-center gap-2">
+        {hasDelta && (
+          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${deltaColor}`}>
+            {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+            {Math.abs(deltaPct as number).toFixed(1)}%
+          </span>
+        )}
+        {hint && <span className="text-xs text-slate-400">{hint}</span>}
+      </div>
     </div>
   );
 }

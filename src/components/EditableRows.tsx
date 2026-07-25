@@ -85,20 +85,20 @@ export function MappingRow({
   const dirty = value !== initialProductId;
 
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form action={action} className="flex w-full items-center gap-2">
       <input type="hidden" name="mappingId" value={mappingId} />
       <Select
         name="productId"
         value={value}
         onValueChange={setValue}
         placeholder="— Belum dipetakan —"
-        className="min-w-52"
+        className="w-64"
         options={options}
       />
       <SubmitButton
         variant={dirty ? "primary" : "outline"}
         disabled={!dirty}
-        className={`shrink-0 px-3 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : ""}`}
+        className={`ml-auto w-24 shrink-0 justify-center px-3 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : ""}`}
         pendingText="…"
       >
         {dirty ? "Simpan" : "Tersimpan"}
