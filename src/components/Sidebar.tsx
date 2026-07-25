@@ -12,8 +12,10 @@ import {
   Link2,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { Logo } from "@/components/ui";
+import { logout } from "@/app/login/actions";
 
 const groups = [
   {
@@ -104,9 +106,19 @@ export default function Sidebar({ env }: { env: string }) {
         ))}
       </nav>
 
-      <div className="border-t border-slate-100 px-5 py-4">
-        <p className="text-xs font-medium text-slate-500">Pembukuan Marketplace</p>
-        <p className="text-[11px] text-slate-400">Shopee · TikTok · Tokopedia</p>
+      <div className="space-y-3 border-t border-slate-100 px-5 py-4">
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          >
+            <LogOut size={16} className="text-slate-400" /> Keluar
+          </button>
+        </form>
+        <div>
+          <p className="text-xs font-medium text-slate-500">Pembukuan Marketplace</p>
+          <p className="text-[11px] text-slate-400">Shopee · TikTok · Tokopedia</p>
+        </div>
       </div>
     </>
   );
