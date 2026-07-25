@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# izinkan template env di-commit
+!.env.production.example
+
+# database SQLite (jangan commit data)
+*.db
+*.db-journal
+prisma/dev.db
+prisma/prod.db
