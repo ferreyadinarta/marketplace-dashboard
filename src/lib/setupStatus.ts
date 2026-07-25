@@ -11,9 +11,15 @@ export async function getSetupStatus() {
       prisma.productMapping.count({ where: { productId: null } }),
     ]);
 
-  // Langkah yang tampil ke user hanya yang halamannya ada di menu.
-  // Setup toko & API marketplace ditangani manual (halaman Master Toko disembunyikan).
+  // Langkah setup sekali-jalan sebelum pembukuan berfungsi.
   const steps = [
+    {
+      key: "toko",
+      done: storeCount > 0,
+      title: "Tambah toko",
+      desc: "Daftarkan toko & marketplace tempat kakak jualan.",
+      href: "/master/toko",
+    },
     {
       key: "grup",
       done: groupCount > 0,
@@ -28,13 +34,9 @@ export async function getSetupStatus() {
       desc: "Masukkan product dan modal (HPP) tiap product untuk hitung profit.",
       href: "/master/product",
     },
-    {
-      key: "mapping",
-      done: unmappedCount === 0 && productCount > 0,
-      title: "Petakan SKU marketplace",
-      desc: "Samakan SKU dari tiap marketplace ke product internal.",
-      href: "/master/mapping",
-    },
+    // Catatan: mapping SKU TIDAK dimasukkan sebagai langkah setup — itu tugas
+    // berulang (SKU baru bisa muncul kapan saja), sudah ditangani banner
+    // "X SKU belum dipetakan" di dashboard. Menaruhnya di sini = redundan.
   ];
 
   const doneCount = steps.filter((s) => s.done).length;

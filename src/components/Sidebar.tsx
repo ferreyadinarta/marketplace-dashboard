@@ -105,7 +105,8 @@ export default function Sidebar({ env }: { env: string }) {
       </nav>
 
       <div className="border-t border-slate-100 px-5 py-4">
-        <p className="text-xs text-slate-400">Butuh bantuan? Lihat SETUP.md</p>
+        <p className="text-xs font-medium text-slate-500">Pembukuan Marketplace</p>
+        <p className="text-[11px] text-slate-400">Shopee · TikTok · Tokopedia</p>
       </div>
     </>
   );
