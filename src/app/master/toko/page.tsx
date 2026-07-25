@@ -1,8 +1,10 @@
-import { Plus, Store as StoreIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { Store as StoreIcon, CheckCircle2, AlertCircle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
-import { Card, CardHeader, PageHeader, Button, Field, inputClass, Select, Checkbox, Badge, EmptyState } from "@/components/ui";
+import { Card, CardHeader, PageHeader, Field, inputClass, Checkbox, Badge, EmptyState } from "@/components/ui";
+import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,31 +21,12 @@ export default async function MasterTokoPage() {
     <div className="space-y-6">
       <PageHeader
         title="Master Toko"
-        description="Daftarkan tiap toko dan isi kredensial API-nya. Kredensial dipakai untuk menarik order otomatis."
+        description="Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko."
       />
 
       <Card>
         <CardHeader title="Tambah Toko" />
-        <form action={createStore} className="flex flex-wrap items-end gap-4 p-5">
-          <Field label="Nama toko">
-            <input name="name" placeholder="mis. Toko Utama Shopee" required className={inputClass} />
-          </Field>
-          <Field label="Marketplace">
-            <Select
-              name="marketplace"
-              defaultValue="SHOPEE"
-              className="min-w-44"
-              options={[
-                { value: "SHOPEE", label: "Shopee" },
-                { value: "TIKTOK", label: "TikTok Shop" },
-                { value: "TOKOPEDIA", label: "Tokopedia" },
-              ]}
-            />
-          </Field>
-          <Button variant="primary">
-            <Plus size={16} /> Tambah Toko
-          </Button>
-        </form>
+        <AddStoreForm action={createStore} />
       </Card>
 
       {stores.length === 0 ? (
@@ -93,24 +76,28 @@ export default async function MasterTokoPage() {
                     </form>
                   </div>
                 </div>
-                <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">
-                  <input type="hidden" name="id" value={s.id} />
-                  <Field label="API Key">
-                    <input name="apiKey" defaultValue={s.apiKey ?? ""} placeholder="dari developer marketplace" className={inputClass} />
-                  </Field>
-                  <Field label="API Secret">
-                    <input name="apiSecret" defaultValue={s.apiSecret ?? ""} placeholder="rahasia, jangan dibagikan" className={inputClass} />
-                  </Field>
-                  <Field label="Shop ID" hint="ID toko di sisi marketplace, biasanya angka.">
-                    <input name="shopIdApi" defaultValue={s.shopIdApi ?? ""} placeholder="mis. 1029384756" className={inputClass} />
-                  </Field>
-                  <div className="flex items-center">
-                    <Checkbox name="isActive" defaultChecked={s.isActive} label="Toko aktif (ikut sync)" />
-                  </div>
-                  <div className="sm:col-span-2 sm:flex sm:justify-end">
-                    <Button variant="outline">Simpan Kredensial</Button>
-                  </div>
-                </form>
+                <AdvancedApiSection connected={connected}>
+                  <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">
+                    <input type="hidden" name="id" value={s.id} />
+                    <Field label="API Key">
+                      <input name="apiKey" defaultValue={s.apiKey ?? ""} placeholder="dari developer marketplace" className={inputClass} />
+                    </Field>
+                    <Field label="API Secret">
+                      <input name="apiSecret" defaultValue={s.apiSecret ?? ""} placeholder="rahasia, jangan dibagikan" className={inputClass} />
+                    </Field>
+                    <Field label="Shop ID" hint="ID toko di sisi marketplace, biasanya angka.">
+                      <input name="shopIdApi" defaultValue={s.shopIdApi ?? ""} placeholder="mis. 1029384756" className={inputClass} />
+                    </Field>
+                    <div className="flex items-center">
+                      <Checkbox name="isActive" defaultChecked={s.isActive} label="Toko aktif (ikut sync)" />
+                    </div>
+                    <div className="sm:col-span-2 sm:flex sm:justify-end">
+                      <SubmitButton variant="outline" pendingText="Menyimpan…">
+                        Simpan Kredensial
+                      </SubmitButton>
+                    </div>
+                  </form>
+                </AdvancedApiSection>
               </Card>
             );
           })}

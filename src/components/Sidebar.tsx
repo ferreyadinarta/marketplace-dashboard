@@ -8,6 +8,7 @@ import {
   BookOpen,
   Wallet,
   Package,
+  Store,
   Link2,
   Menu,
   X,
@@ -27,8 +28,8 @@ const groups = [
     label: "Pengaturan",
     items: [
       { href: "/master/product", label: "Master Product", desc: "Product, HPP, grup", icon: Package },
+      { href: "/master/toko", label: "Master Toko", desc: "Nama toko & marketplace", icon: Store },
       { href: "/master/mapping", label: "Mapping SKU", desc: "Samakan SKU", icon: Link2 },
-      // Master Toko sengaja disembunyikan dari menu (route tetap ada di /master/toko).
     ],
   },
 ];

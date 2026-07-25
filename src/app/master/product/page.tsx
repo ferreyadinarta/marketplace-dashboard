@@ -1,15 +1,57 @@
-import { Plus, FolderPlus, Package } from "lucide-react";
+import Link from "next/link";
+import { Package, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { createProduct, updateProduct, deleteProduct, createGroup } from "./actions";
-import { Card, CardHeader, PageHeader, Button, Field, inputClass, Select, Badge, EmptyState } from "@/components/ui";
+import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
+import { ProductSearch } from "@/components/ProductControls";
+import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
+import { ProductRow } from "@/components/EditableRows";
 
 export const dynamic = "force-dynamic";
 
-export default async function MasterProductPage() {
-  const [products, groups] = await Promise.all([
-    prisma.product.findMany({ include: { group: true }, orderBy: { name: "asc" } }),
+const PER_PAGE = 10;
+
+export default async function MasterProductPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q) ?? "";
+  const page = Math.max(1, parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page) ?? "1", 10) || 1);
+
+  const where = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" as const } },
+          { sku: { contains: q, mode: "insensitive" as const } },
+        ],
+      }
+    : {};
+
+  const [products, total, groups] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      include: { group: true },
+      orderBy: { name: "asc" },
+      skip: (page - 1) * PER_PAGE,
+      take: PER_PAGE,
+    }),
+    prisma.product.count({ where }),
     prisma.bookkeepingGroup.findMany({ orderBy: { name: "asc" } }),
   ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
+  const to = Math.min(page * PER_PAGE, total);
+
+  const pageHref = (p: number) => {
+    const s = new URLSearchParams();
+    if (q) s.set("q", q);
+    if (p > 1) s.set("page", String(p));
+    const qs = s.toString();
+    return `/master/product${qs ? `?${qs}` : ""}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -22,123 +64,108 @@ export default async function MasterProductPage() {
         {/* form tambah product */}
         <Card className="lg:col-span-2">
           <CardHeader title="Tambah Product" subtitle="SKU internal harus unik antar product." />
-          <form action={createProduct} className="grid gap-4 p-5 sm:grid-cols-2">
-            <Field label="Nama product">
-              <input name="name" placeholder="mis. Flimty Fiber Blackcurrant" required className={inputClass} />
-            </Field>
-            <Field label="SKU internal" hint="Kode unik product versi kamu sendiri, bukan SKU marketplace.">
-              <input name="sku" placeholder="mis. FLM-FIBER-BC" required className={inputClass} />
-            </Field>
-            <Field label="HPP / Modal (Rp)" hint="Harga Pokok Penjualan: modal untuk 1 unit product.">
-              <input name="hpp" type="number" min="0" placeholder="0" className={inputClass} />
-            </Field>
-            <Field label="Grup pembukuan">
-              <Select
-                name="groupId"
-                placeholder="— Tanpa grup —"
-                options={[
-                  { value: "", label: "— Tanpa grup —" },
-                  ...groups.map((g) => ({ value: g.id, label: g.name })),
-                ]}
-              />
-            </Field>
-            <div className="sm:col-span-2">
-              <Button variant="primary">
-                <Plus size={16} /> Simpan Product
-              </Button>
-            </div>
-          </form>
+          <AddProductForm groups={groups} action={createProduct} />
         </Card>
 
         {/* form tambah grup */}
-        <Card className="self-start">
+        <Card>
           <CardHeader title="Grup Pembukuan" subtitle="Kelompok untuk tabel pembukuan." />
-          <form action={createGroup} className="space-y-4 p-5">
-            <Field label="Nama grup">
-              <input name="name" placeholder="mis. Flimty" required className={inputClass} />
-            </Field>
-            <Button variant="outline">
-              <FolderPlus size={16} /> Tambah Grup
-            </Button>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {groups.length ? (
-                groups.map((g) => <Badge key={g.id} color="brand">{g.name}</Badge>)
-              ) : (
-                <span className="text-xs text-slate-400">Belum ada grup</span>
-              )}
-            </div>
-          </form>
+          <AddGroupForm groups={groups} action={createGroup} />
         </Card>
       </div>
 
       {/* tabel product */}
       <Card className="overflow-hidden">
-        <CardHeader title={`Daftar Product (${products.length})`} subtitle="Edit HPP atau grup langsung di baris, lalu klik Update." />
+        <CardHeader
+          title={`Daftar Product (${total})`}
+          subtitle="Edit HPP atau grup langsung di baris, lalu klik Update."
+          action={<ProductSearch defaultValue={q} />}
+        />
         {products.length === 0 ? (
-          <EmptyState
-            icon={<Package size={40} />}
-            title="Belum ada product"
-            description="Tambahkan product pertama lewat form di atas."
-          />
+          q ? (
+            <EmptyState
+              icon={<Search size={40} />}
+              title="Tidak ada product yang cocok"
+              description={`Tidak ditemukan product dengan kata kunci "${q}". Coba kata kunci lain.`}
+            />
+          ) : (
+            <EmptyState
+              icon={<Package size={40} />}
+              title="Belum ada product"
+              description="Tambahkan product pertama lewat form di atas."
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 font-medium">SKU</th>
-                  <th className="px-5 py-3 font-medium">Ubah HPP (Modal) &amp; Grup</th>
-                  <th className="px-5 py-3 text-right font-medium">Hapus</th>
+                  <th className="w-full px-5 py-3 font-medium">Product</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">SKU</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">Ubah HPP (Modal) &amp; Grup</th>
                 </tr>
               </thead>
               <tbody>
                 {products.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                     <td className="px-5 py-3 font-medium text-slate-900">{p.name}</td>
-                    <td className="px-5 py-3 font-mono text-xs text-slate-500">{p.sku}</td>
+                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-500">{p.sku}</td>
                     <td className="px-5 py-3">
-                      <form action={updateProduct} className="flex flex-wrap items-end gap-2">
-                        <input type="hidden" name="id" value={p.id} />
-                        <span className="flex flex-col">
-                          <span className="mb-1 text-[11px] font-medium text-slate-400">HPP (Rp)</span>
-                          <input
-                            name="hpp"
-                            type="number"
-                            min="0"
-                            defaultValue={p.hpp}
-                            className="h-9 w-32 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          />
-                        </span>
-                        <span className="flex flex-col">
-                          <span className="mb-1 text-[11px] font-medium text-slate-400">Grup</span>
-                          <Select
-                            name="groupId"
-                            defaultValue={p.groupId ?? ""}
-                            placeholder="— Tanpa grup —"
-                            className="h-9 min-w-40 py-0"
-                            options={[
-                              { value: "", label: "— Tanpa grup —" },
-                              ...groups.map((g) => ({ value: g.id, label: g.name })),
-                            ]}
-                          />
-                        </span>
-                        <button className="h-9 rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                          Update
-                        </button>
-                      </form>
-                    </td>
-                    <td className="px-5 py-3 text-right align-bottom">
-                      <form action={deleteProduct} className="inline">
-                        <input type="hidden" name="id" value={p.id} />
-                        <button className="rounded-lg px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50">
-                          Hapus
-                        </button>
-                      </form>
+                      <ProductRow
+                        id={p.id}
+                        name={p.name}
+                        hpp={p.hpp}
+                        groupId={p.groupId ?? ""}
+                        groupOptions={[
+                          { value: "", label: "— Tanpa grup —" },
+                          ...groups.map((g) => ({ value: g.id, label: g.name })),
+                        ]}
+                        updateAction={updateProduct}
+                        deleteAction={deleteProduct}
+                      />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* pagination */}
+        {total > 0 && (
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-sm sm:flex-row">
+            <span className="text-slate-500">
+              Menampilkan {from}–{to} dari {total} product
+            </span>
+            <div className="flex items-center gap-1">
+              {page > 1 ? (
+                <Link
+                  href={pageHref(page - 1)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <ChevronLeft size={15} /> Sebelumnya
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-300">
+                  <ChevronLeft size={15} /> Sebelumnya
+                </span>
+              )}
+              <span className="px-3 text-slate-500">
+                Halaman {page} / {totalPages}
+              </span>
+              {page < totalPages ? (
+                <Link
+                  href={pageHref(page + 1)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Berikutnya <ChevronRight size={15} />
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-300">
+                  Berikutnya <ChevronRight size={15} />
+                </span>
+              )}
+            </div>
           </div>
         )}
       </Card>

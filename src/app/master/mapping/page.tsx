@@ -2,7 +2,8 @@ import { Link2, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { MARKETPLACE_LABEL } from "@/lib/format";
 import { assignMapping } from "./actions";
-import { Card, CardHeader, PageHeader, Select, Badge, EmptyState } from "@/components/ui";
+import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
+import { MappingRow } from "@/components/EditableRows";
 
 export const dynamic = "force-dynamic";
 
@@ -70,22 +71,15 @@ export default async function MappingPage() {
                     <td className="px-5 py-3 font-mono text-xs text-slate-600">{m.marketplaceSku}</td>
                     <td className="px-5 py-3 text-slate-600">{m.marketplaceProductName}</td>
                     <td className="px-5 py-3">
-                      <form action={assignMapping} className="flex items-center gap-2">
-                        <input type="hidden" name="mappingId" value={m.id} />
-                        <Select
-                          name="productId"
-                          defaultValue={m.productId ?? ""}
-                          placeholder="— Belum dipetakan —"
-                          className="min-w-52"
-                          options={[
-                            { value: "", label: "— Belum dipetakan —" },
-                            ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
-                          ]}
-                        />
-                        <button className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
-                          Simpan
-                        </button>
-                      </form>
+                      <MappingRow
+                        mappingId={m.id}
+                        initialProductId={m.productId ?? ""}
+                        action={assignMapping}
+                        options={[
+                          { value: "", label: "— Belum dipetakan —" },
+                          ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
+                        ]}
+                      />
                     </td>
                   </tr>
                 ))}

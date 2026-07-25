@@ -39,6 +39,22 @@ select {
   transition-duration: 150ms;
 }
 
+/* pointer cursor untuk semua elemen yang bisa diklik */
+a[href],
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+select:not(:disabled),
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 /* scrollbar tipis */
 ::-webkit-scrollbar {
   width: 10px;

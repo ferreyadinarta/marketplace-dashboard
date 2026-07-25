@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { ShoppingBag, Check } from "lucide-react";
 
 export { Select, type SelectOption } from "./Select";
+import { HelpHint } from "./HelpHint";
+export { HelpHint };
 
 // ---------- Logo (brand mark) ----------
 export function Logo({ size = 40 }: { size?: number }) {
@@ -11,7 +13,7 @@ export function Logo({ size = 40 }: { size?: number }) {
       className="flex items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm"
       style={{ width: size, height: size }}
     >
-      <ShoppingBag size={size * 0.5} strokeWidth={2.2} />
+      <ShoppingBag size={Math.round(size * 0.62)} strokeWidth={2.4} />
     </div>
   );
 }
@@ -167,30 +169,18 @@ export function LinkButton({
   );
 }
 
-// ---------- Inline help / glossary tooltip ----------
-export function HelpHint({ text }: { text: string }) {
-  // Tooltip terbuka ke BAWAH agar tidak terpotong header tabel / tepi card
-  // yang punya overflow-hidden. right-0 menjaga tooltip tetap di dalam lebar.
-  return (
-    <span className="group relative ml-1 inline-flex cursor-help align-middle">
-      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-500">
-        ?
-      </span>
-      <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-56 rounded-lg bg-slate-900 px-3 py-2 text-xs font-normal normal-case leading-relaxed tracking-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-        {text}
-      </span>
-    </span>
-  );
-}
+// HelpHint di-import dari ./HelpHint (client, portal-based) dan dipakai Field.
 
 // ---------- Field wrapper for forms ----------
 export function Field({
   label,
   hint,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
+  error?: string;
   children: ReactNode;
 }) {
   return (
@@ -200,6 +190,7 @@ export function Field({
         {hint && <HelpHint text={hint} />}
       </span>
       {children}
+      {error && <span className="mt-1 block text-xs font-medium text-red-500">{error}</span>}
     </label>
   );
 }
@@ -207,6 +198,9 @@ export function Field({
 // appearance-none menghapus chrome bawaan OS (panah select, styling default).
 export const inputClass =
   "w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 [color-scheme:light]";
+
+// tambahan class saat field error
+export const inputErrorClass = "border-red-400 focus:border-red-500 focus:ring-red-100";
 
 // ---------- Custom Checkbox ----------
 export function Checkbox({

@@ -13,28 +13,91 @@ async function main() {
   await prisma.store.deleteMany();
 
   // grup pembukuan — dikelompokkan per brand
-  const flimty = await prisma.bookkeepingGroup.create({ data: { name: "Flimty" } });
-  const hotto = await prisma.bookkeepingGroup.create({ data: { name: "Hotto" } });
-  const spencers = await prisma.bookkeepingGroup.create({ data: { name: "Spencers Lab" } });
+  const flimty = await prisma.bookkeepingGroup.create({
+    data: { name: "Flimty" },
+  });
+  const hotto = await prisma.bookkeepingGroup.create({
+    data: { name: "Hotto" },
+  });
+  const spencers = await prisma.bookkeepingGroup.create({
+    data: { name: "Spencers Lab" },
+  });
 
   // product + HPP (contoh, angka bisa disesuaikan)
   const products = await Promise.all([
-    prisma.product.create({ data: { name: "Flimty Fiber Blackcurrant", sku: "FLM-FIBER-BC", hpp: 95000, groupId: flimty.id } }),
-    prisma.product.create({ data: { name: "Flimty Fiber Mango", sku: "FLM-FIBER-MG", hpp: 95000, groupId: flimty.id } }),
-    prisma.product.create({ data: { name: "Hotto Purto Multigrain", sku: "HTT-PURTO", hpp: 155000, groupId: hotto.id } }),
-    prisma.product.create({ data: { name: "Hotto Malt Choco", sku: "HTT-MALT", hpp: 150000, groupId: hotto.id } }),
-    prisma.product.create({ data: { name: "Spencers Lab Gluta Drink", sku: "SPL-GLUTA", hpp: 120000, groupId: spencers.id } }),
+    prisma.product.create({
+      data: {
+        name: "Flimty Fiber Blackcurrant",
+        sku: "FLM-FIBER-BC",
+        hpp: 95000,
+        groupId: flimty.id,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Flimty Fiber Mango",
+        sku: "FLM-FIBER-MG",
+        hpp: 95000,
+        groupId: flimty.id,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Hotto Purto Multigrain",
+        sku: "HTT-PURTO",
+        hpp: 155000,
+        groupId: hotto.id,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Hotto Malt Choco",
+        sku: "HTT-MALT",
+        hpp: 150000,
+        groupId: hotto.id,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        name: "Spencers Lab Gluta Drink",
+        sku: "SPL-GLUTA",
+        hpp: 120000,
+        groupId: spencers.id,
+      },
+    }),
   ]);
 
   // toko per marketplace — nama toko konsisten antar platform
   const stores = await Promise.all([
-    prisma.store.create({ data: { name: "Sehat Alami — Shopee", marketplace: "SHOPEE", isActive: true } }),
-    prisma.store.create({ data: { name: "Sehat Alami — TikTok", marketplace: "TIKTOK", isActive: true } }),
-    prisma.store.create({ data: { name: "Sehat Alami — Tokopedia", marketplace: "TOKOPEDIA", isActive: true } }),
+    prisma.store.create({
+      data: {
+        name: "Luxe Supplement Store — Shopee",
+        marketplace: "SHOPEE",
+        isActive: true,
+      },
+    }),
+    prisma.store.create({
+      data: {
+        name: "Luxe Supplement Store — TikTok",
+        marketplace: "TIKTOK",
+        isActive: true,
+      },
+    }),
+    prisma.store.create({
+      data: {
+        name: "Luxe Supplement Store — Tokopedia",
+        marketplace: "TOKOPEDIA",
+        isActive: true,
+      },
+    }),
   ]);
 
   // fee rate per marketplace (kira-kira, buat contoh)
-  const feeRate: Record<string, number> = { SHOPEE: 0.08, TIKTOK: 0.06, TOKOPEDIA: 0.07 };
+  const feeRate: Record<string, number> = {
+    SHOPEE: 0.08,
+    TIKTOK: 0.06,
+    TOKOPEDIA: 0.07,
+  };
 
   // generate order 90 hari terakhir — relatif ke tanggal nyata sekarang,
   // supaya filter "bulan ini" / "N hari terakhir" selalu ada datanya.
@@ -88,7 +151,11 @@ async function main() {
   // Mapping SKU marketplace → product internal.
   // Di dunia nyata baris ini terisi otomatis saat order sync; di seed kita
   // buat manual biar halaman Mapping SKU ada isinya untuk demo.
-  const mpPrefix: Record<string, string> = { SHOPEE: "SHP", TIKTOK: "TT", TOKOPEDIA: "TKP" };
+  const mpPrefix: Record<string, string> = {
+    SHOPEE: "SHP",
+    TIKTOK: "TT",
+    TOKOPEDIA: "TKP",
+  };
   let mappingCount = 0;
   for (const store of stores) {
     const pfx = mpPrefix[store.marketplace];
@@ -125,7 +192,7 @@ async function main() {
   mappingCount += 2;
 
   console.log(
-    `Seed selesai: ${stores.length} toko, ${products.length} product, ${orderCount} order, ${mappingCount} mapping SKU.`
+    `Seed selesai: ${stores.length} toko, ${products.length} product, ${orderCount} order, ${mappingCount} mapping SKU.`,
   );
 }
 
