@@ -51,6 +51,7 @@ export async function ingestOrders(storeId: string, orders: NormalizedOrder[]) {
         where: { id: existing.id },
         data: {
           status: o.status,
+          buyerName: o.buyerName ?? existing.buyerName,
           totalAmount: o.totalAmount,
           marketplaceFee: o.marketplaceFee,
           shippingSubsidy: o.shippingSubsidy,
@@ -65,6 +66,7 @@ export async function ingestOrders(storeId: string, orders: NormalizedOrder[]) {
           marketplaceOrderId: o.marketplaceOrderId,
           orderDate: o.orderDate,
           status: o.status,
+          buyerName: o.buyerName ?? null,
           totalAmount: o.totalAmount,
           marketplaceFee: o.marketplaceFee,
           shippingSubsidy: o.shippingSubsidy,

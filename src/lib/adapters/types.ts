@@ -19,6 +19,7 @@ export type NormalizedOrder = {
   marketplaceOrderId: string;
   orderDate: Date;
   status: "PENDING" | "SHIPPED" | "COMPLETED" | "CANCELLED" | "RETURNED";
+  buyerName?: string; // username/nama pembeli
   totalAmount: number; // total dibayar pembeli
   marketplaceFee: number; // total potongan marketplace
   shippingSubsidy: number;

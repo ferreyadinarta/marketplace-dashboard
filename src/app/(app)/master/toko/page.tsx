@@ -1,7 +1,9 @@
-import { Store as StoreIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
+import { syncTiktok } from "./tiktok-actions";
 import {
   Card,
   CardHeader,
@@ -23,7 +25,16 @@ const mpColor: Record<string, "amber" | "slate" | "green"> = {
   TOKOPEDIA: "green",
 };
 
-export default async function MasterTokoPage() {
+export default async function MasterTokoPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const tiktokStatus = one(sp.tiktok);
+  const syncStatus = one(sp.sync);
+  const reason = one(sp.reason);
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
 
   return (
@@ -33,8 +44,53 @@ export default async function MasterTokoPage() {
         description="Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko."
       />
 
+      {/* hasil connect / sync */}
+      {tiktokStatus === "connected" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          TikTok Shop terhubung ({one(sp.n) ?? 0} toko). Klik <strong>Sync sekarang</strong> di toko-nya untuk tarik order.
+        </div>
+      )}
+      {tiktokStatus === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Gagal menghubungkan TikTok: {reason ?? "unknown"}
+        </div>
+      )}
+      {syncStatus === "ok" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          Sync selesai: {one(sp.created) ?? 0} order baru, {one(sp.updated) ?? 0} diperbarui.
+        </div>
+      )}
+      {syncStatus === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Sync gagal: {reason ?? "unknown"}
+        </div>
+      )}
+
+      {/* Hubungkan marketplace via API (TikTok/Tokopedia) */}
+      <Card className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Hubungkan Marketplace Otomatis</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Sambungkan TikTok Shop (& Tokopedia) untuk tarik order otomatis. Kamu akan diarahkan ke
+              halaman izin — login pakai akun seller yang punya toko.
+            </p>
+          </div>
+          <Link
+            href="/api/tiktok/authorize"
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Hubungkan TikTok Shop
+          </Link>
+        </div>
+      </Card>
+
       <Card>
-        <CardHeader title="Tambah Toko" />
+        <CardHeader title="Tambah Toko Manual" subtitle="Untuk toko yang tidak lewat API (mis. konsinyasi)." />
         <AddStoreForm action={createStore} />
       </Card>
 
@@ -50,7 +106,10 @@ export default async function MasterTokoPage() {
         <div className="space-y-4">
           {stores.map((s) => {
             const isKonsinyasi = s.marketplace === "KONSINYASI";
-            const connected = !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
+            const isTiktok = s.marketplace === "TIKTOK";
+            const connected = isTiktok
+              ? !!s.accessToken
+              : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
               <Card key={s.id} className="p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -85,6 +144,14 @@ export default async function MasterTokoPage() {
                           <AlertCircle size={13} /> Belum terhubung
                         </Badge>
                       ))}
+                    {isTiktok && connected && (
+                      <form action={syncTiktok}>
+                        <input type="hidden" name="storeId" value={s.id} />
+                        <SubmitButton variant="outline" className="px-3 py-1.5 text-xs" icon={<RefreshCw size={14} />} pendingText="Sync…">
+                          Sync sekarang
+                        </SubmitButton>
+                      </form>
+                    )}
                     <form action={deleteStore}>
                       <input type="hidden" name="id" value={s.id} />
                       <button className="text-xs font-medium text-red-500 hover:underline">
@@ -94,8 +161,9 @@ export default async function MasterTokoPage() {
                   </div>
                 </div>
 
-                {/* Konsinyasi = manual, tidak perlu pengaturan API */}
-                {!isKonsinyasi && (
+                {/* TikTok pakai OAuth (bukan API key manual) → tidak perlu section API.
+                    Konsinyasi = manual, juga tanpa API. */}
+                {!isKonsinyasi && !isTiktok && (
                   <div>
                     <AdvancedApiSection connected={connected}>
                       <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">

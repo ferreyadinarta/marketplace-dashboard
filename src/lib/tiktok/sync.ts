@@ -1,0 +1,92 @@
+import { prisma } from "@/lib/prisma";
+import { ingestOrders } from "@/lib/sync";
+import type { NormalizedOrder } from "@/lib/adapters/types";
+import { refreshAccessToken, searchOrders, type TiktokOrder } from "./client";
+
+function toNum(v?: string): number {
+  if (!v) return 0;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+
+// map status TikTok → status internal
+function mapStatus(s: string): NormalizedOrder["status"] {
+  const up = (s || "").toUpperCase();
+  if (up === "COMPLETED") return "COMPLETED";
+  if (up === "CANCELLED" || up === "CANCEL") return "CANCELLED";
+  if (up === "DELIVERED" || up === "IN_TRANSIT" || up === "AWAITING_COLLECTION") return "SHIPPED";
+  return "PENDING";
+}
+
+// TikTok order → NormalizedOrder.
+// CATATAN v1: fee/komisi marketplace belum diambil (butuh Finance API terpisah);
+// sementara fee=0, akan disempurnakan saat sync settlement.
+function normalize(o: TiktokOrder): NormalizedOrder {
+  const items = (o.line_items ?? []).map((li) => {
+    const price = toNum(li.sale_price ?? li.original_price);
+    const qty = li.quantity ?? 1;
+    return {
+      marketplaceSku: li.seller_sku || li.sku_id || "",
+      productName: li.product_name || "(tanpa nama)",
+      qty,
+      price,
+      subtotal: price * qty,
+    };
+  });
+  const subtotal = items.reduce((a, it) => a + it.subtotal, 0);
+  const shipping = toNum(o.payment?.shipping_fee);
+  const total = toNum(o.payment?.total_amount) || subtotal;
+
+  return {
+    marketplaceOrderId: o.id,
+    orderDate: new Date(o.create_time * 1000),
+    status: mapStatus(o.status),
+    buyerName: o.buyer_email ?? o.user_id ?? undefined,
+    totalAmount: subtotal, // omzet = nilai produk
+    marketplaceFee: 0, // TODO: dari Finance/settlement API
+    shippingSubsidy: 0,
+    netAmount: subtotal,
+    // simpan info tambahan tidak dipakai sekarang: total, shipping
+    items,
+  };
+}
+
+// Sync satu toko TikTok: refresh token kalau perlu → ambil order → normalisasi → simpan.
+export async function syncTiktokStore(storeId: string, from: Date, to: Date) {
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error("Toko tidak ditemukan");
+  if (!store.accessToken || !store.shopCipher) {
+    throw new Error(`Toko "${store.name}" belum terhubung (authorize dulu).`);
+  }
+
+  let accessToken = store.accessToken;
+
+  // refresh token kalau sudah/hampir kadaluarsa
+  const soon = Date.now() + 5 * 60 * 1000;
+  if (store.tokenExpiresAt && store.tokenExpiresAt.getTime() < soon && store.refreshToken) {
+    const t = await refreshAccessToken(store.refreshToken);
+    accessToken = t.accessToken;
+    await prisma.store.update({
+      where: { id: store.id },
+      data: {
+        accessToken: t.accessToken,
+        refreshToken: t.refreshToken,
+        tokenExpiresAt: new Date(t.accessTokenExpireAt * 1000),
+      },
+    });
+  }
+
+  // TikTok membatasi rentang waktu per query → pecah jadi window 7 hari.
+  const WINDOW = 7 * 24 * 3600;
+  const fromSec = Math.floor(from.getTime() / 1000);
+  const toSec = Math.floor(to.getTime() / 1000);
+  const orders: TiktokOrder[] = [];
+  for (let start = fromSec; start < toSec; start += WINDOW) {
+    const end = Math.min(start + WINDOW, toSec);
+    const chunk = await searchOrders(accessToken, store.shopCipher, start, end);
+    orders.push(...chunk);
+  }
+
+  const normalized = orders.map(normalize);
+  return ingestOrders(store.id, normalized);
+}

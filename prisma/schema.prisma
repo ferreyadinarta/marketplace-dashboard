@@ -12,13 +12,19 @@ datasource db {
 model Store {
   id          String   @id @default(cuid())
   name        String
-  marketplace String // SHOPEE | TIKTOK | TOKOPEDIA
+  marketplace String // SHOPEE | TIKTOK | TOKOPEDIA | KONSINYASI
   apiKey      String?
   apiSecret   String?
-  shopIdApi   String? // id toko di sisi marketplace
+  shopIdApi   String? // id toko di sisi marketplace (shop_id)
   isActive    Boolean  @default(true)
   lastSyncAt  DateTime?
   createdAt   DateTime @default(now())
+
+  // OAuth token per toko (diisi otomatis saat toko authorize app kita)
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  shopCipher     String? // TikTok: dibutuhkan untuk panggil API per shop
 
   mappings ProductMapping[]
   orders   Order[]
