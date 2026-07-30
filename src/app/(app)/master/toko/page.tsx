@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
 import { syncTiktok } from "./tiktok-actions";
+import { syncShopee } from "./shopee-actions";
 import {
   Card,
   CardHeader,
@@ -34,6 +35,7 @@ export default async function MasterTokoPage({
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tiktokStatus = one(sp.tiktok);
+  const shopeeStatus = one(sp.shopee);
   const syncStatus = one(sp.sync);
   const reason = one(sp.reason);
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
@@ -56,6 +58,24 @@ export default async function MasterTokoPage({
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
           Gagal menghubungkan TikTok: {reason ?? "unknown"}
+        </div>
+      )}
+      {shopeeStatus === "connected" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          Shopee terhubung. Klik <strong>Sync sekarang</strong> di toko-nya untuk tarik order.
+        </div>
+      )}
+      {shopeeStatus === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Gagal menghubungkan Shopee: {reason ?? "unknown"}
+        </div>
+      )}
+      {shopeeStatus === "notconfigured" && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+          <AlertCircle size={18} className="shrink-0 text-amber-500" />
+          Kredensial Shopee belum di-set (SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY).
         </div>
       )}
       {syncStatus === "ok" && (
@@ -81,12 +101,20 @@ export default async function MasterTokoPage({
               halaman izin — login pakai akun seller yang punya toko.
             </p>
           </div>
-          <Link
-            href="/api/tiktok/authorize"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Hubungkan TikTok Shop
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/api/tiktok/authorize"
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              Hubungkan TikTok Shop
+            </Link>
+            <Link
+              href="/api/shopee/authorize"
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+            >
+              Hubungkan Shopee
+            </Link>
+          </div>
         </div>
       </Card>
 
@@ -108,7 +136,9 @@ export default async function MasterTokoPage({
           {stores.map((s) => {
             const isKonsinyasi = s.marketplace === "KONSINYASI" || s.marketplace === "WA";
             const isTiktok = s.marketplace === "TIKTOK";
-            const connected = isTiktok
+            const isShopee = s.marketplace === "SHOPEE";
+            const isOauth = isTiktok || isShopee;
+            const connected = isOauth
               ? !!s.accessToken
               : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
@@ -145,8 +175,8 @@ export default async function MasterTokoPage({
                           <AlertCircle size={13} /> Belum terhubung
                         </Badge>
                       ))}
-                    {isTiktok && connected && (
-                      <form action={syncTiktok}>
+                    {isOauth && connected && (
+                      <form action={isShopee ? syncShopee : syncTiktok}>
                         <input type="hidden" name="storeId" value={s.id} />
                         <SubmitButton variant="outline" className="px-3 py-1.5 text-xs" icon={<RefreshCw size={14} />} pendingText="Sync…">
                           Sync sekarang
@@ -169,9 +199,9 @@ export default async function MasterTokoPage({
                   </div>
                 </div>
 
-                {/* TikTok pakai OAuth (bukan API key manual) → tidak perlu section API.
+                {/* TikTok & Shopee pakai OAuth (bukan API key manual) → tidak perlu section API.
                     Konsinyasi = manual, juga tanpa API. */}
-                {!isKonsinyasi && !isTiktok && (
+                {!isKonsinyasi && !isOauth && (
                   <div>
                     <AdvancedApiSection connected={connected}>
                       <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">

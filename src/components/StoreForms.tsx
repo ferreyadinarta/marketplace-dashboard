@@ -71,15 +71,23 @@ export function AddStoreForm({ action }: { action: Action }) {
       action={action}
       onSubmit={validate}
       noValidate
-      className="flex flex-wrap items-end gap-4 p-5"
+      className="flex flex-wrap items-end gap-4 px-5 pb-9 pt-5"
     >
-      <Field label="Nama toko" error={error}>
-        <input
-          name="name"
-          onInput={() => error && setError(undefined)}
-          placeholder="ex: Luxe Supplement Store — Shopee"
-          className={`${inputClass} ${error ? inputErrorClass : ""}`}
-        />
+      <Field label="Nama toko">
+        {/* error diposisikan absolute supaya munculnya tidak menggeser baris (input & tombol tetap sejajar) */}
+        <div className="relative">
+          <input
+            name="name"
+            onInput={() => error && setError(undefined)}
+            placeholder="ex: Luxe Supplement Store — Shopee"
+            className={`${inputClass} ${error ? inputErrorClass : ""}`}
+          />
+          {error && (
+            <span className="absolute left-0 top-full mt-1 block text-xs font-medium text-red-500">
+              {error}
+            </span>
+          )}
+        </div>
       </Field>
       <Field label="Marketplace">
         <Select
