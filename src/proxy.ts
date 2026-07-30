@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   "/api/shopee/callback",
   "/api/shopee/webhook",
   "/api/cron/",
+  "/api/health", // keep-warm / uptime ping (tanpa login)
 ];
 
 // Lindungi seluruh route kecuali /login & aset statis.
