@@ -1,3 +1,4 @@
+import type { Store } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
 import type { NormalizedOrder } from "@/lib/adapters/types";
@@ -7,6 +8,29 @@ import {
   getOrderDetails,
   type ShopeeOrderDetail,
 } from "./client";
+
+// Pastikan access token masih valid (Shopee token cuma 4 jam) → refresh bila
+// hampir kadaluarsa, simpan yang baru. Balikin access token siap pakai.
+async function ensureFreshToken(store: Store): Promise<string> {
+  if (!store.accessToken || !store.shopIdApi) {
+    throw new Error(`Toko "${store.name}" belum terhubung (authorize dulu).`);
+  }
+  let accessToken = store.accessToken;
+  const soon = Date.now() + 10 * 60 * 1000;
+  if (store.tokenExpiresAt && store.tokenExpiresAt.getTime() < soon && store.refreshToken) {
+    const t = await refreshAccessToken(store.refreshToken, store.shopIdApi);
+    accessToken = t.accessToken;
+    await prisma.store.update({
+      where: { id: store.id },
+      data: {
+        accessToken: t.accessToken,
+        refreshToken: t.refreshToken,
+        tokenExpiresAt: new Date(Date.now() + t.expireIn * 1000),
+      },
+    });
+  }
+  return accessToken;
+}
 
 // map status Shopee → status internal
 function mapStatus(s: string): NormalizedOrder["status"] {
@@ -58,27 +82,8 @@ function normalize(o: ShopeeOrderDetail): NormalizedOrder {
 export async function syncShopeeStore(storeId: string, from: Date, to: Date) {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
-  if (!store.accessToken || !store.shopIdApi) {
-    throw new Error(`Toko "${store.name}" belum terhubung (authorize dulu).`);
-  }
-
-  let accessToken = store.accessToken;
-  const shopId = store.shopIdApi;
-
-  // token Shopee cuma 4 jam → refresh kalau hampir kadaluarsa.
-  const soon = Date.now() + 10 * 60 * 1000;
-  if (store.tokenExpiresAt && store.tokenExpiresAt.getTime() < soon && store.refreshToken) {
-    const t = await refreshAccessToken(store.refreshToken, shopId);
-    accessToken = t.accessToken;
-    await prisma.store.update({
-      where: { id: store.id },
-      data: {
-        accessToken: t.accessToken,
-        refreshToken: t.refreshToken,
-        tokenExpiresAt: new Date(Date.now() + t.expireIn * 1000),
-      },
-    });
-  }
+  const accessToken = await ensureFreshToken(store);
+  const shopId = store.shopIdApi!;
 
   // Shopee batasi window get_order_list ≤ 15 hari → pecah.
   const WINDOW = 15 * 24 * 3600;
@@ -92,6 +97,22 @@ export async function syncShopeeStore(storeId: string, from: Date, to: Date) {
   }
 
   const details = await getOrderDetails(accessToken, shopId, sns);
+  const normalized = details.map(normalize);
+  const r = await ingestOrders(store.id, normalized);
+  await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
+  return r;
+}
+
+// Sync order tertentu berdasarkan order_sn (dipakai webhook realtime Shopee).
+// Hanya tarik detail order yang di-push → jauh lebih ringan daripada scan penuh.
+export async function syncShopeeOrders(storeId: string, orderSns: string[]) {
+  if (!orderSns.length) return { created: 0, updated: 0, unmapped: 0 };
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error("Toko tidak ditemukan");
+  const accessToken = await ensureFreshToken(store);
+  const shopId = store.shopIdApi!;
+
+  const details = await getOrderDetails(accessToken, shopId, orderSns);
   const normalized = details.map(normalize);
   const r = await ingestOrders(store.id, normalized);
   await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });

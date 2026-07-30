@@ -26,6 +26,17 @@ export function tanggal(date: Date | string): string {
   }).format(new Date(date));
 }
 
+// Tanggal + jam (mis. untuk waktu sync terakhir): "30 Jul 2026, 14.05".
+export function waktu(date: Date | string): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(date));
+}
+
 // Rentang default: awal bulan berjalan sampai hari ini (format YYYY-MM-DD).
 export function currentMonthRange(): { from: string; to: string } {
   const now = new Date();

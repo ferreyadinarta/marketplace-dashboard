@@ -16,6 +16,17 @@ export const SHOPEE = {
   redirectUrl:
     process.env.SHOPEE_REDIRECT_URL ??
     "https://pembukuan-marketplace.vercel.app/api/shopee/callback",
+
+  // URL push/webhook yang didaftarkan di console (Push Mechanism). Harus SAMA
+  // persis dengan yang di console — dipakai untuk verifikasi tanda tangan push.
+  webhookUrl:
+    process.env.SHOPEE_WEBHOOK_URL ??
+    "https://pembukuan-marketplace.vercel.app/api/shopee/webhook",
+
+  // Kunci penanda-tangan PUSH. Di SANDBOX beda dari partner_key API — pakai
+  // "Test Push Partner Key" dari console. Di produksi kosongkan → fallback ke
+  // partnerKey (produksi pakai partner_key yang sama).
+  pushPartnerKey: process.env.SHOPEE_PUSH_PARTNER_KEY ?? "",
 };
 
 export function shopeeConfigured(): boolean {

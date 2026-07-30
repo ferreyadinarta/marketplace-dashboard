@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle } from "lucide-react";
+import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
+import { waktu, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
 import { syncTiktok } from "./tiktok-actions";
 import { syncShopee } from "./shopee-actions";
+import { syncAll } from "./sync-actions";
 import {
   Card,
   CardHeader,
@@ -39,6 +40,9 @@ export default async function MasterTokoPage({
   const syncStatus = one(sp.sync);
   const reason = one(sp.reason);
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
+  const hasConnected = stores.some(
+    (s) => (s.marketplace === "TIKTOK" || s.marketplace === "SHOPEE") && !!s.accessToken
+  );
 
   return (
     <div className="space-y-6">
@@ -116,6 +120,24 @@ export default async function MasterTokoPage({
             </Link>
           </div>
         </div>
+        {hasConnected && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            <p className="text-xs text-slate-500">
+              Tarik order terbaru dari semua toko sekaligus. Order sebenarnya masuk realtime lewat
+              webhook; sync ini untuk menambal kalau ada yang terlewat.
+            </p>
+            <form action={syncAll}>
+              <SubmitButton
+                variant="outline"
+                className="text-sm"
+                icon={<RefreshCw size={14} />}
+                pendingText="Menyinkron…"
+              >
+                Sync semua toko
+              </SubmitButton>
+            </form>
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -143,7 +165,7 @@ export default async function MasterTokoPage({
               : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
               <Card key={s.id} className="p-5">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                       <StoreIcon size={18} />
@@ -158,7 +180,7 @@ export default async function MasterTokoPage({
                           <span className="text-xs text-slate-400">Input manual (tanpa API)</span>
                         ) : (
                           <span className="text-xs text-slate-400">
-                            {s.lastSyncAt ? `Sync: ${tanggal(s.lastSyncAt)}` : "Belum pernah sync"}
+                            {s.lastSyncAt ? `Sync: ${waktu(s.lastSyncAt)}` : "Belum pernah sync"}
                           </span>
                         )}
                       </div>
@@ -186,8 +208,8 @@ export default async function MasterTokoPage({
                     <ConfirmModalButton
                       action={deleteStore}
                       id={s.id}
-                      trigger="Hapus"
-                      triggerClassName="text-xs font-medium text-red-500 hover:underline"
+                      trigger={<Trash2 size={16} />}
+                      triggerClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
                       title="Hapus toko ini?"
                       message={
                         <>

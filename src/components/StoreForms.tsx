@@ -75,12 +75,12 @@ export function AddStoreForm({ action }: { action: Action }) {
     >
       <Field label="Nama toko">
         {/* error diposisikan absolute supaya munculnya tidak menggeser baris (input & tombol tetap sejajar) */}
-        <div className="relative">
+        <div className="relative w-full sm:w-80">
           <input
             name="name"
             onInput={() => error && setError(undefined)}
             placeholder="ex: Luxe Supplement Store — Shopee"
-            className={`${inputClass} ${error ? inputErrorClass : ""}`}
+            className={`${inputClass} w-full ${error ? inputErrorClass : ""}`}
           />
           {error && (
             <span className="absolute left-0 top-full mt-1 block text-xs font-medium text-red-500">

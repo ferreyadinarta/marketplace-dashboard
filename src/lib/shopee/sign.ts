@@ -20,3 +20,14 @@ export function sign(
 export function nowTimestamp(): number {
   return Math.floor(Date.now() / 1000);
 }
+
+// Verifikasi tanda tangan push/webhook Shopee.
+// Shopee kirim header Authorization = HMAC-SHA256(push_key, "{url}|{raw_body}").
+// push_key = SHOPEE_PUSH_PARTNER_KEY kalau di-set (sandbox), else partner_key (produksi).
+export function verifyPush(rawBody: string, authHeader: string | null, url: string): boolean {
+  const key = SHOPEE.pushPartnerKey || SHOPEE.partnerKey;
+  if (!key || !authHeader) return false;
+  const base = `${url}|${rawBody}`;
+  const expected = crypto.createHmac("sha256", key).update(base, "utf8").digest("hex");
+  return authHeader === expected;
+}
