@@ -1,4 +1,5 @@
 import Sidebar from "@/components/Sidebar";
+import { Toaster } from "@/components/Toaster";
 import { APP_ENV } from "@/lib/config";
 
 export default function AppLayout({
@@ -12,6 +13,7 @@ export default function AppLayout({
           {children}
         </main>
       </div>
+      <Toaster />
     </>
   );
 }

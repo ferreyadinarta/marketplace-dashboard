@@ -2,7 +2,9 @@ import { Boxes } from "lucide-react";
 import { getPembukuanByGroup, getStores, getGroups } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange } from "@/lib/format";
+import { Suspense } from "react";
 import PembukuanFilter from "@/components/PembukuanFilter";
+import { RememberFilters } from "@/components/RememberFilters";
 import { Card, PageHeader, EmptyState, LinkButton, HelpHint } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,9 @@ export default async function PembukuanPage({
 
   return (
     <div className="space-y-6">
+      <Suspense fallback={null}>
+        <RememberFilters storageKey="filters:pembukuan" />
+      </Suspense>
       <PageHeader
         title="Pembukuan"
         description="Penjualan tiap product dikelompokkan per grup. Atur rentang tanggal & marketplace, lalu export ke Excel."

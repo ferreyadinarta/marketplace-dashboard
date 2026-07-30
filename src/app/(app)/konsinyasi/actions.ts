@@ -2,32 +2,49 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { buildItemsData } from "@/lib/sales";
+import { eventDateFromInput } from "@/lib/format";
 
 // Tambah toko konsinyasi (tempat titip jual).
 export async function createKonsinyasiStore(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;
+  // cegah toko/reseller duplikat (case-insensitive)
+  const exists = await prisma.store.findFirst({
+    where: { marketplace: "KONSINYASI", name: { equals: name, mode: "insensitive" } },
+  });
+  if (exists) return;
   await prisma.store.create({ data: { name, marketplace: "KONSINYASI" } });
   revalidatePath("/konsinyasi");
 }
 
-// Catat satu penjualan konsinyasi → jadi order (masuk pembukuan & dashboard).
+// Hapus toko / reseller. Cascade: penjualan toko ini ikut terhapus (schema onDelete: Cascade).
+export async function deleteKonsinyasiStore(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.store.delete({ where: { id } });
+  revalidatePath("/konsinyasi");
+  revalidatePath("/pembukuan");
+  revalidatePath("/stok");
+  revalidatePath("/");
+}
+
+// Catat satu penjualan grosir/reseller (jual putus) → jadi order.
+// Bisa BANYAK product dalam 1 order (1 toko + 1 tanggal).
+// Toko beli putus di depan: tidak ada komisi, omzet = Σ(harga grosir × qty).
+// Masuk pembukuan, dashboard, dan stok (order COMPLETED).
 export async function createKonsinyasiSale(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
-  const productId = String(formData.get("productId") ?? "");
-  const qty = Math.max(1, Number(formData.get("qty") ?? 0) || 0);
-  const price = Math.max(0, Number(formData.get("price") ?? 0) || 0);
-  const komisi = Math.max(0, Number(formData.get("komisi") ?? 0) || 0);
   const tanggalStr = String(formData.get("tanggal") ?? "");
   const buyerName = String(formData.get("buyerName") ?? "").trim() || null;
-  if (!storeId || !productId || qty < 1) return;
+  if (!storeId) return;
 
-  const product = await prisma.product.findUnique({ where: { id: productId } });
-  if (!product) return;
+  const itemsData = await buildItemsData(formData);
+  if (itemsData.length === 0) return;
 
-  const orderDate = tanggalStr ? new Date(`${tanggalStr}T00:00:00`) : new Date();
-  const subtotal = price * qty;
-  const ref = `KONS-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  const orderDate = eventDateFromInput(tanggalStr);
+  const total = itemsData.reduce((a, x) => a + x.subtotal, 0);
+  const ref = `GROSIR-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
   await prisma.order.create({
     data: {
@@ -36,25 +53,17 @@ export async function createKonsinyasiSale(formData: FormData) {
       orderDate,
       status: "COMPLETED",
       buyerName,
-      totalAmount: subtotal,
-      marketplaceFee: komisi, // potongan/komisi toko konsinyasi
+      totalAmount: total,
+      marketplaceFee: 0, // jual putus: tidak ada komisi
       shippingSubsidy: 0,
-      netAmount: subtotal - komisi,
-      items: {
-        create: {
-          productId: product.id,
-          marketplaceSku: product.sku,
-          productName: product.name,
-          qty,
-          price,
-          subtotal,
-        },
-      },
+      netAmount: total,
+      items: { create: itemsData },
     },
   });
 
   revalidatePath("/konsinyasi");
   revalidatePath("/pembukuan");
+  revalidatePath("/stok");
   revalidatePath("/");
 }
 
@@ -64,5 +73,6 @@ export async function deleteKonsinyasiSale(formData: FormData) {
   await prisma.order.delete({ where: { id } });
   revalidatePath("/konsinyasi");
   revalidatePath("/pembukuan");
+  revalidatePath("/stok");
   revalidatePath("/");
 }

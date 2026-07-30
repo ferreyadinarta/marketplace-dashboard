@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type FormEvent } from "react";
 import { Plus, FolderPlus, X } from "lucide-react";
 import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
+import { CurrencyInput } from "@/components/CurrencyInput";
 
 type Group = { id: string; name: string };
 type Action = (formData: FormData) => void | Promise<void>;
@@ -17,6 +18,8 @@ export function AddProductForm({
   action: Action;
 }) {
   const [errors, setErrors] = useState<{ name?: string; sku?: string }>({});
+  const [mainUnit, setMainUnit] = useState("pcs");
+  const [smallUnit, setSmallUnit] = useState("");
 
   function validate(e: FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
@@ -67,13 +70,37 @@ export function AddProductForm({
         label="HPP / Modal (Rp)"
         hint="Harga Pokok Penjualan: modal untuk 1 unit product."
       >
+        <CurrencyInput name="hpp" placeholder="0" />
+      </Field>
+      <Field label="Satuan utama" hint="Satuan yang biasa dipakai (mis. box, botol, pcs).">
         <input
-          name="hpp"
-          type="number"
-          min="0"
-          placeholder="0"
+          name="mainUnit"
+          value={mainUnit}
+          onChange={(e) => setMainUnit(e.target.value)}
+          placeholder="ex: box"
           className={inputClass}
         />
+      </Field>
+      <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
+        <input
+          name="smallUnit"
+          value={smallUnit}
+          onChange={(e) => setSmallUnit(e.target.value)}
+          placeholder="ex: sachet"
+          className={inputClass}
+        />
+      </Field>
+      <Field
+        label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
+        hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
+      >
+        <input name="isi" type="number" min="0" placeholder="ex: 12" className={inputClass} />
+      </Field>
+      <Field label="Harga retail (Rp)" hint="Default harga jual WA/offline. Bisa diubah saat mencatat penjualan.">
+        <CurrencyInput name="priceRetail" placeholder="0" />
+      </Field>
+      <Field label="Harga grosir (Rp)" hint="Default harga jual ke reseller. Bisa diubah saat mencatat penjualan.">
+        <CurrencyInput name="priceGrosir" placeholder="0" />
       </Field>
       <Field label="Grup pembukuan">
         <Select
@@ -90,6 +117,7 @@ export function AddProductForm({
           variant="primary"
           icon={<Plus size={16} />}
           pendingText="Menyimpan…"
+          notify="Product ditambahkan"
         >
           Simpan Product
         </SubmitButton>
@@ -183,6 +211,9 @@ export function AddGroupForm({
     if (!name) {
       e.preventDefault();
       setError("Nama grup wajib diisi.");
+    } else if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+      e.preventDefault();
+      setError("Grup dengan nama ini sudah ada.");
     } else {
       setError(undefined);
     }
@@ -203,7 +234,7 @@ export function AddGroupForm({
           Tambah Grup
         </SubmitButton>
       </form>
-      <div className="flex flex-wrap gap-1.5 pt-1">
+      <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto pt-1">
         {groups.length ? (
           groups.map((g) => <GroupChip key={g.id} group={g} deleteAction={deleteAction} />)
         ) : (

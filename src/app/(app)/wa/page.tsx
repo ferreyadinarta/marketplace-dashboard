@@ -1,23 +1,18 @@
-import { Handshake, Trash2, Package } from "lucide-react";
+import { MessageCircle, Trash2, Package } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { rupiah, tanggal, currentMonthRange } from "@/lib/format";
 import { getStockLevels } from "@/lib/stock";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
-import { AddKonsinyasiStoreForm, MultiItemSaleForm, StoreChip } from "@/components/KonsinyasiForms";
+import { MultiItemSaleForm } from "@/components/KonsinyasiForms";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Pagination } from "@/components/Pagination";
-import {
-  createKonsinyasiStore,
-  createKonsinyasiSale,
-  deleteKonsinyasiSale,
-  deleteKonsinyasiStore,
-} from "./actions";
+import { createWaSale, deleteWaSale } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const PER_PAGE = 15;
 
-export default async function KonsinyasiPage({
+export default async function WaPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -25,17 +20,12 @@ export default async function KonsinyasiPage({
   const sp = await searchParams;
   const page = Math.max(1, parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page) ?? "1", 10) || 1);
 
-  const where = { store: { marketplace: "KONSINYASI" } };
-  const [stores, products, sales, total] = await Promise.all([
-    prisma.store.findMany({
-      where: { marketplace: "KONSINYASI" },
-      orderBy: { name: "asc" },
-      include: { _count: { select: { orders: true } } },
-    }),
+  const where = { store: { marketplace: "WA" } };
+  const [products, sales, total] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" } }),
     prisma.order.findMany({
       where,
-      include: { store: true, items: true },
+      include: { items: true },
       orderBy: { orderDate: "desc" },
       skip: (page - 1) * PER_PAGE,
       take: PER_PAGE,
@@ -49,9 +39,8 @@ export default async function KonsinyasiPage({
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const fromRow = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
   const toRow = Math.min(page * PER_PAGE, total);
-  const pageHref = (p: number) => `/konsinyasi${p > 1 ? `?page=${p}` : ""}`;
+  const pageHref = (p: number) => `/wa${p > 1 ? `?page=${p}` : ""}`;
 
-  const storeOptions = stores.map((s) => ({ value: s.id, label: s.name }));
   const productOptions = products.map((p) => ({
     value: p.id,
     label: `${p.name} (${p.sku})`,
@@ -67,43 +56,21 @@ export default async function KonsinyasiPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Grosir / Reseller"
-        description="Penjualan jual putus ke toko/reseller (dibayar di depan saat kirim). Otomatis masuk ke pembukuan, dashboard, & stok."
+        title="Penjualan WA / Offline"
+        description="Catat penjualan manual lewat WhatsApp atau offline ke pembeli langsung. Otomatis masuk ke pembukuan, dashboard, & stok."
       />
 
       <Card>
-        <CardHeader title="Toko / Reseller" subtitle="Daftar toko/reseller yang beli grosir dari kamu." />
-        <AddKonsinyasiStoreForm action={createKonsinyasiStore} existingNames={stores.map((s) => s.name)} />
-        {stores.length > 0 && (
-          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto px-5 pb-5">
-            {stores.map((s) => (
-              <StoreChip
-                key={s.id}
-                store={{ id: s.id, name: s.name, count: s._count.orders }}
-                deleteAction={deleteKonsinyasiStore}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
-
-      <Card>
-        <CardHeader title="Catat Penjualan Grosir" subtitle="Satu baris = satu penjualan jual putus." />
-        <MultiItemSaleForm
-          variant="grosir"
-          stores={storeOptions}
-          products={productOptions}
-          action={createKonsinyasiSale}
-          today={today}
-        />
+        <CardHeader title="Catat Penjualan WA" subtitle="Satu baris = satu penjualan retail." />
+        <MultiItemSaleForm variant="wa" products={productOptions} action={createWaSale} today={today} />
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader title={`Riwayat Penjualan (${total})`} subtitle="Penjualan grosir yang sudah dicatat." />
+        <CardHeader title={`Riwayat Penjualan (${total})`} subtitle="Penjualan WA / offline yang sudah dicatat." />
         {sales.length === 0 ? (
           <EmptyState
             icon={<Package size={40} />}
-            title="Belum ada penjualan grosir"
+            title="Belum ada penjualan WA"
             description="Catat penjualan pertama lewat form di atas."
           />
         ) : (
@@ -112,7 +79,7 @@ export default async function KonsinyasiPage({
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-3 font-medium">Tanggal</th>
-                  <th className="px-5 py-3 font-medium">Toko / Reseller</th>
+                  <th className="px-5 py-3 font-medium">Pembeli</th>
                   <th className="px-5 py-3 font-medium">Product</th>
                   <th className="px-5 py-3 text-right font-medium">Jumlah</th>
                   <th className="px-5 py-3 text-right font-medium">Omzet</th>
@@ -125,7 +92,7 @@ export default async function KonsinyasiPage({
                   return (
                     <tr key={o.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                       <td className="whitespace-nowrap px-5 py-3 align-top text-slate-600">{tanggal(o.orderDate)}</td>
-                      <td className="px-5 py-3 align-top text-slate-600">{o.store.name}</td>
+                      <td className="px-5 py-3 align-top text-slate-600">{o.buyerName ?? "-"}</td>
                       <td className="px-5 py-3 align-top font-medium text-slate-900">
                         <div className="space-y-0.5">
                           {o.items.map((it) => (
@@ -138,7 +105,7 @@ export default async function KonsinyasiPage({
                       <td className="px-5 py-3 text-right align-top text-slate-600">{totalQty}</td>
                       <td className="px-5 py-3 text-right align-top font-semibold text-emerald-600">{rupiah(o.totalAmount)}</td>
                       <td className="px-5 py-3 text-right align-top">
-                        <form action={deleteKonsinyasiSale} className="inline">
+                        <form action={deleteWaSale} className="inline">
                           <input type="hidden" name="id" value={o.id} />
                           <SubmitButton
                             variant="ghost"

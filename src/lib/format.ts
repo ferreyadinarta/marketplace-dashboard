@@ -6,6 +6,18 @@ export function rupiah(value: number): string {
   }).format(value);
 }
 
+// Ubah input tanggal (YYYY-MM-DD) jadi Date untuk event (restock/penjualan).
+// Kalau tanggalnya HARI INI (atau kosong) → pakai timestamp SEKARANG, supaya
+// event ini urut SETELAH opname yang mungkin dilakukan hari ini juga (kalau
+// pakai tengah malam, event hari ini bisa dianggap "sebelum" opname → tidak terhitung).
+export function eventDateFromInput(dateStr: string): Date {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  if (!dateStr || dateStr === todayStr) return now;
+  return new Date(`${dateStr}T12:00:00`);
+}
+
 export function tanggal(date: Date | string): string {
   return new Intl.DateTimeFormat("id-ID", {
     day: "2-digit",
@@ -27,7 +39,8 @@ export const MARKETPLACE_LABEL: Record<string, string> = {
   SHOPEE: "Shopee",
   TIKTOK: "TikTok Shop",
   TOKOPEDIA: "Tokopedia",
-  KONSINYASI: "Konsinyasi",
+  KONSINYASI: "Grosir / Reseller", // dulu "konsinyasi", sebenarnya jual putus
+  WA: "WhatsApp / Offline",
 };
 
 export const STATUS_LABEL: Record<string, string> = {

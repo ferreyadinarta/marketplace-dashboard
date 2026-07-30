@@ -18,6 +18,7 @@ export function Select({
   placeholder = "Pilih…",
   className = "",
   disabled = false,
+  searchable = false,
 }: {
   options: SelectOption[];
   name?: string;
@@ -27,9 +28,11 @@ export function Select({
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
   const [internal, setInternal] = useState(defaultValue ?? "");
   const [pos, setPos] = useState<{
     left: number;
@@ -40,7 +43,7 @@ export function Select({
   }>();
 
   const btnRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const isControlled = value !== undefined;
   const current = isControlled ? value : internal;
@@ -67,9 +70,17 @@ export function Select({
 
   function toggle() {
     if (disabled) return;
-    if (!open) place();
+    if (!open) {
+      place();
+      setQuery("");
+    }
     setOpen((o) => !o);
   }
+
+  const shown =
+    searchable && query.trim()
+      ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+      : options;
 
   // tutup saat klik di luar, scroll, atau resize
   useEffect(() => {
@@ -121,7 +132,7 @@ export function Select({
         open &&
         pos &&
         createPortal(
-          <ul
+          <div
             ref={listRef}
             style={{
               position: "fixed",
@@ -130,32 +141,46 @@ export function Select({
               bottom: pos.bottom,
               minWidth: pos.width,
               maxWidth: "min(90vw, 22rem)",
-              maxHeight: pos.maxH,
             }}
-            className="z-[100] overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl"
+            className="z-[100] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
           >
-            {options.map((o) => {
-              const active = o.value === current;
-              return (
-                <li key={o.value || "__empty"}>
-                  <button
-                    type="button"
-                    onClick={() => choose(o.value)}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm ${
-                      active
-                        ? "bg-indigo-50 font-medium text-indigo-700"
-                        : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="whitespace-nowrap">{o.label}</span>
-                    {active && (
-                      <Check size={15} className="shrink-0 text-indigo-600" />
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>,
+            {searchable && (
+              <div className="border-b border-slate-100 p-1.5">
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Cari…"
+                  className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
+            )}
+            <ul style={{ maxHeight: pos.maxH }} className="overflow-auto p-1">
+              {shown.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-slate-400">Tidak ada hasil</li>
+              ) : (
+                shown.map((o) => {
+                  const active = o.value === current;
+                  return (
+                    <li key={o.value || "__empty"}>
+                      <button
+                        type="button"
+                        onClick={() => choose(o.value)}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm ${
+                          active
+                            ? "bg-indigo-50 font-medium text-indigo-700"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="whitespace-nowrap">{o.label}</span>
+                        {active && <Check size={15} className="shrink-0 text-indigo-600" />}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>,
           document.body,
         )}
     </div>

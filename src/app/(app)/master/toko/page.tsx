@@ -15,6 +15,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
+import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
@@ -105,7 +106,7 @@ export default async function MasterTokoPage({
       ) : (
         <div className="space-y-4">
           {stores.map((s) => {
-            const isKonsinyasi = s.marketplace === "KONSINYASI";
+            const isKonsinyasi = s.marketplace === "KONSINYASI" || s.marketplace === "WA";
             const isTiktok = s.marketplace === "TIKTOK";
             const connected = isTiktok
               ? !!s.accessToken
@@ -152,12 +153,19 @@ export default async function MasterTokoPage({
                         </SubmitButton>
                       </form>
                     )}
-                    <form action={deleteStore}>
-                      <input type="hidden" name="id" value={s.id} />
-                      <button className="text-xs font-medium text-red-500 hover:underline">
-                        Hapus
-                      </button>
-                    </form>
+                    <ConfirmModalButton
+                      action={deleteStore}
+                      id={s.id}
+                      trigger="Hapus"
+                      triggerClassName="text-xs font-medium text-red-500 hover:underline"
+                      title="Hapus toko ini?"
+                      message={
+                        <>
+                          <span className="font-medium text-slate-700">{s.name}</span> beserta semua data
+                          order/penjualannya akan dihapus permanen.
+                        </>
+                      }
+                    />
                   </div>
                 </div>
 

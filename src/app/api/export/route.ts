@@ -219,7 +219,7 @@ export async function GET(req: NextRequest) {
           row.buyerName,
           channel,
           row.sku,
-          row.qty,
+          row.unit ? `${row.qty} ${row.unit}` : row.qty,
           row.price,
           row.fee,
           row.total,

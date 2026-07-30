@@ -8,9 +8,11 @@ import {
   BookOpen,
   Wallet,
   Package,
+  Boxes,
   Store,
   Link2,
   Handshake,
+  MessageCircle,
   Menu,
   X,
   LogOut,
@@ -24,7 +26,8 @@ const groups = [
     items: [
       { href: "/", label: "Dashboard", desc: "Ringkasan & profit", icon: LayoutDashboard },
       { href: "/pembukuan", label: "Pembukuan", desc: "Per grup product", icon: BookOpen },
-      { href: "/konsinyasi", label: "Konsinyasi", desc: "Titip jual di toko lain", icon: Handshake },
+      { href: "/wa", label: "Penjualan WA", desc: "Jual manual WA / offline", icon: MessageCircle },
+      { href: "/konsinyasi", label: "Grosir / Reseller", desc: "Jual putus ke reseller", icon: Handshake },
       { href: "/rekonsiliasi", label: "Rekonsiliasi Dana", desc: "Cek dana cair", icon: Wallet },
     ],
   },
@@ -32,6 +35,7 @@ const groups = [
     label: "Pengaturan",
     items: [
       { href: "/master/product", label: "Master Product", desc: "Product, HPP, grup", icon: Package },
+      { href: "/stok", label: "Stok Opname", desc: "Stok, barang masuk, opname", icon: Boxes },
       { href: "/master/toko", label: "Master Toko", desc: "Nama toko & marketplace", icon: Store },
       { href: "/master/mapping", label: "Mapping SKU", desc: "Samakan SKU", icon: Link2 },
     ],
@@ -65,7 +69,7 @@ export default function Sidebar({ env }: { env: string }) {
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
             <span className="h-2 w-2 rounded-full bg-amber-500" />
-            Mode Sandbox (data uji)
+            Mode Sandbox
           </div>
         </div>
       )}

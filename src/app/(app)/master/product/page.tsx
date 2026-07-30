@@ -1,6 +1,6 @@
 import { Package, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProduct, deleteProduct, createGroup, deleteGroup } from "./actions";
+import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup } from "./actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
 import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
@@ -101,38 +101,30 @@ export default async function MasterProductPage({
             />
           )
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="w-full px-5 py-3 font-medium">Product</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">SKU</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Ubah HPP (Modal) &amp; Grup</th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => (
-                  <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                    <td className="px-5 py-3 font-medium text-slate-900">{p.name}</td>
-                    <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-500">{p.sku}</td>
-                    <td className="px-5 py-3">
-                      <ProductRow
-                        id={p.id}
-                        name={p.name}
-                        hpp={p.hpp}
-                        groupId={p.groupId ?? ""}
-                        groupOptions={[
-                          { value: "", label: "— Tanpa grup —" },
-                          ...groups.map((g) => ({ value: g.id, label: g.name })),
-                        ]}
-                        updateAction={updateProduct}
-                        deleteAction={deleteProduct}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3 p-5">
+            {products.map((p) => (
+              <ProductRow
+                key={p.id}
+                id={p.id}
+                name={p.name}
+                sku={p.sku}
+                hpp={p.hpp}
+                priceRetail={p.priceRetail}
+                priceGrosir={p.priceGrosir}
+                unit={p.unit}
+                packUnit={p.packUnit}
+                packSize={p.packSize}
+                groupId={p.groupId ?? ""}
+                groupName={p.group?.name}
+                groupOptions={[
+                  { value: "", label: "— Tanpa grup —" },
+                  ...groups.map((g) => ({ value: g.id, label: g.name })),
+                ]}
+                updateAction={updateProduct}
+                deleteAction={deleteProduct}
+                duplicateAction={duplicateProduct}
+              />
+            ))}
           </div>
         )}
 

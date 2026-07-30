@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "OrderItem" ADD COLUMN     "baseQty" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "unit" TEXT NOT NULL DEFAULT '';
+
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN     "packSize" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "packUnit" TEXT NOT NULL DEFAULT '';

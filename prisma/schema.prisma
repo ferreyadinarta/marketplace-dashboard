@@ -43,13 +43,21 @@ model Product {
   id        String   @id @default(cuid())
   name      String
   sku       String   @unique // SKU internal
-  hpp       Int      @default(0) // harga pokok penjualan, rupiah
+  hpp         Int    @default(0) // harga pokok penjualan (modal), rupiah
+  priceRetail Int    @default(0) // harga jual retail (default penjualan WA/offline)
+  priceGrosir Int    @default(0) // harga jual grosir (default penjualan reseller)
+  unit        String @default("pcs") // satuan DASAR (kecil): pcs / sachet, dll — stok dihitung di sini
+  packUnit    String @default("") // satuan BESAR opsional (ex: box). Kosong = tanpa pack
+  packSize    Int    @default(0) // isi per pack (ex: 1 box = 12 sachet). 0 = tanpa pack
+  minStock    Int    @default(0) // ambang "stok menipis" (low-stock alert), dalam satuan dasar
   groupId   String?
   group     BookkeepingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   mappings   ProductMapping[]
   orderItems OrderItem[]
+  opnames    StockOpname[]
+  restocks   StockRestock[]
 }
 
 // SKU di marketplace bisa beda dengan SKU internal → mapping
@@ -98,9 +106,43 @@ model OrderItem {
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   marketplaceSku String // simpan SKU asli, walau belum ter-mapping
   productName    String
-  qty            Int
-  price          Int // harga satuan
+  qty            Int // jumlah dalam SATUAN SAAT DIJUAL (bisa box atau sachet)
+  unit           String @default("") // label satuan saat dijual (ex: "box"/"sachet"); kosong → satuan dasar
+  baseQty        Int    @default(0) // jumlah dalam satuan DASAR (untuk stok); 0 → fallback ke qty
+  price          Int // harga per satuan-jual
   subtotal       Int
+  hppSnapshot    Int @default(0) // HPP (modal) per SATUAN DASAR, dibekukan saat jual; 0 → fallback ke product.hpp
+}
+
+// ===== STOK / INVENTORY =====
+
+// Hasil stock opname: hitung fisik pada satu waktu → jadi titik "anchor" stok.
+// Stok berjalan = countedQty + restock setelah opnameAt − penjualan COMPLETED setelah opnameAt.
+model StockOpname {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  countedQty Int // jumlah fisik hasil hitung
+  systemQty  Int // stok sistem saat opname (untuk catat selisih)
+  note       String?
+  opnameAt   DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([productId, opnameAt])
+}
+
+// Barang masuk (restock/pembelian) → menambah stok.
+model StockRestock {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty       Int
+  cost      Int      @default(0) // harga beli / unit batch ini (untuk rata-rata HPP)
+  note      String?
+  restockAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([productId, restockAt])
 }
 
 // pencairan dana dari marketplace → untuk rekonsiliasi

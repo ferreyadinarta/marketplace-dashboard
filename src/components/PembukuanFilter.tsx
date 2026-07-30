@@ -26,7 +26,7 @@ export default function PembukuanFilter({
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
-    router.push(`/pembukuan?${next.toString()}`);
+    router.push(`/pembukuan?${next.toString()}`, { scroll: false });
   }
 
   // Default halaman = semua data. Export ikut itu (tanpa from/to) kecuali
@@ -58,7 +58,8 @@ export default function PembukuanFilter({
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
-            { value: "KONSINYASI", label: "Konsinyasi" },
+            { value: "WA", label: "WhatsApp / Offline" },
+            { value: "KONSINYASI", label: "Grosir / Reseller" },
           ]}
         />
       </label>
@@ -87,7 +88,7 @@ export default function PembukuanFilter({
 
       {hasFilter && (
         <button
-          onClick={() => router.push("/pembukuan")}
+          onClick={() => router.push("/pembukuan", { scroll: false })}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
         >
           <RotateCcw size={15} /> Reset

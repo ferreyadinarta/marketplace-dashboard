@@ -1,5 +1,17 @@
 import { prisma } from "./prisma";
 
+// HPP (modal) per item: pakai snapshot yang dibekukan saat jual; kalau 0
+// (data lama / order marketplace) fallback ke HPP product saat ini.
+function itemHpp(it: { hppSnapshot?: number | null; product?: { hpp: number } | null }): number {
+  return it.hppSnapshot && it.hppSnapshot > 0 ? it.hppSnapshot : it.product?.hpp ?? 0;
+}
+
+// Jumlah dalam SATUAN DASAR (untuk hitung modal/terjual konsisten). Pakai baseQty;
+// kalau 0 (data lama) fallback ke qty.
+function itemBaseQty(it: { baseQty?: number | null; qty: number }): number {
+  return it.baseQty && it.baseQty > 0 ? it.baseQty : it.qty;
+}
+
 export type DashboardFilter = {
   from?: Date;
   to?: Date;
@@ -44,7 +56,7 @@ export async function getSummary(f: DashboardFilter) {
     omzet += o.totalAmount;
     fee += o.marketplaceFee;
     for (const it of o.items) {
-      hpp += (it.product?.hpp ?? 0) * it.qty;
+      hpp += itemHpp(it) * itemBaseQty(it);
     }
   }
   const profit = omzet - fee - hpp;
@@ -64,7 +76,7 @@ export async function getDailyTrend(f: DashboardFilter) {
     const key = o.orderDate.toISOString().slice(0, 10);
     const cur = map.get(key) ?? { omzet: 0, profit: 0 };
     let hpp = 0;
-    for (const it of o.items) hpp += (it.product?.hpp ?? 0) * it.qty;
+    for (const it of o.items) hpp += itemHpp(it) * itemBaseQty(it);
     cur.omzet += o.totalAmount;
     cur.profit += o.totalAmount - o.marketplaceFee - hpp;
     map.set(key, cur);
@@ -83,7 +95,7 @@ export async function getByMarketplace(f: DashboardFilter) {
     const key = o.store.marketplace;
     const cur = map.get(key) ?? { omzet: 0, profit: 0, order: 0 };
     let hpp = 0;
-    for (const it of o.items) hpp += (it.product?.hpp ?? 0) * it.qty;
+    for (const it of o.items) hpp += itemHpp(it) * itemBaseQty(it);
     cur.omzet += o.totalAmount;
     cur.profit += o.totalAmount - o.marketplaceFee - hpp;
     cur.order += 1;
@@ -122,10 +134,10 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
     for (const it of o.items) {
       if (!it.productId) continue;
       const r = perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
-      r.terjual += it.qty;
+      r.terjual += itemBaseQty(it); // dalam satuan dasar (konsisten walau jual campur box/sachet)
       r.omzet += it.subtotal;
       r.fee += feePerItem;
-      r.hpp += (it.product?.hpp ?? 0) * it.qty;
+      r.hpp += itemHpp(it) * itemBaseQty(it);
       perProduct.set(it.productId, r);
     }
   }
@@ -183,7 +195,8 @@ export type LedgerRow = {
   groupName: string; // brand / grup pembukuan (atau "Tanpa Grup")
   sku: string; // kolom "Order" di format kakak
   productName: string;
-  qty: number;
+  qty: number; // dalam satuan saat dijual
+  unit: string; // label satuan jual (ex: box / sachet)
   price: number;
   fee: number; // ongkir/adm (fee proporsional per item)
   total: number; // net per item (omzet - fee + subsidi ongkir)
@@ -223,10 +236,11 @@ export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> 
         sku: it.product?.sku ?? it.marketplaceSku,
         productName: it.productName,
         qty: it.qty,
+        unit: it.unit || it.product?.unit || "",
         price: it.price,
         fee: Math.round(feePerItem),
         total: Math.round(it.subtotal - feePerItem + shipPerItem),
-        modal: (it.product?.hpp ?? 0) * it.qty,
+        modal: itemHpp(it) * itemBaseQty(it),
       });
     }
   }

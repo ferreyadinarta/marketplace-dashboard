@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -21,6 +22,7 @@ export function SubmitButton({
   className = "",
   icon,
   disabled = false,
+  notify,
 }: {
   children: ReactNode;
   pendingText?: string;
@@ -28,8 +30,16 @@ export function SubmitButton({
   className?: string;
   icon?: ReactNode;
   disabled?: boolean;
+  notify?: string; // kalau diisi: tampilkan toast saat submit selesai
 }) {
   const { pending } = useFormStatus();
+  const prev = useRef(false);
+  useEffect(() => {
+    if (prev.current && !pending && notify) {
+      window.dispatchEvent(new CustomEvent("app:toast", { detail: notify }));
+    }
+    prev.current = pending;
+  }, [pending, notify]);
   return (
     <button
       type="submit"
