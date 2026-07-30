@@ -27,6 +27,13 @@ export type NormalizedOrder = {
   items: NormalizedOrderItem[];
 };
 
+// Product katalog marketplace yang sudah dinormalisasi untuk di-import ke Master Product.
+export type ImportedProduct = {
+  sku: string; // seller SKU (kunci dedup). Kosong = tak bisa di-import/map.
+  name: string;
+  price: number; // harga jual di marketplace, rupiah bulat
+};
+
 export type NormalizedPayout = {
   payoutDate: Date;
   amount: number;

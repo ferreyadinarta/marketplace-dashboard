@@ -43,7 +43,7 @@ export default async function RekonsiliasiPage() {
       ) : (
         <Card className="overflow-hidden">
           <CardHeader title="Per Toko" subtitle="Data payout terisi otomatis lewat sync marketplace." />
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -93,6 +93,57 @@ export default async function RekonsiliasiPage() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="space-y-3 p-4 md:hidden">
+            {rows.map((r) => {
+              const belumAdaPayout = r.danaCair === 0;
+              const cocok = r.selisih === 0 && !belumAdaPayout;
+              return (
+                <div key={r.store.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">{r.store.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{MARKETPLACE_LABEL[r.store.marketplace]}</p>
+                    </div>
+                    {belumAdaPayout ? (
+                      <Badge color="slate">
+                        <Clock size={13} /> Payout belum masuk
+                      </Badge>
+                    ) : cocok ? (
+                      <Badge color="green">
+                        <CheckCircle2 size={13} /> Cocok
+                      </Badge>
+                    ) : (
+                      <Badge color="amber">
+                        <AlertTriangle size={13} /> Perlu dicek
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Net Seharusnya</span>
+                      <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.netSeharusnya)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Dana Cair</span>
+                      <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.danaCair)}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-slate-400">Selisih</span>
+                      <span
+                        className={`font-semibold tabular-nums ${
+                          r.selisih === 0 ? "text-slate-400" : "text-amber-600"
+                        }`}
+                      >
+                        {rupiah(r.selisih)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

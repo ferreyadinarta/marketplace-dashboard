@@ -91,6 +91,7 @@ export default async function StokPage({
     unit: l.unit,
     packUnit: l.packUnit,
     packSize: l.packSize,
+    current: l.current,
   }));
   const bulkItems = levels.map((l) => ({
     productId: l.productId,
@@ -182,7 +183,7 @@ export default async function StokPage({
             />
           )
         ) : (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -262,6 +263,80 @@ export default async function StokPage({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* daftar stok — versi kartu untuk mobile */}
+        {rows.length > 0 && (
+          <div className="space-y-3 p-4 md:hidden">
+            {rows.map((l) => {
+              const meta = statusMeta[l.status];
+              const info = opnameInfo(l.hasOpname, l.anchorAt, now);
+              return (
+                <div key={l.productId} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900">{l.name}</p>
+                      <p className="font-mono text-xs text-slate-500">{l.sku}</p>
+                      <p className={`text-[11px] ${info.overdue ? "text-amber-600" : "text-slate-400"}`}>{info.label}</p>
+                    </div>
+                    <Badge color={meta.color}>
+                      {l.status === "OK" && <CheckCircle2 size={13} />}
+                      {meta.label}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div>
+                      <span className="block text-[11px] text-slate-400">Stok</span>
+                      {l.status === "UNSET" ? (
+                        <span className="text-lg font-bold text-slate-300">—</span>
+                      ) : (
+                        <span>
+                          <span
+                            className={`text-lg font-bold tabular-nums ${
+                              l.status === "OUT" ? "text-red-600" : l.status === "LOW" ? "text-amber-600" : "text-slate-900"
+                            }`}
+                          >
+                            {l.current}
+                          </span>
+                          <span className="ml-1 text-xs font-normal text-slate-400">{l.unit}</span>
+                          {l.packSize > 0 && l.current > 0 && (
+                            <span className="block text-[10px] text-slate-400">
+                              {packBreakdown(l.current, l.packSize, l.packUnit, l.unit)}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[11px] text-slate-400">Terjual</span>
+                      <span className="tabular-nums text-slate-600">{l.soldTotal}</span>
+                      <span className="ml-1 text-xs text-slate-400">{l.unit}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs text-slate-500">Min. stok (alert)</span>
+                      <MinStockCell productId={l.productId} minStock={l.minStock} action={updateMinStock} />
+                    </div>
+                    <div>
+                      <span className="mb-1 block text-xs text-slate-500">Opname (hitung fisik)</span>
+                      <OpnameCell
+                        productId={l.productId}
+                        current={l.current}
+                        known={l.status !== "UNSET"}
+                        unit={l.unit}
+                        packUnit={l.packUnit}
+                        packSize={l.packSize}
+                        action={saveOpname}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

@@ -69,7 +69,7 @@ export default async function PembukuanPage({
                   <span className="font-semibold text-emerald-600">{rupiah(g.subtotal.profit)}</span>
                 </span>
               </div>
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -120,6 +120,66 @@ export default async function PembukuanPage({
                   </tfoot>
                 </table>
               </div>
+
+              {/* Mobile: kartu bertumpuk */}
+              {g.rows.length > 0 && (
+                <div className="space-y-3 p-4 md:hidden">
+                  {g.rows.map((r) => (
+                    <div key={r.productId} className="rounded-xl border border-slate-200 p-4">
+                      <div className="font-semibold text-slate-900">{r.name}</div>
+                      <div className="mt-1 flex flex-col">
+                        <span className="text-[11px] text-slate-400">SKU</span>
+                        <span className="font-mono text-xs text-slate-500">{r.sku}</span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400">Terjual</span>
+                          <span className="text-slate-600 tabular-nums">{r.terjual}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400">Omzet</span>
+                          <span className="text-slate-600 tabular-nums">{rupiah(r.omzet)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400">Fee</span>
+                          <span className="text-red-500 tabular-nums">{rupiah(r.fee)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400">HPP/unit</span>
+                          <span className="text-slate-400 tabular-nums">{rupiah(r.hpp)}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                        <span className="text-[11px] text-slate-400">Profit</span>
+                        <span className="font-semibold text-emerald-600 tabular-nums">{rupiah(r.profit)}</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Subtotal grup */}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="font-semibold text-slate-700">Subtotal {g.groupName}</div>
+                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-slate-400">Terjual</span>
+                        <span className="font-semibold text-slate-700 tabular-nums">{g.subtotal.terjual}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-slate-400">Omzet</span>
+                        <span className="font-semibold text-slate-700 tabular-nums">{rupiah(g.subtotal.omzet)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-slate-400">Fee</span>
+                        <span className="font-semibold text-red-500 tabular-nums">{rupiah(g.subtotal.fee)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-slate-400">Profit</span>
+                        <span className="font-semibold text-emerald-600 tabular-nums">{rupiah(g.subtotal.profit)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           ))}
         </>

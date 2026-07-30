@@ -12,7 +12,7 @@ type Option = { value: string; label: string };
 type Action = (formData: FormData) => void | Promise<void>;
 
 // ---------- Barang masuk (restock) — multi-product ----------
-type RestockOption = { value: string; label: string; unit?: string; packUnit?: string; packSize?: number };
+type RestockOption = { value: string; label: string; unit?: string; packUnit?: string; packSize?: number; current?: number };
 type RItem = { productId: string; qty: string; cost: string; unit: "base" | "pack" };
 
 export function RestockForm({
@@ -82,82 +82,131 @@ export function RestockForm({
     <form action={submit} onSubmit={validate} noValidate className="space-y-5 p-5">
       <input type="hidden" name="items" value={JSON.stringify(clean)} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Tanggal masuk">
+      <Field label="Tanggal masuk">
+        <div className="sm:max-w-[15rem]">
           <DatePicker name="tanggal" defaultValue={today} />
-        </Field>
-      </div>
+        </div>
+      </Field>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-slate-600">
-            Product masuk <span className="text-slate-400">(harga beli/unit → update rata-rata HPP)</span>
-          </span>
+          <span className="text-sm font-medium text-slate-700">Product masuk</span>
           {error && <span className="text-xs font-medium text-red-500">{error}</span>}
         </div>
-        {items.map((it, i) => (
-          <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 p-2 sm:flex-nowrap">
-            <div className="min-w-0 flex-1">
-              <Select
-                value={it.productId}
-                onValueChange={(v) => chooseProduct(i, v)}
-                placeholder="Pilih product…"
-                options={products}
-                searchable
-              />
-            </div>
-            <input
-              aria-label="Jumlah masuk"
-              type="number"
-              min="1"
-              value={it.qty}
-              onChange={(e) => setItem(i, "qty", e.target.value)}
-              placeholder="Qty"
-              className="h-10 w-20 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-            {hasPack(it.productId) ? (
-              <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-300 text-xs">
+        <p className="text-xs text-slate-400">
+          Pilih product, isi jumlah & satuannya. Harga beli/unit opsional — isi kalau harganya berubah supaya
+          rata-rata HPP ikut ter-update.
+        </p>
+
+        {items.map((it, i) => {
+          const p = prodOf(it.productId);
+          const pack = hasPack(it.productId);
+          const baseUnit = p?.unit || "unit";
+          const qtyNum = Math.max(0, Math.floor(Number(it.qty) || 0));
+          const addBase = qtyNum * (it.unit === "pack" ? p?.packSize || 1 : 1);
+          const cur = p?.current ?? 0;
+          const lbl = "mb-1 block text-[11px] font-medium text-slate-500";
+          return (
+            <div key={i} className="rounded-xl border border-slate-200 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className={lbl}>Product</label>
+                  <Select
+                    value={it.productId}
+                    onValueChange={(v) => chooseProduct(i, v)}
+                    placeholder="Pilih product…"
+                    options={products}
+                    searchable
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <div>
+                    <label className={lbl}>Jumlah</label>
+                    <input
+                      aria-label="Jumlah masuk"
+                      type="number"
+                      min="1"
+                      value={it.qty}
+                      onChange={(e) => setItem(i, "qty", e.target.value)}
+                      className="h-10 w-20 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    />
+                  </div>
+                  <div>
+                    <label className={lbl}>Satuan</label>
+                    {pack ? (
+                      <div className="flex h-10 overflow-hidden rounded-lg border border-slate-300 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setUnit(i, "base")}
+                          className={it.unit === "base" ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
+                        >
+                          {p?.unit}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUnit(i, "pack")}
+                          className={it.unit === "pack" ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
+                        >
+                          {p?.packUnit}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-500">
+                        {baseUnit}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="sm:w-40">
+                  <label className={lbl}>
+                    Harga beli/unit <span className="text-slate-400">(opsional)</span>
+                  </label>
+                  <CurrencyInput
+                    value={Number(it.cost) || 0}
+                    onValueChange={(n) => setItem(i, "cost", String(n))}
+                    placeholder="0"
+                    className="h-10"
+                  />
+                </div>
                 <button
                   type="button"
-                  onClick={() => setUnit(i, "base")}
-                  className={it.unit === "base" ? "bg-indigo-600 px-2 py-2 font-medium text-white" : "px-2 py-2 text-slate-600 hover:bg-slate-50"}
+                  onClick={() => removeRow(i)}
+                  disabled={items.length === 1}
+                  aria-label="Hapus baris"
+                  className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 sm:flex"
                 >
-                  {prodOf(it.productId)?.unit}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUnit(i, "pack")}
-                  className={it.unit === "pack" ? "bg-indigo-600 px-2 py-2 font-medium text-white" : "px-2 py-2 text-slate-600 hover:bg-slate-50"}
-                >
-                  {prodOf(it.productId)?.packUnit}
+                  <X size={16} />
                 </button>
               </div>
-            ) : (
-              <span className="w-10 shrink-0 truncate text-xs text-slate-400">{unitOf(it.productId) || "unit"}</span>
-            )}
-            <div className="w-32 shrink-0">
-              <CurrencyInput
-                value={Number(it.cost) || 0}
-                onValueChange={(n) => setItem(i, "cost", String(n))}
-                placeholder="Beli/unit"
-                className="h-10"
-              />
+
+              {/* preview stok + hapus (mobile) */}
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                {p ? (
+                  <p className="text-xs text-slate-500">
+                    Stok sekarang: <span className="font-medium text-slate-700">{cur} {baseUnit}</span>
+                    {addBase > 0 && (
+                      <> → jadi <span className="font-semibold text-emerald-600">{cur + addBase} {baseUnit}</span></>
+                    )}
+                  </p>
+                ) : (
+                  <span className="text-xs text-slate-400">Belum pilih product</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  disabled={items.length === 1}
+                  className="text-xs font-medium text-red-500 hover:underline disabled:opacity-30 sm:hidden"
+                >
+                  Hapus
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => removeRow(i)}
-              disabled={items.length === 1}
-              aria-label="Hapus baris"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
         <button
           type="button"
           onClick={addRow}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 sm:w-auto"
         >
           <Plus size={15} /> Tambah product
         </button>

@@ -119,7 +119,7 @@ export function Select({
         onClick={toggle}
         className={`flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 ${className}`}
       >
-        <span className={`truncate ${selected ? "" : "text-slate-400"}`}>
+        <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-slate-400"}`}>
           {selected ? selected.label : placeholder}
         </span>
         <ChevronDown
@@ -172,7 +172,7 @@ export function Select({
                             : "text-slate-700 hover:bg-slate-100"
                         }`}
                       >
-                        <span className="whitespace-nowrap">{o.label}</span>
+                        <span className="min-w-0 flex-1 truncate">{o.label}</span>
                         {active && <Check size={15} className="shrink-0 text-indigo-600" />}
                       </button>
                     </li>

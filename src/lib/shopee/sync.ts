@@ -2,11 +2,13 @@ import type { Store } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
 import type { NormalizedOrder } from "@/lib/adapters/types";
+import type { ImportedProduct } from "@/lib/adapters/types";
 import {
   refreshAccessToken,
   getOrderSnList,
   getOrderDetails,
   getEscrowDetail,
+  fetchShopeeCatalog,
   type ShopeeOrderDetail,
   type ShopeeIncome,
 } from "./client";
@@ -141,6 +143,14 @@ export async function syncShopeeStore(storeId: string, from: Date, to: Date) {
   const r = await ingestOrders(store.id, normalized);
   await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
   return r;
+}
+
+// Ambil katalog product toko Shopee (untuk import ke Master Product).
+export async function getShopeeCatalog(storeId: string): Promise<ImportedProduct[]> {
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error("Toko tidak ditemukan");
+  const accessToken = await ensureFreshToken(store);
+  return fetchShopeeCatalog(accessToken, store.shopIdApi!);
 }
 
 // Sync order tertentu berdasarkan order_sn (dipakai webhook realtime Shopee).

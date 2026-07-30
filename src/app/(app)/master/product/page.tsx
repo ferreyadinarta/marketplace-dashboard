@@ -1,11 +1,15 @@
-import { Package, Search } from "lucide-react";
+import { Package, Search, CheckCircle, XCircle, PackageOpen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup } from "./actions";
+import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices } from "./actions";
+import { importStoreProducts } from "../toko/import-actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
 import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
 import { ProductRow } from "@/components/EditableRows";
+import { BulkPriceForm } from "@/components/BulkPriceForm";
+import { SubmitButton } from "@/components/SubmitButton";
 import { Pagination, PaginationControls } from "@/components/Pagination";
+import { MARKETPLACE_LABEL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +33,11 @@ export default async function MasterProductPage({
       }
     : {};
 
-  const [products, total, groups] = await Promise.all([
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+  const importStatus = one(sp.import);
+  const reason = one(sp.reason);
+
+  const [products, total, groups, priceRows, connectedStores] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { group: true },
@@ -39,6 +47,16 @@ export default async function MasterProductPage({
     }),
     prisma.product.count({ where }),
     prisma.bookkeepingGroup.findMany({ orderBy: { name: "asc" } }),
+    // semua product (untuk panel isi harga massal), field harga saja
+    prisma.product.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, sku: true, hpp: true, priceRetail: true, priceGrosir: true },
+    }),
+    // toko marketplace yang sudah terhubung → sumber import product
+    prisma.store.findMany({
+      where: { marketplace: { in: ["SHOPEE", "TIKTOK"] }, accessToken: { not: null } },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -59,6 +77,49 @@ export default async function MasterProductPage({
         title="Master Product"
         description="Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit."
       />
+
+      {importStatus === "ok" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          Import selesai: <strong>{one(sp.created) ?? 0} product baru</strong>, {one(sp.existing) ?? 0} sudah ada
+          {Number(one(sp.nosku) ?? 0) > 0 ? `, ${one(sp.nosku)} dilewati (tanpa SKU)` : ""}. Lengkapi HPP-nya
+          lewat “Isi Harga Massal” di bawah.
+        </div>
+      )}
+      {importStatus === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Import gagal: {reason ?? "unknown"}
+        </div>
+      )}
+
+      {/* import product dari marketplace terhubung */}
+      {connectedStores.length > 0 && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Import Produk dari Marketplace</h2>
+              <p className="mt-0.5 text-sm text-slate-500">
+                Tarik katalog dari toko terhubung → jadi Master Product otomatis. Product yang SKU-nya sudah ada
+                tidak diubah (HPP/harga manual aman).
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {connectedStores.map((s) => (
+                <form key={s.id} action={importStoreProducts}>
+                  <input type="hidden" name="storeId" value={s.id} />
+                  <SubmitButton variant="outline" icon={<PackageOpen size={15} />} pendingText="Import…" className="text-sm">
+                    {s.name} ({MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace})
+                  </SubmitButton>
+                </form>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* isi harga massal (HPP / retail / grosir sekaligus) */}
+      <BulkPriceForm products={priceRows} action={saveBulkPrices} />
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* form tambah product */}

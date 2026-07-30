@@ -1,5 +1,6 @@
 import { SHOPEE } from "./config";
 import { sign, nowTimestamp } from "./sign";
+import type { ImportedProduct } from "@/lib/adapters/types";
 
 // ---------- Authorize (langkah 1: seller klik izinkan) ----------
 // Redirect seller ke halaman izin Shopee. Setelah setuju, Shopee balik ke
@@ -141,6 +142,77 @@ export async function getOrderSnList(
     cursor = r.next_cursor;
   }
   return all;
+}
+
+// ---------- Katalog product (untuk import ke Master Product) ----------
+type ShopeeItem = {
+  item_id: number;
+  item_name?: string;
+  item_sku?: string;
+  has_model?: boolean;
+  price_info?: { current_price?: number }[];
+};
+type ShopeeModel = {
+  model_sku?: string;
+  price_info?: { current_price?: number }[];
+};
+
+// Ambil semua product toko (termasuk varian/model) → normalized ImportedProduct.
+export async function fetchShopeeCatalog(
+  accessToken: string,
+  shopId: string
+): Promise<ImportedProduct[]> {
+  // 1. daftar item_id (paginate)
+  const itemIds: number[] = [];
+  let offset = 0;
+  for (let i = 0; i < 100; i++) {
+    const r = await shopGet<{ item?: { item_id: number }[]; has_next_page?: boolean; next_offset?: number }>(
+      "/api/v2/product/get_item_list",
+      accessToken,
+      shopId,
+      { offset: String(offset), page_size: "100", item_status: "NORMAL" }
+    );
+    for (const it of r.item ?? []) itemIds.push(it.item_id);
+    if (!r.has_next_page) break;
+    offset = r.next_offset ?? offset + 100;
+  }
+
+  // 2. detail per batch 50; varian → ambil model list
+  const out: ImportedProduct[] = [];
+  for (let i = 0; i < itemIds.length; i += 50) {
+    const chunk = itemIds.slice(i, i + 50);
+    const r = await shopGet<{ item_list?: ShopeeItem[] }>(
+      "/api/v2/product/get_item_base_info",
+      accessToken,
+      shopId,
+      { item_id_list: chunk.join(",") }
+    );
+    for (const it of r.item_list ?? []) {
+      const name = it.item_name || "(tanpa nama)";
+      if (it.has_model) {
+        const m = await shopGet<{ model?: ShopeeModel[] }>(
+          "/api/v2/product/get_model_list",
+          accessToken,
+          shopId,
+          { item_id: String(it.item_id) }
+        );
+        for (const md of m.model ?? []) {
+          out.push({
+            sku: md.model_sku || "",
+            name,
+            price: Math.round(md.price_info?.[0]?.current_price ?? 0),
+          });
+        }
+      } else {
+        out.push({
+          sku: it.item_sku || "",
+          name,
+          price: Math.round(it.price_info?.[0]?.current_price ?? 0),
+        });
+      }
+    }
+  }
+  return out;
 }
 
 // ---------- Shop profile (nama + logo toko) ----------

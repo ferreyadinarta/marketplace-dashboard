@@ -106,6 +106,38 @@ export async function getAuthorizedShops(accessToken: string): Promise<TiktokSho
   return data.shops ?? [];
 }
 
+// ---------- Products (untuk import katalog) ----------
+export type TiktokProduct = {
+  id: string;
+  title?: string;
+  skus?: { seller_sku?: string; price?: { sale_price?: string } }[];
+};
+
+// Cari semua product toko (paginate) untuk import ke Master Product.
+export async function searchProducts(
+  accessToken: string,
+  shopCipher: string
+): Promise<TiktokProduct[]> {
+  const all: TiktokProduct[] = [];
+  let pageToken = "";
+  for (let i = 0; i < 100; i++) {
+    const data = await signedFetch<{ products?: TiktokProduct[]; next_page_token?: string }>(
+      "POST",
+      `/product/${TIKTOK.apiVersion}/products/search`,
+      accessToken,
+      {
+        shopCipher,
+        query: { page_size: "100", ...(pageToken ? { page_token: pageToken } : {}) },
+        body: {},
+      }
+    );
+    if (data.products?.length) all.push(...data.products);
+    if (!data.next_page_token) break;
+    pageToken = data.next_page_token;
+  }
+  return all;
+}
+
 // ---------- Orders ----------
 // Bentuk order dari TikTok (subset yang kita pakai). Perlu diverifikasi saat test.
 export type TiktokOrder = {

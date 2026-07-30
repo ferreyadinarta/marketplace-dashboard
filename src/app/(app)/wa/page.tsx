@@ -74,7 +74,7 @@ export default async function WaPage({
             description="Catat penjualan pertama lewat form di atas."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -121,6 +121,56 @@ export default async function WaPage({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        {sales.length > 0 && (
+          <div className="space-y-3 p-4 md:hidden">
+            {sales.map((o) => {
+              const totalQty = o.items.reduce((a, it) => a + it.qty, 0);
+              return (
+                <div key={o.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-900">{tanggal(o.orderDate)}</div>
+                    <form action={deleteWaSale} className="inline">
+                      <input type="hidden" name="id" value={o.id} />
+                      <SubmitButton
+                        variant="ghost"
+                        className="px-2 py-1.5 text-red-500 hover:bg-red-50"
+                        pendingText="…"
+                      >
+                        <Trash2 size={16} />
+                      </SubmitButton>
+                    </form>
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <span className="text-[11px] text-slate-400">Pembeli</span>
+                      <div className="text-sm text-slate-600">{o.buyerName ?? "-"}</div>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-400">Product</span>
+                      <div className="space-y-0.5 text-sm font-medium text-slate-900">
+                        {o.items.map((it) => (
+                          <div key={it.id}>
+                            {it.productName} <span className="text-slate-400">×{it.qty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-[11px] text-slate-400">Jumlah</span>
+                        <div className="text-sm tabular-nums text-slate-600">{totalQty}</div>
+                      </div>
+                      <div>
+                        <span className="text-[11px] text-slate-400">Omzet</span>
+                        <div className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(o.totalAmount)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         <Pagination

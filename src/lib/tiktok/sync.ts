@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
-import type { NormalizedOrder } from "@/lib/adapters/types";
-import { refreshAccessToken, searchOrders, type TiktokOrder } from "./client";
+import type { NormalizedOrder, ImportedProduct } from "@/lib/adapters/types";
+import {
+  refreshAccessToken,
+  searchOrders,
+  searchProducts,
+  type TiktokOrder,
+} from "./client";
 
 function toNum(v?: string): number {
   if (!v) return 0;
@@ -89,4 +94,47 @@ export async function syncTiktokStore(storeId: string, from: Date, to: Date) {
 
   const normalized = orders.map(normalize);
   return ingestOrders(store.id, normalized);
+}
+
+// Ambil katalog product toko TikTok (untuk import ke Master Product).
+export async function getTiktokCatalog(storeId: string): Promise<ImportedProduct[]> {
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error("Toko tidak ditemukan");
+  if (!store.accessToken || !store.shopCipher) {
+    throw new Error(`Toko "${store.name}" belum terhubung (authorize dulu).`);
+  }
+
+  let accessToken = store.accessToken;
+  const soon = Date.now() + 5 * 60 * 1000;
+  if (store.tokenExpiresAt && store.tokenExpiresAt.getTime() < soon && store.refreshToken) {
+    const t = await refreshAccessToken(store.refreshToken);
+    accessToken = t.accessToken;
+    await prisma.store.update({
+      where: { id: store.id },
+      data: {
+        accessToken: t.accessToken,
+        refreshToken: t.refreshToken,
+        tokenExpiresAt: new Date(t.accessTokenExpireAt * 1000),
+      },
+    });
+  }
+
+  const products = await searchProducts(accessToken, store.shopCipher);
+  const out: ImportedProduct[] = [];
+  for (const p of products) {
+    const skus = p.skus ?? [];
+    if (skus.length === 0) {
+      out.push({ sku: "", name: p.title || "(tanpa nama)", price: 0 });
+      continue;
+    }
+    for (const s of skus) {
+      const price = parseFloat(s.price?.sale_price ?? "0");
+      out.push({
+        sku: s.seller_sku || "",
+        name: p.title || "(tanpa nama)",
+        price: Number.isFinite(price) ? Math.round(price) : 0,
+      });
+    }
+  }
+  return out;
 }

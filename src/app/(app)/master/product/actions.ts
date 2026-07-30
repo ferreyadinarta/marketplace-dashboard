@@ -143,3 +143,28 @@ export async function deleteGroup(formData: FormData) {
   revalidatePath("/master/product");
   revalidatePath("/pembukuan");
 }
+
+// Simpan HPP / harga retail / harga grosir banyak product sekaligus (bulk).
+export async function saveBulkPrices(formData: FormData) {
+  const raw = String(formData.get("prices") ?? "[]");
+  let rows: { id: string; hpp?: number; retail?: number; grosir?: number }[] = [];
+  try {
+    rows = JSON.parse(raw);
+  } catch {
+    rows = [];
+  }
+
+  for (const r of rows) {
+    if (!r.id) continue;
+    await prisma.product.update({
+      where: { id: r.id },
+      data: {
+        hpp: Math.max(0, Math.floor(r.hpp ?? 0)),
+        priceRetail: Math.max(0, Math.floor(r.retail ?? 0)),
+        priceGrosir: Math.max(0, Math.floor(r.grosir ?? 0)),
+      },
+    });
+  }
+
+  revalidatePath("/master/product");
+}

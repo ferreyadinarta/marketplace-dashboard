@@ -204,7 +204,7 @@ export default async function DashboardPage({
         {/* per marketplace */}
         <Card>
           <CardHeader title="Performa per Marketplace" subtitle="Kontribusi tiap platform" />
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -234,6 +234,36 @@ export default async function DashboardPage({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* mobile: kartu bertumpuk */}
+          <div className="space-y-3 p-4 md:hidden">
+            {byMp.map((m) => (
+              <div key={m.marketplace} className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-3 text-sm font-bold text-slate-900">
+                  {MARKETPLACE_LABEL[m.marketplace] ?? m.marketplace}
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Order</span>
+                    <span className="text-sm tabular-nums text-slate-700">{m.order.toLocaleString("id-ID")}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Omzet</span>
+                    <span className="text-sm font-semibold tabular-nums text-slate-700">{rupiah(m.omzet)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Profit</span>
+                    <span className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(m.profit)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {byMp.length === 0 && (
+              <p className="py-10 text-center text-sm text-slate-400">
+                Belum ada data penjualan di periode ini.
+              </p>
+            )}
           </div>
         </Card>
 

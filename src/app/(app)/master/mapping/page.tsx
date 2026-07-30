@@ -113,7 +113,7 @@ export default async function MappingPage({
             />
           )
         ) : (
-          <div className="overflow-x-auto">
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -149,6 +149,44 @@ export default async function MappingPage({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {mappings.length > 0 && (
+          <div className="space-y-3 p-4 md:hidden">
+            {mappings.map((m) => (
+              <div
+                key={m.id}
+                className={`rounded-xl border border-slate-200 p-4 ${
+                  !m.productId ? "bg-amber-50/50" : ""
+                }`}
+              >
+                <p className="font-mono text-sm font-bold text-slate-900">{m.marketplaceSku}</p>
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Toko</span>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <Badge color="slate">{MARKETPLACE_LABEL[m.store.marketplace]}</Badge>
+                      <span className="text-sm text-slate-600">{m.store.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Nama di Marketplace</span>
+                    <span className="mt-0.5 text-sm text-slate-600">{m.marketplaceProductName}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] text-slate-400">Product Internal</span>
+                    <div className="mt-1">
+                      <MappingRow
+                        mappingId={m.id}
+                        initialProductId={m.productId ?? ""}
+                        action={assignMapping}
+                        options={productOptions}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
         <Pagination
