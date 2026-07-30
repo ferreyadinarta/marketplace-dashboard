@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PackagePlus, Plus, Search, X, ClipboardCheck, ArrowUpNarrowWide, ChevronDown, ClipboardList } from "lucide-react";
-import { Field, inputClass, Select } from "@/components/ui";
+import { Field, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { DatePicker } from "@/components/DatePicker";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -63,6 +63,13 @@ export function RestockForm({
     } else setError(undefined);
   }
 
+  // Bungkus server action → setelah tersimpan, kosongkan lagi form-nya.
+  async function submit(formData: FormData) {
+    await action(formData);
+    setItems([{ productId: "", qty: "1", cost: "", unit: "base" }]);
+    setError(undefined);
+  }
+
   if (products.length === 0) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
@@ -72,15 +79,12 @@ export function RestockForm({
   }
 
   return (
-    <form action={action} onSubmit={validate} noValidate className="space-y-5 p-5">
+    <form action={submit} onSubmit={validate} noValidate className="space-y-5 p-5">
       <input type="hidden" name="items" value={JSON.stringify(clean)} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Tanggal masuk">
           <DatePicker name="tanggal" defaultValue={today} />
-        </Field>
-        <Field label="Catatan (opsional)" hint="Berlaku untuk semua product di bawah. Misal: no. nota / supplier.">
-          <input name="note" placeholder="ex: PO Maret" className={inputClass} />
         </Field>
       </div>
 

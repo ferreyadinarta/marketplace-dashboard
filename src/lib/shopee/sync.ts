@@ -6,7 +6,9 @@ import {
   refreshAccessToken,
   getOrderSnList,
   getOrderDetails,
+  getEscrowDetail,
   type ShopeeOrderDetail,
+  type ShopeeIncome,
 } from "./client";
 
 // Pastikan access token masih valid (Shopee token cuma 4 jam) → refresh bila
@@ -71,11 +73,49 @@ function normalize(o: ShopeeOrderDetail): NormalizedOrder {
     status: mapStatus(o.order_status),
     buyerName: o.buyer_username ?? undefined,
     totalAmount: subtotal, // omzet = nilai produk
-    marketplaceFee: 0, // TODO: get_escrow_detail
+    marketplaceFee: 0, // diisi dari escrow (lihat normalizeWithFees)
     shippingSubsidy: 0,
     netAmount: subtotal,
     items,
   };
+}
+
+// Total fee marketplace yang dipotong Shopee dari income detail.
+function feeFromIncome(inc: ShopeeIncome): number {
+  const f =
+    (inc.commission_fee ?? 0) +
+    (inc.service_fee ?? 0) +
+    (inc.seller_transaction_fee ?? 0) +
+    (inc.credit_card_transaction_fee ?? 0) +
+    (inc.campaign_fee ?? 0);
+  return Number.isFinite(f) ? Math.round(f) : 0;
+}
+
+// Normalisasi + ambil fee escrow per order. Escrow di-skip HANYA untuk UNPAID
+// (belum dibayar → escrow pasti belum ada). CANCELLED & RETURNED tetap dicek:
+// Shopee sering masih memotong sebagian fee / ada penyesuaian refund, jadi butuh
+// datanya biar pembukuan akurat. Escrow gagal → fee tetap 0, sync jalan terus.
+async function normalizeWithFees(
+  accessToken: string,
+  shopId: string,
+  details: ShopeeOrderDetail[]
+): Promise<NormalizedOrder[]> {
+  const out: NormalizedOrder[] = [];
+  for (const o of details) {
+    const order = normalize(o);
+    const st = (o.order_status || "").toUpperCase();
+    if (st !== "UNPAID") {
+      const inc = await getEscrowDetail(accessToken, shopId, o.order_sn);
+      if (inc) {
+        order.marketplaceFee = feeFromIncome(inc);
+        if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
+          order.netAmount = Math.round(inc.escrow_amount);
+        }
+      }
+    }
+    out.push(order);
+  }
+  return out;
 }
 
 // Sync satu toko Shopee: refresh token kalau perlu → ambil order → normalisasi → simpan.
@@ -97,7 +137,7 @@ export async function syncShopeeStore(storeId: string, from: Date, to: Date) {
   }
 
   const details = await getOrderDetails(accessToken, shopId, sns);
-  const normalized = details.map(normalize);
+  const normalized = await normalizeWithFees(accessToken, shopId, details);
   const r = await ingestOrders(store.id, normalized);
   await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
   return r;
@@ -113,7 +153,7 @@ export async function syncShopeeOrders(storeId: string, orderSns: string[]) {
   const shopId = store.shopIdApi!;
 
   const details = await getOrderDetails(accessToken, shopId, orderSns);
-  const normalized = details.map(normalize);
+  const normalized = await normalizeWithFees(accessToken, shopId, details);
   const r = await ingestOrders(store.id, normalized);
   await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
   return r;

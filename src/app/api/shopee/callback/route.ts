@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exchangeToken } from "@/lib/shopee/client";
+import { exchangeToken, getShopProfile } from "@/lib/shopee/client";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,13 @@ export async function GET(req: NextRequest) {
     const token = await exchangeToken(code, shopId);
     const tokenExpiresAt = new Date(Date.now() + token.expireIn * 1000);
 
+    // ambil nama + foto toko (opsional, tidak boleh menggagalkan authorize)
+    const profile = await getShopProfile(token.accessToken, shopId);
+
     const base = {
       marketplace: "SHOPEE",
       shopIdApi: shopId,
+      logoUrl: profile.logoUrl ?? null,
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,
       tokenExpiresAt,
@@ -33,7 +37,9 @@ export async function GET(req: NextRequest) {
       // jangan timpa nama toko yang mungkin sudah diedit user
       await prisma.store.update({ where: { id: existing.id }, data: base });
     } else {
-      await prisma.store.create({ data: { ...base, name: `Shopee ${shopId}` } });
+      await prisma.store.create({
+        data: { ...base, name: profile.shopName || `Shopee ${shopId}` },
+      });
     }
 
     return back("shopee=connected");

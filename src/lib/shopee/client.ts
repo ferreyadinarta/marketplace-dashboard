@@ -143,6 +143,54 @@ export async function getOrderSnList(
   return all;
 }
 
+// ---------- Shop profile (nama + logo toko) ----------
+export type ShopProfile = { shopName?: string; logoUrl?: string };
+
+// Ambil profil toko (nama + foto). Balikin {} kalau gagal — jangan blok authorize.
+export async function getShopProfile(accessToken: string, shopId: string): Promise<ShopProfile> {
+  try {
+    const r = await shopGet<{ shop_logo?: string; shop_name?: string }>(
+      "/api/v2/shop/get_profile",
+      accessToken,
+      shopId
+    );
+    return { shopName: r.shop_name || undefined, logoUrl: r.shop_logo || undefined };
+  } catch {
+    return {};
+  }
+}
+
+// ---------- Escrow (fee marketplace sebenarnya) ----------
+// order_income = rincian uang order: escrow (yang cair) + semua fee yang dipotong.
+export type ShopeeIncome = {
+  escrow_amount?: number; // jumlah bersih yang cair ke seller
+  commission_fee?: number;
+  service_fee?: number;
+  seller_transaction_fee?: number;
+  credit_card_transaction_fee?: number;
+  campaign_fee?: number;
+};
+
+// Ambil rincian escrow satu order. Balikin null kalau belum ada (mis. order
+// belum dibayar) atau API error — biar sync tetap jalan tanpa fee.
+export async function getEscrowDetail(
+  accessToken: string,
+  shopId: string,
+  orderSn: string
+): Promise<ShopeeIncome | null> {
+  try {
+    const r = await shopGet<{ order_income?: ShopeeIncome }>(
+      "/api/v2/payment/get_escrow_detail",
+      accessToken,
+      shopId,
+      { order_sn: orderSn }
+    );
+    return r.order_income ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // Detail order (maks 50 order_sn per panggilan).
 export async function getOrderDetails(
   accessToken: string,

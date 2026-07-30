@@ -16,6 +16,7 @@ model Store {
   apiKey      String?
   apiSecret   String?
   shopIdApi   String? // id toko di sisi marketplace (shop_id)
+  logoUrl     String? // URL foto profil toko (diambil saat authorize)
   isActive    Boolean  @default(true)
   lastSyncAt  DateTime?
   createdAt   DateTime @default(now())
