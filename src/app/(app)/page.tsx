@@ -1,5 +1,19 @@
 import Link from "next/link";
-import { TrendingUp, Receipt, Boxes, Wallet, AlertTriangle, ArrowRight, Trophy } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  TrendingUp,
+  Receipt,
+  Boxes,
+  Wallet,
+  AlertTriangle,
+  ArrowRight,
+  Trophy,
+  MessageCircle,
+  Handshake,
+  PackagePlus,
+  Package,
+  CalendarClock,
+} from "lucide-react";
 import {
   getSummary,
   getDailyTrend,
@@ -7,6 +21,7 @@ import {
   getBestSellers,
   previousPeriod,
 } from "@/lib/queries";
+import { getStockLevels } from "@/lib/stock";
 import { getSetupStatus } from "@/lib/setupStatus";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange, MARKETPLACE_LABEL } from "@/lib/format";
@@ -24,6 +39,19 @@ function pct(cur: number, prev: number): number | null {
   return ((cur - prev) / prev) * 100;
 }
 
+// Tombol aksi cepat — besar & mudah di-tap (mobile friendly).
+function QuickAction({ href, icon, label }: { href: string; icon: ReactNode; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-[68px] flex-col items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-3 text-center text-sm font-medium text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+    >
+      <span className="text-indigo-600">{icon}</span>
+      {label}
+    </Link>
+  );
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -38,14 +66,22 @@ export default async function DashboardPage({
   const canCompare = !period.isAll && !!filter.from && !!filter.to;
   const prev = canCompare ? previousPeriod(filter.from!, filter.to!) : null;
 
-  const [summary, prevSummary, trend, byMp, best, setup] = await Promise.all([
+  const [summary, prevSummary, trend, byMp, best, setup, levels] = await Promise.all([
     getSummary(filter),
     prev ? getSummary({ ...filter, from: prev.from, to: prev.to }) : Promise.resolve(null),
     getDailyTrend(filter),
     getByMarketplace(filter),
     getBestSellers(filter, 5),
     getSetupStatus(),
+    getStockLevels(),
   ]);
+
+  // alert stok: menipis/habis + perlu opname (> 30 hari / belum pernah)
+  const nowMs = Date.now();
+  const lowOut = levels.filter((l) => l.status === "LOW" || l.status === "OUT").length;
+  const opnameOverdue = levels.filter(
+    (l) => !l.hasOpname || (l.anchorAt ? (nowMs - l.anchorAt.getTime()) / 86_400_000 > 30 : true)
+  ).length;
 
   const margin = summary.omzet ? (summary.profit / summary.omzet) * 100 : 0;
   const dOmzet = prevSummary ? pct(summary.omzet, prevSummary.omzet) : null;
@@ -76,6 +112,43 @@ export default async function DashboardPage({
           <ArrowRight size={16} />
         </Link>
       )}
+
+      {lowOut > 0 && (
+        <Link
+          href="/stok?low=1"
+          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 hover:bg-amber-100"
+        >
+          <Boxes size={18} className="shrink-0 text-amber-500" />
+          <span className="flex-1">
+            <strong>{lowOut} product</strong> stoknya menipis atau habis — cek & restock.
+          </span>
+          <ArrowRight size={16} />
+        </Link>
+      )}
+
+      {opnameOverdue > 0 && (
+        <Link
+          href="/stok"
+          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 hover:bg-amber-100"
+        >
+          <CalendarClock size={18} className="shrink-0 text-amber-500" />
+          <span className="flex-1">
+            <strong>{opnameOverdue} product</strong> perlu di-opname — hitung stok fisiknya.
+          </span>
+          <ArrowRight size={16} />
+        </Link>
+      )}
+
+      {/* aksi cepat */}
+      <Card className="p-4">
+        <p className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Aksi Cepat</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <QuickAction href="/wa" icon={<MessageCircle size={18} />} label="Penjualan WA" />
+          <QuickAction href="/konsinyasi" icon={<Handshake size={18} />} label="Grosir / Reseller" />
+          <QuickAction href="/stok" icon={<PackagePlus size={18} />} label="Barang Masuk" />
+          <QuickAction href="/master/product" icon={<Package size={18} />} label="Tambah Product" />
+        </div>
+      </Card>
 
       {/* KPI */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

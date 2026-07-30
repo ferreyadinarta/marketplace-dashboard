@@ -1,7 +1,7 @@
 import { Boxes, Search, PackageX, AlertTriangle, CheckCircle2, HelpCircle, CalendarClock } from "lucide-react";
 import { getStockLevels, type StockStatus } from "@/lib/stock";
 import { currentMonthRange } from "@/lib/format";
-import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
+import { Card, CardHeader, PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
 import { Suspense } from "react";
 import { RestockForm, OpnameCell, MinStockCell, StockControls, BulkOpnamePanel } from "@/components/StockForms";
 import { RememberFilters } from "@/components/RememberFilters";
@@ -177,7 +177,8 @@ export default async function StokPage({
             <EmptyState
               icon={<Boxes size={40} />}
               title="Belum ada product"
-              description="Tambahkan product dulu di Master Product."
+              description="Tambahkan product dulu di Master Product, lalu stoknya bisa dihitung di sini."
+              action={<LinkButton href="/master/product">Ke Master Product</LinkButton>}
             />
           )
         ) : (

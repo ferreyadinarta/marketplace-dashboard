@@ -160,7 +160,13 @@ export function RestockForm({
       </div>
 
       <div className="border-t border-slate-100 pt-4">
-        <SubmitButton variant="primary" icon={<PackagePlus size={16} />} pendingText="Menyimpan…" notify="Barang masuk tercatat">
+        <SubmitButton
+          variant="primary"
+          icon={<PackagePlus size={16} />}
+          pendingText="Menyimpan…"
+          notify="Barang masuk tercatat"
+          className="w-full justify-center sm:w-auto"
+        >
           Catat Barang Masuk
         </SubmitButton>
       </div>

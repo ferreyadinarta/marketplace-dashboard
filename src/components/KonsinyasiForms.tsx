@@ -394,11 +394,17 @@ export function MultiItemSaleForm({
           Ada product yang sama di beberapa baris — jumlahnya akan <strong>digabung otomatis</strong> saat disimpan.
         </p>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+      <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-sm text-slate-500">
           Total: <strong className="text-slate-900">{rupiah(grandTotal)}</strong>
         </span>
-        <SubmitButton variant="primary" icon={<Plus size={16} />} pendingText="Menyimpan…" notify="Penjualan tercatat">
+        <SubmitButton
+          variant="primary"
+          icon={<Plus size={16} />}
+          pendingText="Menyimpan…"
+          notify="Penjualan tercatat"
+          className="w-full justify-center sm:w-auto"
+        >
           Catat Penjualan
         </SubmitButton>
       </div>
