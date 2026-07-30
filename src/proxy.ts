@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySession, SESSION_COOKIE } from "@/lib/auth";
 
+// Endpoint publik (server-to-server / redirect luar) yang TIDAK boleh kena gate
+// sesi login. Masing-masing punya auth sendiri:
+//  - OAuth callback: redirect dari marketplace, browser seller mungkin belum login
+//  - webhook/push: request server Shopee, diverifikasi via tanda tangan
+//  - cron: dipanggil Vercel Cron, diproteksi CRON_SECRET
+const PUBLIC_PATHS = [
+  "/api/tiktok/callback",
+  "/api/shopee/callback",
+  "/api/shopee/webhook",
+  "/api/cron/",
+];
+
 // Lindungi seluruh route kecuali /login & aset statis.
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  // /login + OAuth callback marketplace dibiarkan lewat (redirect dari luar,
-  // sesi login mungkin tidak ada di browser yang dipakai seller untuk authorize).
-  if (pathname === "/login" || pathname.startsWith("/api/tiktok/callback")) {
+  if (pathname === "/login" || PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
