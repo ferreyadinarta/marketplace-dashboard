@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { effectiveHppMap } from "./bundle";
 
 type ParsedItem = { productId: string; qty: number; price: number; unit?: string };
 
@@ -29,6 +30,7 @@ export async function buildItemsData(formData: FormData) {
     where: { id: { in: items.map((i) => i.productId) } },
   });
   const pmap = new Map(products.map((p) => [p.id, p]));
+  const hppMap = await effectiveHppMap(products.map((p) => p.id)); // bundle → Σ isi
 
   return items
     .filter((i) => pmap.has(i.productId))
@@ -46,7 +48,7 @@ export async function buildItemsData(formData: FormData) {
         baseQty, // untuk stok (satuan dasar)
         price: i.price, // per satuan jual
         subtotal: i.price * i.qty,
-        hppSnapshot: p.hpp, // modal per satuan DASAR, dibekukan
+        hppSnapshot: hppMap.get(p.id) ?? p.hpp, // modal dibekukan (bundle = Σ isi)
       };
     });
 }

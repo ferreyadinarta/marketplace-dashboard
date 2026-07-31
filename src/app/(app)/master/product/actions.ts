@@ -168,3 +168,43 @@ export async function saveBulkPrices(formData: FormData) {
 
   revalidatePath("/master/product");
 }
+
+// (updateBundle) — Simpan konfigurasi bundle: tandai isBundle + ganti isinya (ProductComponent).
+export async function updateBundle(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const isBundle = formData.get("isBundle") === "true";
+  let comps: { componentId: string; qty: number }[] = [];
+  try {
+    const arr = JSON.parse(String(formData.get("components") ?? "[]"));
+    if (Array.isArray(arr)) {
+      comps = arr.map((c) => ({
+        componentId: String(c?.componentId ?? ""),
+        qty: Math.max(1, Math.floor(Number(c?.qty) || 0)),
+      }));
+    }
+  } catch {
+    comps = [];
+  }
+
+  // buang isi kosong, diri sendiri, dan duplikat
+  const seen = new Set<string>();
+  comps = comps.filter((c) => {
+    if (!c.componentId || c.componentId === id || seen.has(c.componentId)) return false;
+    seen.add(c.componentId);
+    return true;
+  });
+
+  await prisma.$transaction([
+    prisma.product.update({ where: { id }, data: { isBundle } }),
+    prisma.productComponent.deleteMany({ where: { bundleId: id } }),
+    ...(isBundle && comps.length
+      ? [prisma.productComponent.createMany({ data: comps.map((c) => ({ bundleId: id, ...c })) })]
+      : []),
+  ]);
+
+  revalidatePath("/master/product");
+  revalidatePath("/stok");
+  revalidatePath("/pembukuan");
+}

@@ -47,7 +47,7 @@ export default async function MasterProductPage({
     }),
     prisma.product.count({ where }),
     prisma.bookkeepingGroup.findMany({ orderBy: { name: "asc" } }),
-    // semua product (untuk panel isi harga massal), field harga saja
+    // semua product (untuk panel isi harga massal)
     prisma.product.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, sku: true, hpp: true, priceRetail: true, priceGrosir: true },

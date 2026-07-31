@@ -51,6 +51,7 @@ model Product {
   packUnit    String @default("") // satuan BESAR opsional (ex: box). Kosong = tanpa pack
   packSize    Int    @default(0) // isi per pack (ex: 1 box = 12 sachet). 0 = tanpa pack
   minStock    Int    @default(0) // ambang "stok menipis" (low-stock alert), dalam satuan dasar
+  isBundle    Boolean @default(false) // true = bundle (gabungan product lain); tidak di-stok/opname sendiri
   groupId   String?
   group     BookkeepingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
@@ -59,6 +60,23 @@ model Product {
   orderItems OrderItem[]
   opnames    StockOpname[]
   restocks   StockRestock[]
+
+  // Bundle: isi bundle ini (kalau isBundle) + bundle mana yang memakai product ini
+  bundleComponents ProductComponent[] @relation("BundleToComponents")
+  usedInBundles    ProductComponent[] @relation("ComponentToBundles")
+}
+
+// Isi sebuah bundle: 1 bundle = beberapa product component × qty.
+// Bundle sale otomatis mengurangi stok tiap component-nya (lihat lib/stock.ts).
+model ProductComponent {
+  id          String  @id @default(cuid())
+  bundleId    String
+  bundle      Product @relation("BundleToComponents", fields: [bundleId], references: [id], onDelete: Cascade)
+  componentId String
+  component   Product @relation("ComponentToBundles", fields: [componentId], references: [id], onDelete: Cascade)
+  qty         Int // berapa unit component per 1 bundle
+
+  @@unique([bundleId, componentId])
 }
 
 // SKU di marketplace bisa beda dengan SKU internal → mapping

@@ -25,7 +25,7 @@ export type StockLevel = {
 // Penjualan diturunkan dari OrderItem (sumber kebenaran), tidak disimpan ganda,
 // jadi opname baru cukup me-reset anchor tanpa risiko double-count masa lalu.
 export async function getStockLevels(): Promise<StockLevel[]> {
-  const [products, latestOpnames, restocks, saleItems] = await Promise.all([
+  const [products, latestOpnames, restocks, saleItems, components] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" } }),
     // opname terbaru per product (distinct ambil baris pertama sesuai orderBy)
     prisma.stockOpname.findMany({
@@ -37,20 +37,47 @@ export async function getStockLevels(): Promise<StockLevel[]> {
       where: { productId: { not: null }, order: { status: "COMPLETED" } },
       select: { productId: true, qty: true, baseQty: true, order: { select: { orderDate: true } } },
     }),
+    prisma.productComponent.findMany({ select: { bundleId: true, componentId: true, qty: true } }),
   ]);
 
   // jumlah terjual dalam SATUAN DASAR (pakai baseQty; fallback qty untuk data lama)
   const soldBase = (s: { qty: number; baseQty: number }) => (s.baseQty > 0 ? s.baseQty : s.qty);
+
+  // Peta isi bundle: bundleId → [{ componentId, qty }]
+  const bundleMap = new Map<string, { componentId: string; qty: number }[]>();
+  for (const c of components) {
+    const arr = bundleMap.get(c.bundleId) ?? [];
+    arr.push({ componentId: c.componentId, qty: c.qty });
+    bundleMap.set(c.bundleId, arr);
+  }
+
+  // Expand penjualan: jual 1 bundle = jual (qty × isi) tiap component-nya.
+  // Penjualan product biasa diteruskan apa adanya. Hasil: daftar penjualan yang
+  // sudah diatribusikan ke product FISIK (bukan bundle).
+  type Sale = { productId: string; base: number; orderDate: Date };
+  const expanded: Sale[] = [];
+  for (const s of saleItems) {
+    if (!s.productId) continue;
+    const comps = bundleMap.get(s.productId);
+    const base = soldBase(s);
+    if (comps) {
+      for (const c of comps) expanded.push({ productId: c.componentId, base: base * c.qty, orderDate: s.order.orderDate });
+    } else {
+      expanded.push({ productId: s.productId, base, orderDate: s.order.orderDate });
+    }
+  }
+
   const opnameByProduct = new Map(latestOpnames.map((o) => [o.productId, o]));
 
-  return products.map((p) => {
+  // Bundle tidak di-stok/opname sendiri → keluarkan dari daftar.
+  return products.filter((p) => !p.isBundle).map((p) => {
     const op = opnameByProduct.get(p.id);
     const hasOpname = !!op;
     const anchorAt = op ? op.opnameAt : null;
     const base = op ? op.countedQty : 0;
 
-    const saleForProduct = saleItems.filter((s) => s.productId === p.id);
-    const soldTotal = saleForProduct.reduce((a, s) => a + soldBase(s), 0);
+    const saleForProduct = expanded.filter((s) => s.productId === p.id);
+    const soldTotal = saleForProduct.reduce((a, s) => a + s.base, 0);
 
     // Barang masuk selalu dihitung. Kalau sudah pernah opname, hanya restock
     // SETELAH opname yang ditambah (yang sebelum opname sudah "terhitung" di angka fisik).
@@ -61,7 +88,7 @@ export async function getStockLevels(): Promise<StockLevel[]> {
     // Sebelum opname, penjualan lama (mis. histori marketplace) tidak dikurangi
     // supaya stok tidak jadi minus tanpa hitungan awal.
     const soldSince = hasOpname
-      ? saleForProduct.filter((s) => anchorAt && s.order.orderDate > anchorAt).reduce((a, s) => a + soldBase(s), 0)
+      ? saleForProduct.filter((s) => anchorAt && s.orderDate > anchorAt).reduce((a, s) => a + s.base, 0)
       : 0;
 
     const current = base + restockSince - soldSince;
@@ -97,25 +124,42 @@ export async function getStockLevels(): Promise<StockLevel[]> {
 // Stok sistem saat ini untuk 1 product — dipakai saat menyimpan opname
 // agar bisa mencatat selisih (systemQty) terhadap hitungan fisik.
 export async function computeCurrentStock(productId: string): Promise<number> {
-  const [op, restocks, saleItems] = await Promise.all([
+  const [op, restocks, directItems, compOf] = await Promise.all([
     prisma.stockOpname.findFirst({ where: { productId }, orderBy: { opnameAt: "desc" } }),
     prisma.stockRestock.findMany({ where: { productId }, select: { qty: true, restockAt: true } }),
     prisma.orderItem.findMany({
       where: { productId, order: { status: "COMPLETED" } },
       select: { qty: true, baseQty: true, order: { select: { orderDate: true } } },
     }),
+    // bundle yang MEMAKAI product ini sebagai component
+    prisma.productComponent.findMany({ where: { componentId: productId }, select: { bundleId: true, qty: true } }),
   ]);
+
+  const soldBase = (s: { qty: number; baseQty: number }) => (s.baseQty > 0 ? s.baseQty : s.qty);
+  const sales: { base: number; orderDate: Date }[] = directItems.map((s) => ({
+    base: soldBase(s),
+    orderDate: s.order.orderDate,
+  }));
+
+  // tambahkan penjualan bundle yang mengandung product ini (base × isi)
+  if (compOf.length) {
+    const qtyByBundle = new Map(compOf.map((c) => [c.bundleId, c.qty]));
+    const bundleItems = await prisma.orderItem.findMany({
+      where: { productId: { in: compOf.map((c) => c.bundleId) }, order: { status: "COMPLETED" } },
+      select: { productId: true, qty: true, baseQty: true, order: { select: { orderDate: true } } },
+    });
+    for (const s of bundleItems) {
+      const mult = qtyByBundle.get(s.productId ?? "") ?? 0;
+      sales.push({ base: soldBase(s) * mult, orderDate: s.order.orderDate });
+    }
+  }
+
   const anchorAt = op ? op.opnameAt : null;
   const base = op ? op.countedQty : 0;
   const restockSince = restocks
     .filter((r) => !anchorAt || r.restockAt > anchorAt)
     .reduce((a, r) => a + r.qty, 0);
-  // penjualan dalam satuan DASAR (baseQty; fallback qty). Sebelum opname pertama,
-  // penjualan lama tidak dikurangi (lihat getStockLevels).
-  const soldSince = op
-    ? saleItems
-        .filter((s) => s.order.orderDate > anchorAt!)
-        .reduce((a, s) => a + (s.baseQty > 0 ? s.baseQty : s.qty), 0)
-    : 0;
+  // penjualan dalam satuan DASAR. Sebelum opname pertama, penjualan lama tidak dikurangi.
+  const soldSince = op ? sales.filter((s) => s.orderDate > anchorAt!).reduce((a, s) => a + s.base, 0) : 0;
   return base + restockSince - soldSince;
 }

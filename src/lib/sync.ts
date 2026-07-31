@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { adapters } from "./adapters";
+import { effectiveHppMap } from "./bundle";
 import type { NormalizedOrder } from "./adapters/types";
 
 // Simpan order hasil normalisasi ke DB. Idempotent: order yang sudah ada
@@ -42,6 +43,15 @@ export async function ingestOrders(storeId: string, orders: NormalizedOrder[]) {
       })
     );
 
+    // bekukan HPP per item (bundle = Σ isi). Item belum ter-mapping → 0 (fallback nanti).
+    const hppMap = await effectiveHppMap(
+      itemsData.map((i) => i.productId).filter((id): id is string => !!id)
+    );
+    const itemsWithHpp = itemsData.map((i) => ({
+      ...i,
+      hppSnapshot: i.productId ? hppMap.get(i.productId) ?? 0 : 0,
+    }));
+
     const existing = await prisma.order.findUnique({
       where: { storeId_marketplaceOrderId: { storeId, marketplaceOrderId: o.marketplaceOrderId } },
     });
@@ -71,7 +81,7 @@ export async function ingestOrders(storeId: string, orders: NormalizedOrder[]) {
           marketplaceFee: o.marketplaceFee,
           shippingSubsidy: o.shippingSubsidy,
           netAmount: o.netAmount,
-          items: { create: itemsData },
+          items: { create: itemsWithHpp },
         },
       });
       created++;
