@@ -9,6 +9,8 @@ export type StockLevel = {
   unit: string;
   packUnit: string;
   packSize: number;
+  koliUnit: string;
+  koliSize: number;
   minStock: number;
   hasOpname: boolean;
   base: number; // jumlah fisik pada opname terakhir (anchor)
@@ -108,6 +110,8 @@ export async function getStockLevels(): Promise<StockLevel[]> {
       unit: p.unit,
       packUnit: p.packUnit,
       packSize: p.packSize,
+      koliUnit: p.koliUnit,
+      koliSize: p.koliSize,
       minStock: p.minStock,
       hasOpname,
       base,

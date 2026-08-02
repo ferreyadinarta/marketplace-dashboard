@@ -21,6 +21,8 @@ export function ProductRow({
   unit,
   packUnit,
   packSize,
+  koliUnit,
+  koliSize,
   groupId,
   groupName,
   groupOptions,
@@ -37,6 +39,8 @@ export function ProductRow({
   unit: string;
   packUnit: string;
   packSize: number;
+  koliUnit: string;
+  koliSize: number;
   groupId: string;
   groupName?: string;
   groupOptions: SelectOption[];
@@ -48,6 +52,7 @@ export function ProductRow({
   // tampilan "box-first": satuan utama = pack kalau ada, kecil = base
   const [mainUnit, setMainUnit] = useState(packSize > 0 ? packUnit : unit);
   const [smallUnit, setSmallUnit] = useState(packSize > 0 ? unit : "");
+  const [koliU, setKoliU] = useState(koliUnit ?? "");
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -63,6 +68,11 @@ export function ProductRow({
             {packSize > 0 && (
               <span>
                 1 {packUnit} = <b className="text-slate-700">{packSize} {unit}</b>
+              </span>
+            )}
+            {koliSize > 0 && (
+              <span>
+                1 {koliUnit} = <b className="text-slate-700">{koliSize} {packUnit}</b>
               </span>
             )}
             {groupName && <span>Grup <b className="text-slate-700">{groupName}</b></span>}
@@ -150,6 +160,28 @@ export function ProductRow({
               min="0"
               defaultValue={packSize || ""}
               placeholder="12"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+          </Field>
+          <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+            <input
+              name="koliUnit"
+              value={koliU}
+              onChange={(e) => setKoliU(e.target.value)}
+              placeholder="koli"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+          </Field>
+          <Field
+            label={`Isi koli (1 ${koliU.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
+            hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+          >
+            <input
+              name="isiKoli"
+              type="number"
+              min="0"
+              defaultValue={koliSize || ""}
+              placeholder="6"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
           </Field>

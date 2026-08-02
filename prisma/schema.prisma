@@ -50,7 +50,10 @@ model Product {
   unit        String @default("pcs") // satuan DASAR (kecil): pcs / sachet, dll — stok dihitung di sini
   packUnit    String @default("") // satuan BESAR opsional (ex: box). Kosong = tanpa pack
   packSize    Int    @default(0) // isi per pack (ex: 1 box = 12 sachet). 0 = tanpa pack
+  koliUnit    String @default("") // satuan TERBESAR opsional (ex: koli). Kosong = tanpa koli
+  koliSize    Int    @default(0) // isi koli dalam PACK (ex: 1 koli = 6 box). 0 = tanpa koli
   minStock    Int    @default(0) // ambang "stok menipis" (low-stock alert), dalam satuan dasar
+  lowAlertSent Boolean @default(false) // sudah dikirim notif "stok menipis"? reset saat stok naik lagi (edge-trigger)
   isBundle    Boolean @default(false) // true = bundle (gabungan product lain); tidak di-stok/opname sendiri
   groupId   String?
   group     BookkeepingGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
@@ -137,6 +140,17 @@ model OrderItem {
 
 // Hasil stock opname: hitung fisik pada satu waktu → jadi titik "anchor" stok.
 // Stok berjalan = countedQty + restock setelah opnameAt − penjualan COMPLETED setelah opnameAt.
+// Langganan Web Push (browser/PWA) untuk notifikasi stok menipis.
+// Satu baris = satu device/browser yang mengizinkan notifikasi.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique // URL push service (unik per device)
+  p256dh    String // kunci publik enkripsi dari browser
+  auth      String // secret auth dari browser
+  label     String? // opsional: penanda device
+  createdAt DateTime @default(now())
+}
+
 model StockOpname {
   id         String   @id @default(cuid())
   productId  String

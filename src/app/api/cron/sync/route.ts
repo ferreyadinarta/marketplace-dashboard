@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAllStores } from "@/lib/syncAll";
+import { notifyLowStock } from "@/lib/lowStock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // beri waktu lebih untuk beberapa toko sekaligus
@@ -18,7 +19,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const r = await syncAllStores(30);
-    return NextResponse.json({ ok: true, ...r });
+    // setelah sync, cek stok menipis → kirim notifikasi (edge-triggered).
+    // jangan gagalkan cron kalau notif error.
+    let notif = { sent: 0, failed: 0, fresh: 0 };
+    try {
+      notif = await notifyLowStock();
+    } catch (e) {
+      console.error("notifyLowStock gagal:", e);
+    }
+    return NextResponse.json({ ok: true, ...r, notif });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN     "koliSize" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "koliUnit" TEXT NOT NULL DEFAULT '';

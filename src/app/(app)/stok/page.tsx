@@ -5,6 +5,7 @@ import { Card, CardHeader, PageHeader, Badge, EmptyState, LinkButton } from "@/c
 import { Suspense } from "react";
 import { RestockForm, OpnameCell, MinStockCell, StockControls, BulkOpnamePanel } from "@/components/StockForms";
 import { RememberFilters } from "@/components/RememberFilters";
+import { NotificationToggle } from "@/components/NotificationToggle";
 import { Pagination, PaginationControls } from "@/components/Pagination";
 import { restockProducts, saveOpname, saveBulkOpname, updateMinStock } from "./actions";
 
@@ -91,6 +92,8 @@ export default async function StokPage({
     unit: l.unit,
     packUnit: l.packUnit,
     packSize: l.packSize,
+    koliUnit: l.koliUnit,
+    koliSize: l.koliSize,
     current: l.current,
   }));
   const bulkItems = levels.map((l) => ({
@@ -132,6 +135,9 @@ export default async function StokPage({
         <StatCard icon={<PackageX size={18} />} label="Stok habis" value={summary.out} tone="red" />
         <StatCard icon={<HelpCircle size={18} />} label="Belum di-opname" value={summary.unset} tone="slate" />
       </div>
+
+      {/* notifikasi stok menipis (web push) */}
+      <NotificationToggle />
 
       {/* pengingat opname (muncul hanya kalau ada yang perlu di-opname) */}
       {overdueCount > 0 && (

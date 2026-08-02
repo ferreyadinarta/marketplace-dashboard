@@ -14,7 +14,7 @@ export async function createStore(formData: FormData) {
 export async function updateStoreCredentials(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.store.update({
+  await prisma.store.updateMany({
     where: { id },
     data: {
       apiKey: String(formData.get("apiKey") ?? "") || null,
@@ -29,6 +29,6 @@ export async function updateStoreCredentials(formData: FormData) {
 export async function deleteStore(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.store.delete({ where: { id } });
+  await prisma.store.deleteMany({ where: { id } });
   revalidatePath("/master/toko");
 }

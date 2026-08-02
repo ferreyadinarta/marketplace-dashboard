@@ -54,7 +54,7 @@ export async function createWaSale(formData: FormData) {
 export async function deleteWaSale(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.order.delete({ where: { id } });
+  await prisma.order.deleteMany({ where: { id } });
   revalidatePath("/wa");
   revalidatePath("/pembukuan");
   revalidatePath("/stok");

@@ -22,7 +22,7 @@ export async function createKonsinyasiStore(formData: FormData) {
 export async function deleteKonsinyasiStore(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.store.delete({ where: { id } });
+  await prisma.store.deleteMany({ where: { id } });
   revalidatePath("/konsinyasi");
   revalidatePath("/pembukuan");
   revalidatePath("/stok");
@@ -70,7 +70,7 @@ export async function createKonsinyasiSale(formData: FormData) {
 export async function deleteKonsinyasiSale(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.order.delete({ where: { id } });
+  await prisma.order.deleteMany({ where: { id } });
   revalidatePath("/konsinyasi");
   revalidatePath("/pembukuan");
   revalidatePath("/stok");

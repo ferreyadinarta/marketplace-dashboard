@@ -20,6 +20,7 @@ export function AddProductForm({
   const [errors, setErrors] = useState<{ name?: string; sku?: string }>({});
   const [mainUnit, setMainUnit] = useState("pcs");
   const [smallUnit, setSmallUnit] = useState("");
+  const [koliUnit, setKoliUnit] = useState("koli");
 
   function validate(e: FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
@@ -95,6 +96,21 @@ export function AddProductForm({
         hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
       >
         <input name="isi" type="number" min="0" placeholder="ex: 12" className={inputClass} />
+      </Field>
+      <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+        <input
+          name="koliUnit"
+          value={koliUnit}
+          onChange={(e) => setKoliUnit(e.target.value)}
+          placeholder="ex: koli"
+          className={inputClass}
+        />
+      </Field>
+      <Field
+        label={`Isi koli (1 ${koliUnit.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
+        hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+      >
+        <input name="isiKoli" type="number" min="0" placeholder="ex: 6" className={inputClass} />
       </Field>
       <Field label="Harga retail (Rp)" hint="Default harga jual WA/offline. Bisa diubah saat mencatat penjualan.">
         <CurrencyInput name="priceRetail" placeholder="0" />

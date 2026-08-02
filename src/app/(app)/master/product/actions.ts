@@ -2,19 +2,40 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 // Master pakai "box-first": satuan utama (besar) + satuan kecil (opsional) + isi.
 // Stok tetap dihitung di satuan TERKECIL agar tidak pecahan → base = satuan kecil
 // kalau ada, kalau tidak base = satuan utama.
-function resolveUnits(formData: FormData): { unit: string; packUnit: string; packSize: number } {
+function resolveUnits(formData: FormData): {
+  unit: string;
+  packUnit: string;
+  packSize: number;
+  koliUnit: string;
+  koliSize: number;
+} {
   const mainUnit = String(formData.get("mainUnit") ?? "").trim() || "pcs";
   const smallUnit = String(formData.get("smallUnit") ?? "").trim();
   const isiRaw = Number(formData.get("isi") ?? 0);
   const isi = isNaN(isiRaw) || isiRaw < 0 ? 0 : Math.floor(isiRaw);
   const hasPack = !!smallUnit && isi >= 2 && smallUnit.toLowerCase() !== mainUnit.toLowerCase();
-  return hasPack
+  const base = hasPack
     ? { unit: smallUnit, packUnit: mainUnit, packSize: isi }
     : { unit: mainUnit, packUnit: "", packSize: 0 };
+
+  // Koli = satuan terbesar (isi dalam PACK). Hanya berlaku kalau ada pack tier.
+  const koliUnit = String(formData.get("koliUnit") ?? "").trim();
+  const isiKoliRaw = Number(formData.get("isiKoli") ?? 0);
+  const isiKoli = isNaN(isiKoliRaw) || isiKoliRaw < 0 ? 0 : Math.floor(isiKoliRaw);
+  const hasKoli =
+    base.packSize > 0 &&
+    !!koliUnit &&
+    isiKoli >= 2 &&
+    koliUnit.toLowerCase() !== base.packUnit.toLowerCase();
+
+  return hasKoli
+    ? { ...base, koliUnit, koliSize: isiKoli }
+    : { ...base, koliUnit: "", koliSize: 0 };
 }
 
 export async function createProduct(formData: FormData) {
@@ -23,9 +44,13 @@ export async function createProduct(formData: FormData) {
   const hpp = Number(formData.get("hpp") ?? 0);
   const priceRetail = Number(formData.get("priceRetail") ?? 0);
   const priceGrosir = Number(formData.get("priceGrosir") ?? 0);
-  const { unit, packUnit, packSize } = resolveUnits(formData);
+  const { unit, packUnit, packSize, koliUnit, koliSize } = resolveUnits(formData);
   const groupId = String(formData.get("groupId") ?? "");
   if (!name || !sku) return;
+
+  // SKU harus unik → cek dulu, jangan sampai crash P2002
+  const clash = await prisma.product.findUnique({ where: { sku } });
+  if (clash) redirect(`/master/product?add=dupe&sku=${encodeURIComponent(sku)}`);
 
   await prisma.product.create({
     data: {
@@ -37,11 +62,14 @@ export async function createProduct(formData: FormData) {
       unit,
       packUnit,
       packSize,
+      koliUnit,
+      koliSize,
       groupId: groupId || null,
     },
   });
   revalidatePath("/master/product");
   revalidatePath("/stok");
+  redirect("/master/product?add=ok");
 }
 
 export async function updateProduct(formData: FormData) {
@@ -51,7 +79,7 @@ export async function updateProduct(formData: FormData) {
   const hpp = Number(formData.get("hpp") ?? 0);
   const priceRetail = Number(formData.get("priceRetail") ?? 0);
   const priceGrosir = Number(formData.get("priceGrosir") ?? 0);
-  const { unit, packUnit, packSize } = resolveUnits(formData);
+  const { unit, packUnit, packSize, koliUnit, koliSize } = resolveUnits(formData);
   const groupId = String(formData.get("groupId") ?? "");
   if (!id) return;
 
@@ -64,6 +92,8 @@ export async function updateProduct(formData: FormData) {
     unit: string;
     packUnit: string;
     packSize: number;
+    koliUnit: string;
+    koliSize: number;
     groupId: string | null;
   } = {
     hpp: isNaN(hpp) ? 0 : hpp,
@@ -72,6 +102,8 @@ export async function updateProduct(formData: FormData) {
     unit,
     packUnit,
     packSize,
+    koliUnit,
+    koliSize,
     groupId: groupId || null,
   };
   if (name) data.name = name;
@@ -81,7 +113,8 @@ export async function updateProduct(formData: FormData) {
     if (!clash) data.sku = sku;
   }
 
-  await prisma.product.update({ where: { id }, data });
+  // updateMany → tidak crash (P2025) kalau product keburu dihapus di tab lain
+  await prisma.product.updateMany({ where: { id }, data });
   revalidatePath("/master/product");
   revalidatePath("/pembukuan");
   revalidatePath("/stok");
@@ -110,6 +143,8 @@ export async function duplicateProduct(formData: FormData) {
       unit: p.unit,
       packUnit: p.packUnit,
       packSize: p.packSize,
+      koliUnit: p.koliUnit,
+      koliSize: p.koliSize,
       minStock: p.minStock,
       groupId: p.groupId,
     },
@@ -121,8 +156,10 @@ export async function duplicateProduct(formData: FormData) {
 export async function deleteProduct(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
-  await prisma.product.delete({ where: { id } });
+  // deleteMany → idempoten (klik hapus 2x / baris sudah terhapus tidak crash)
+  await prisma.product.deleteMany({ where: { id } });
   revalidatePath("/master/product");
+  revalidatePath("/stok");
 }
 
 export async function createGroup(formData: FormData) {
@@ -131,7 +168,12 @@ export async function createGroup(formData: FormData) {
   // cegah duplikat (nama grup unik, case-insensitive)
   const exists = await prisma.bookkeepingGroup.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
   if (exists) return;
-  await prisma.bookkeepingGroup.create({ data: { name } });
+  try {
+    await prisma.bookkeepingGroup.create({ data: { name } });
+  } catch {
+    // race: nama grup keburu dibuat submit lain → abaikan (bukan crash)
+    return;
+  }
   revalidatePath("/master/product");
 }
 
@@ -139,15 +181,56 @@ export async function deleteGroup(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   // product di grup ini otomatis jadi "tanpa grup" (schema onDelete: SetNull)
-  await prisma.bookkeepingGroup.delete({ where: { id } });
+  await prisma.bookkeepingGroup.deleteMany({ where: { id } });
   revalidatePath("/master/product");
   revalidatePath("/pembukuan");
 }
 
-// Simpan HPP / harga retail / harga grosir banyak product sekaligus (bulk).
+// Ubah field satuan mentah (mainUnit/smallUnit/isi/koliUnit/isiKoli) → kolom DB.
+// Sama logikanya dengan resolveUnits, tapi baca dari objek row (bukan FormData).
+function resolveUnitsFromRow(r: {
+  mainUnit?: string;
+  smallUnit?: string;
+  isi?: string | number;
+  koliUnit?: string;
+  isiKoli?: string | number;
+}): { unit: string; packUnit: string; packSize: number; koliUnit: string; koliSize: number } | null {
+  // kalau tidak ada satu pun field satuan → jangan sentuh satuan (return null)
+  const anyUnit = r.mainUnit !== undefined || r.smallUnit !== undefined || r.koliUnit !== undefined;
+  if (!anyUnit) return null;
+
+  const mainUnit = String(r.mainUnit ?? "").trim() || "pcs";
+  const smallUnit = String(r.smallUnit ?? "").trim();
+  const isiRaw = Number(r.isi ?? 0);
+  const isi = isNaN(isiRaw) || isiRaw < 0 ? 0 : Math.floor(isiRaw);
+  const hasPack = !!smallUnit && isi >= 2 && smallUnit.toLowerCase() !== mainUnit.toLowerCase();
+  const base = hasPack
+    ? { unit: smallUnit, packUnit: mainUnit, packSize: isi }
+    : { unit: mainUnit, packUnit: "", packSize: 0 };
+
+  const koliUnit = String(r.koliUnit ?? "").trim();
+  const isiKoliRaw = Number(r.isiKoli ?? 0);
+  const isiKoli = isNaN(isiKoliRaw) || isiKoliRaw < 0 ? 0 : Math.floor(isiKoliRaw);
+  const hasKoli =
+    base.packSize > 0 && !!koliUnit && isiKoli >= 2 && koliUnit.toLowerCase() !== base.packUnit.toLowerCase();
+
+  return hasKoli ? { ...base, koliUnit, koliSize: isiKoli } : { ...base, koliUnit: "", koliSize: 0 };
+}
+
+// Simpan HPP / harga + satuan banyak product sekaligus (bulk).
 export async function saveBulkPrices(formData: FormData) {
   const raw = String(formData.get("prices") ?? "[]");
-  let rows: { id: string; hpp?: number; retail?: number; grosir?: number }[] = [];
+  let rows: {
+    id: string;
+    hpp?: number;
+    retail?: number;
+    grosir?: number;
+    mainUnit?: string;
+    smallUnit?: string;
+    isi?: string | number;
+    koliUnit?: string;
+    isiKoli?: string | number;
+  }[] = [];
   try {
     rows = JSON.parse(raw);
   } catch {
@@ -156,17 +239,20 @@ export async function saveBulkPrices(formData: FormData) {
 
   for (const r of rows) {
     if (!r.id) continue;
+    const u = resolveUnitsFromRow(r);
     await prisma.product.update({
       where: { id: r.id },
       data: {
         hpp: Math.max(0, Math.floor(r.hpp ?? 0)),
         priceRetail: Math.max(0, Math.floor(r.retail ?? 0)),
         priceGrosir: Math.max(0, Math.floor(r.grosir ?? 0)),
+        ...(u ?? {}),
       },
     });
   }
 
   revalidatePath("/master/product");
+  revalidatePath("/stok");
 }
 
 // (updateBundle) — Simpan konfigurasi bundle: tandai isBundle + ganti isinya (ProductComponent).

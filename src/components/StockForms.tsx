@@ -12,8 +12,18 @@ type Option = { value: string; label: string };
 type Action = (formData: FormData) => void | Promise<void>;
 
 // ---------- Barang masuk (restock) — multi-product ----------
-type RestockOption = { value: string; label: string; unit?: string; packUnit?: string; packSize?: number; current?: number };
-type RItem = { productId: string; qty: string; cost: string; unit: "base" | "pack" };
+type RestockOption = {
+  value: string;
+  label: string;
+  unit?: string;
+  packUnit?: string;
+  packSize?: number;
+  koliUnit?: string;
+  koliSize?: number;
+  current?: number;
+};
+type RUnit = "base" | "pack" | "koli";
+type RItem = { productId: string; qty: string; cost: string; unit: RUnit };
 
 export function RestockForm({
   products,
@@ -27,10 +37,37 @@ export function RestockForm({
   const [items, setItems] = useState<RItem[]>([{ productId: "", qty: "1", cost: "", unit: "base" }]);
   const [error, setError] = useState<string | undefined>();
   const prodOf = (pid: string) => products.find((p) => p.value === pid);
-  const unitOf = (pid: string) => prodOf(pid)?.unit || "";
   const hasPack = (pid: string) => {
     const p = prodOf(pid);
     return !!p && (p.packSize ?? 0) >= 2 && !!p.packUnit;
+  };
+  const hasKoli = (pid: string) => {
+    const p = prodOf(pid);
+    return hasPack(pid) && (p?.koliSize ?? 0) >= 2 && !!p?.koliUnit;
+  };
+  // satuan terbesar yang tersedia → jadi default saat pilih product
+  const biggestUnit = (pid: string): RUnit => (hasKoli(pid) ? "koli" : hasPack(pid) ? "pack" : "base");
+  // faktor konversi ke satuan dasar untuk 1 product+satuan
+  const factorOf = (pid: string, u: RUnit) => {
+    const p = prodOf(pid);
+    if (u === "koli" && hasKoli(pid)) return (p?.packSize ?? 1) * (p?.koliSize ?? 1);
+    if (u === "pack" && hasPack(pid)) return p?.packSize ?? 1;
+    return 1;
+  };
+  // tampilkan jumlah dalam SATUAN UTAMA (box) + sisa satuan kecil — TANPA pecahan.
+  // ex: 232 sachet, 1 box = 16 sachet → "14 box 8 sachet". 240 → "15 box". 48 → "3 box".
+  const fmtQty = (pid: string, base: number) => {
+    const p = prodOf(pid);
+    const smallUnit = p?.unit || "unit";
+    const n = Math.max(0, Math.floor(base));
+    if (!hasPack(pid)) return `${n} ${smallUnit}`;
+    const size = p?.packSize ?? 1;
+    const box = Math.floor(n / size);
+    const rem = n % size;
+    const parts: string[] = [];
+    if (box > 0 || rem === 0) parts.push(`${box} ${p?.packUnit}`);
+    if (rem > 0) parts.push(`${rem} ${smallUnit}`);
+    return parts.join(" ");
   };
 
   function setItem(i: number, key: keyof RItem, val: string) {
@@ -39,10 +76,10 @@ export function RestockForm({
   }
   const addRow = () => setItems((prev) => [...prev, { productId: "", qty: "1", cost: "", unit: "base" }]);
   const removeRow = (i: number) => setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
-  const setUnit = (i: number, u: "base" | "pack") =>
+  const setUnit = (i: number, u: RUnit) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, unit: u } : it)));
   const chooseProduct = (i: number, v: string) => {
-    const u: "base" | "pack" = hasPack(v) ? "pack" : "base";
+    const u = biggestUnit(v); // default ke satuan terbesar (koli › box › sachet)
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, productId: v, unit: u } : it)));
     setError(undefined);
   };
@@ -100,12 +137,17 @@ export function RestockForm({
 
         {items.map((it, i) => {
           const p = prodOf(it.productId);
-          const pack = hasPack(it.productId);
           const baseUnit = p?.unit || "unit";
           const qtyNum = Math.max(0, Math.floor(Number(it.qty) || 0));
-          const addBase = qtyNum * (it.unit === "pack" ? p?.packSize || 1 : 1);
+          const factor = factorOf(it.productId, it.unit);
+          const addBase = qtyNum * factor;
           const cur = p?.current ?? 0;
           const lbl = "mb-1 block text-[11px] font-medium text-slate-500";
+          // tier satuan yang tersedia, terbesar → terkecil (koli › box › sachet)
+          const tiers: { u: RUnit; label: string }[] = [];
+          if (hasKoli(it.productId)) tiers.push({ u: "koli", label: p?.koliUnit || "koli" });
+          if (hasPack(it.productId)) tiers.push({ u: "pack", label: p?.packUnit || "box" });
+          tiers.push({ u: "base", label: baseUnit });
           return (
             <div key={i} className="rounded-xl border border-slate-200 p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -133,22 +175,18 @@ export function RestockForm({
                   </div>
                   <div>
                     <label className={lbl}>Satuan</label>
-                    {pack ? (
+                    {tiers.length > 1 ? (
                       <div className="flex h-10 overflow-hidden rounded-lg border border-slate-300 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setUnit(i, "base")}
-                          className={it.unit === "base" ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
-                        >
-                          {p?.unit}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setUnit(i, "pack")}
-                          className={it.unit === "pack" ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
-                        >
-                          {p?.packUnit}
-                        </button>
+                        {tiers.map((t) => (
+                          <button
+                            key={t.u}
+                            type="button"
+                            onClick={() => setUnit(i, t.u)}
+                            className={it.unit === t.u ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
                       </div>
                     ) : (
                       <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs text-slate-500">
@@ -183,9 +221,9 @@ export function RestockForm({
               <div className="mt-2.5 flex items-center justify-between gap-2">
                 {p ? (
                   <p className="text-xs text-slate-500">
-                    Stok sekarang: <span className="font-medium text-slate-700">{cur} {baseUnit}</span>
+                    Stok sekarang: <span className="font-medium text-slate-700">{fmtQty(it.productId, cur)}</span>
                     {addBase > 0 && (
-                      <> → jadi <span className="font-semibold text-emerald-600">{cur + addBase} {baseUnit}</span></>
+                      <> → jadi <span className="font-semibold text-emerald-600">{fmtQty(it.productId, cur + addBase)}</span></>
                     )}
                   </p>
                 ) : (

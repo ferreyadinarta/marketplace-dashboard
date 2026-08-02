@@ -36,6 +36,8 @@ export default async function MasterProductPage({
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const importStatus = one(sp.import);
   const reason = one(sp.reason);
+  const addStatus = one(sp.add);
+  const dupeSku = one(sp.sku);
 
   const [products, total, groups, priceRows, connectedStores] = await Promise.all([
     prisma.product.findMany({
@@ -50,7 +52,10 @@ export default async function MasterProductPage({
     // semua product (untuk panel isi harga massal)
     prisma.product.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, sku: true, hpp: true, priceRetail: true, priceGrosir: true },
+      select: {
+        id: true, name: true, sku: true, hpp: true, priceRetail: true, priceGrosir: true,
+        unit: true, packUnit: true, packSize: true, koliUnit: true, koliSize: true,
+      },
     }),
     // toko marketplace yang sudah terhubung → sumber import product
     prisma.store.findMany({
@@ -90,6 +95,18 @@ export default async function MasterProductPage({
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
           Import gagal: {reason ?? "unknown"}
+        </div>
+      )}
+      {addStatus === "dupe" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          SKU <strong className="font-mono">{dupeSku}</strong> sudah dipakai product lain. Ganti SKU yang lain.
+        </div>
+      )}
+      {addStatus === "ok" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          Product baru ditambahkan.
         </div>
       )}
 
@@ -175,6 +192,8 @@ export default async function MasterProductPage({
                 unit={p.unit}
                 packUnit={p.packUnit}
                 packSize={p.packSize}
+                koliUnit={p.koliUnit}
+                koliSize={p.koliSize}
                 groupId={p.groupId ?? ""}
                 groupName={p.group?.name}
                 groupOptions={[

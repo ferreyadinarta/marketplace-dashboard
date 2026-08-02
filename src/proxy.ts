@@ -13,6 +13,8 @@ const PUBLIC_PATHS = [
   "/api/shopee/webhook",
   "/api/cron/",
   "/api/health", // keep-warm / uptime ping (tanpa login)
+  "/sw.js", // service worker push (di-fetch browser, kadang tanpa cookie)
+  "/manifest.webmanifest", // PWA manifest (di-fetch browser untuk install)
 ];
 
 // Lindungi seluruh route kecuali /login & aset statis.

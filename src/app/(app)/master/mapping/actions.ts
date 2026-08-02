@@ -10,7 +10,10 @@ export async function assignMapping(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   if (!mappingId) return;
 
-  const mapping = await prisma.productMapping.update({
+  // pastikan mapping masih ada (jangan crash P2025 kalau keburu berubah)
+  const mapping = await prisma.productMapping.findUnique({ where: { id: mappingId } });
+  if (!mapping) return;
+  await prisma.productMapping.update({
     where: { id: mappingId },
     data: { productId: productId || null },
   });

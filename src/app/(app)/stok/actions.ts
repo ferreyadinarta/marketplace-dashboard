@@ -24,7 +24,7 @@ export async function restockProducts(formData: FormData) {
       productId: String(x?.productId ?? ""),
       qty: Math.max(1, Math.floor(Number(x?.qty) || 0)),
       cost: Math.max(0, Math.floor(Number(x?.cost) || 0)),
-      unit: x?.unit === "pack" ? "pack" : "base",
+      unit: x?.unit === "koli" ? "koli" : x?.unit === "pack" ? "pack" : "base",
     }))
     .filter((x) => x.productId && x.qty >= 1);
   if (items.length === 0) return;
@@ -43,12 +43,18 @@ export async function restockProducts(formData: FormData) {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (!product) continue;
     const hasPack = product.packSize >= 2 && !!product.packUnit;
+    const hasKoli = hasPack && product.koliSize >= 2 && !!product.koliUnit;
 
     let onHand = Math.max(0, await computeCurrentStock(productId)); // stok sebelum restock ini (satuan dasar)
     let avg = product.hpp;
     for (const b of batches) {
-      // konversi ke satuan DASAR (kalau input per pack)
-      const factor = b.unit === "pack" && hasPack ? product.packSize : 1;
+      // konversi ke satuan DASAR: koli = packSize×koliSize, pack = packSize, base = 1
+      const factor =
+        b.unit === "koli" && hasKoli
+          ? product.packSize * product.koliSize
+          : b.unit === "pack" && hasPack
+            ? product.packSize
+            : 1;
       const baseQty = b.qty * factor;
       const baseCost = b.cost > 0 ? (factor > 1 ? Math.round(b.cost / factor) : b.cost) : 0;
 
@@ -131,6 +137,6 @@ export async function updateMinStock(formData: FormData) {
   const productId = String(formData.get("productId") ?? "");
   const minStock = Math.max(0, Math.floor(Number(formData.get("minStock") ?? 0) || 0));
   if (!productId) return;
-  await prisma.product.update({ where: { id: productId }, data: { minStock } });
+  await prisma.product.updateMany({ where: { id: productId }, data: { minStock } });
   revalidatePath("/stok");
 }
