@@ -5,7 +5,7 @@ import { prisma } from "./prisma";
 // (semua fungsi jadi no-op) — app tetap jalan normal tanpa notifikasi.
 const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY ?? "";
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:noreply@pembukuan-marketplace.vercel.app";
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "https://pembukuan-marketplace.vercel.app";
 
 let configured = false;
 

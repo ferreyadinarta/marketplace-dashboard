@@ -28,6 +28,29 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* pakai dynamic viewport height biar pas di iOS (URL bar) & standalone */
+  min-height: 100dvh;
+  /* cegah rubber-band putih di iOS standalone */
+  overscroll-behavior-y: none;
+}
+
+/* iOS: hilangkan highlight abu-abu saat tap + callout long-press */
+a,
+button,
+[role="button"],
+summary {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* iOS auto-zoom saat fokus input kalau font < 16px → paksa 16px di layar sentuh.
+   Cuma di pointer kasar (HP) supaya tampilan desktop tetap rapat. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* transisi halus untuk elemen interaktif */

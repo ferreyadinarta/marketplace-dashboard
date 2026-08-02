@@ -131,14 +131,14 @@ export default function Sidebar({ env }: { env: string }) {
 
   return (
     <>
-      {/* Top bar — mobile only */}
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:hidden">
+      {/* Top bar — mobile only. pt safe-area supaya tidak ketutup notch/status bar */}
+      <header className="fixed inset-x-0 top-0 z-30 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white pl-[calc(env(safe-area-inset-left)+1rem)] pr-[calc(env(safe-area-inset-right)+1rem)] pt-[env(safe-area-inset-top)] lg:hidden">
         <button
           onClick={() => setOpen(true)}
           aria-label="Buka menu"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200"
         >
-          <Menu size={20} />
+          <Menu size={22} />
         </button>
         <Logo size={28} />
         <span className="text-sm font-bold text-slate-900">Marketplace</span>
@@ -155,7 +155,7 @@ export default function Sidebar({ env }: { env: string }) {
 
       {/* Drawer (mobile) / fixed sidebar (desktop) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white transition-transform duration-200 lg:translate-x-0 lg:border-r lg:border-slate-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)] transition-transform duration-200 lg:translate-x-0 lg:border-r lg:border-slate-200 lg:pt-0 ${
           open ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:shadow-none"
         }`}
       >
@@ -163,7 +163,7 @@ export default function Sidebar({ env }: { env: string }) {
         <button
           onClick={() => setOpen(false)}
           aria-label="Tutup menu"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
+          className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
         >
           <X size={18} />
         </button>
