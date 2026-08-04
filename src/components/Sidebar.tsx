@@ -88,6 +88,7 @@ export default function Sidebar({ env }: { env: string }) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => setOpen(false)}
                     className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 ${
                       active
                         ? "bg-indigo-50 text-indigo-700"
