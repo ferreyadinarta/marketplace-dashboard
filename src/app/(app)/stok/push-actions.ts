@@ -8,18 +8,24 @@ import { checkLowStockNow } from "@/lib/lowStock";
 type WebSub = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
 
 // Simpan/segarkan langganan device ini.
-export async function subscribeUser(sub: WebSub): Promise<{ ok: boolean }> {
+// Selalu balikin objek (jangan throw) supaya UI bisa menampilkan alasan aslinya.
+export async function subscribeUser(sub: WebSub): Promise<{ ok: boolean; reason?: string }> {
   const endpoint = sub?.endpoint ?? "";
   const p256dh = sub?.keys?.p256dh ?? "";
   const auth = sub?.keys?.auth ?? "";
-  if (!endpoint || !p256dh || !auth) return { ok: false };
+  if (!endpoint || !p256dh || !auth) return { ok: false, reason: "data langganan tidak lengkap" };
 
-  await prisma.pushSubscription.upsert({
-    where: { endpoint },
-    create: { endpoint, p256dh, auth },
-    update: { p256dh, auth },
-  });
-  return { ok: true };
+  try {
+    await prisma.pushSubscription.upsert({
+      where: { endpoint },
+      create: { endpoint, p256dh, auth },
+      update: { p256dh, auth },
+    });
+    return { ok: true };
+  } catch (e) {
+    // paling sering: database lagi cold-start / tidak terjangkau
+    return { ok: false, reason: e instanceof Error ? e.message.slice(0, 120) : "database error" };
+  }
 }
 
 // Hapus langganan device ini (saat unsubscribe).
