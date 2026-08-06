@@ -158,18 +158,58 @@ export async function chainNextRound(input: RoundInput, reqUrl: string, result: 
     accUpdated: result.updated,
   };
 
+  const url = `${selfOrigin(reqUrl)}/api/cron/sync-run`;
   try {
-    await fetch(`${selfOrigin(reqUrl)}/api/cron/sync-run`, {
+    // JANGAN tunggu putaran berikutnya selesai: dia sendiri butuh ~45 detik dan
+    // ikut memanggil putaran sesudahnya. Kalau ditunggu, tiap invocation induk
+    // menganggur menunggu anaknya → jatah compute habis 2x lipat.
+    // Cukup pastikan request-nya SAMPAI (penolakan seperti 401/400 datang cepat),
+    // lalu putus koneksinya — prosesnya tetap jalan di sisi server.
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         authorization: `Bearer ${process.env.CRON_SECRET}`,
       },
       body: JSON.stringify(next),
+      signal: AbortSignal.timeout(4_000),
     });
+    // Respons TIDAK boleh diabaikan: kalau ditolak (mis. Deployment Protection
+    // atau secret beda), rantainya mati diam-diam dan panel progres hilang
+    // tanpa penjelasan. Catat sebagai job error supaya kelihatan di UI.
+    if (!res.ok) {
+      await reportChainFailure(next, `HTTP ${res.status} saat memanggil ${url}`);
+    }
   } catch (e) {
-    // putaran berikutnya gagal dijadwalkan → progres yang sudah ada tetap aman,
-    // user bisa klik Sync lagi untuk melanjutkan
-    console.error("chainNextRound gagal:", e);
+    // timeout/abort = putaran berikutnya sudah diterima server dan sedang jalan,
+    // kita cuma berhenti menunggu jawabannya → itu memang yang diinginkan
+    const name = e instanceof Error ? e.name : "";
+    if (name === "TimeoutError" || name === "AbortError") return;
+    await reportChainFailure(next, e instanceof Error ? e.message : "unknown");
+  }
+}
+
+// Tulis kegagalan penyambungan sebagai SyncJob error → muncul di panel progres.
+async function reportChainFailure(next: RoundInput, reason: string) {
+  console.error("chainNextRound gagal:", reason);
+  try {
+    const store = next.storeId
+      ? await prisma.store.findUnique({ where: { id: next.storeId }, select: { name: true } })
+      : null;
+    const jobId = await startSyncJob({
+      storeId: next.storeId ?? null,
+      storeName: store?.name ?? "Semua toko",
+      scope: next.scope === "all" ? "ALL" : "STORE",
+    });
+    await finishSyncJob(jobId, {
+      phase: "error",
+      created: next.accCreated,
+      updated: next.accUpdated,
+      partial: true,
+      error: reason,
+      message: `Gagal lanjut otomatis ke putaran ${next.round} — klik Sync lagi untuk melanjutkan`,
+    });
+  } catch {
+    /* laporan gagal pun jangan sampai bikin proses induk error */
   }
 }

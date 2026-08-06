@@ -106,7 +106,10 @@ export async function finishSyncJob(
 // Job yang layak ditampilkan: masih jalan, atau baru saja selesai (biar user
 // sempat lihat hasilnya sebelum hilang).
 export const ACTIVE_STALE_MS = 3 * 60 * 1000; // tak ada update 3 menit → dianggap mati
-export const RECENT_DONE_MS = 25 * 1000;
+// Job selesai tetap ditampilkan beberapa menit: kalau putaran berikutnya
+// gagal dijadwalkan, user masih melihat statusnya (bukan panel yang hilang
+// begitu saja tanpa penjelasan).
+export const RECENT_DONE_MS = 3 * 60 * 1000;
 
 export async function listSyncJobs() {
   const now = Date.now();
