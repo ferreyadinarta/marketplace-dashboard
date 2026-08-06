@@ -147,6 +147,55 @@ export async function getOrderSnList(
   return all;
 }
 
+// ---------- Pencairan dana (escrow yang sudah RELEASE) ----------
+// get_escrow_list mengembalikan order yang dananya sudah dilepas Shopee beserta
+// waktu rilisnya → inilah sumber "dana sudah cair" untuk halaman Rekonsiliasi.
+// Berlaku untuk semua tipe seller (beda dengan wallet transaction yang cuma
+// untuk local shop, atau payout_info yang untuk cross-border).
+export type ShopeeEscrowRelease = {
+  order_sn: string;
+  payout_amount: number; // rupiah (float) — jumlah yang cair untuk order ini
+  escrow_release_time: number; // unix detik
+};
+
+export async function getEscrowList(
+  accessToken: string,
+  shopId: string,
+  fromSec: number,
+  toSec: number,
+  opts: { deadlineMs?: number } = {}
+): Promise<ShopeeEscrowRelease[]> {
+  const started = Date.now();
+  const deadline = opts.deadlineMs ?? 30_000;
+  const out: ShopeeEscrowRelease[] = [];
+
+  // Shopee membatasi rentang get_escrow_list 15 hari → pecah seperti order list
+  const WINDOW = 15 * 24 * 3600;
+  for (let start = fromSec; start < toSec; start += WINDOW) {
+    const end = Math.min(start + WINDOW, toSec);
+
+    for (let page = 1; page <= 100; page++) {
+      if (Date.now() - started > deadline) return out; // berhenti rapi, bukan 504
+      const r = await shopGet<{ escrow_list?: ShopeeEscrowRelease[]; more?: boolean }>(
+        "/api/v2/payment/get_escrow_list",
+        accessToken,
+        shopId,
+        {
+          release_time_from: String(start),
+          release_time_to: String(end),
+          page_size: "40",
+          page_no: String(page),
+        }
+      );
+      for (const e of r.escrow_list ?? []) {
+        if (e?.order_sn) out.push(e);
+      }
+      if (!r.more) break;
+    }
+  }
+  return out;
+}
+
 // ---------- Katalog product (untuk import ke Master Product) ----------
 type ShopeeItem = {
   item_id: number;

@@ -2,6 +2,7 @@ import type { Store } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
 import type { ProgressFn } from "@/lib/syncProgress";
+import { dateKey } from "@/lib/format";
 import type { NormalizedOrder } from "@/lib/adapters/types";
 import type { ImportedProduct } from "@/lib/adapters/types";
 import {
@@ -10,6 +11,7 @@ import {
   getOrderDetails,
   getEscrowDetail,
   fetchShopeeCatalog,
+  getEscrowList,
   shopeeSku,
   type ShopeeOrderDetail,
   type ShopeeIncome,
@@ -318,4 +320,70 @@ export async function syncShopeeOrders(storeId: string, orderSns: string[]) {
   const r = await ingestOrders(store.id, normalized);
   await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
   return r;
+}
+
+// ---------- Pencairan dana (Rekonsiliasi) ----------
+// Shopee tidak mengirim "batch pencairan" untuk seller lokal; yang tersedia
+// adalah waktu RILIS escrow per order (get_escrow_list). Jadi pencairan disusun
+// sendiri: order yang rilis di HARI yang sama (WIB) digabung jadi satu Payout,
+// lalu tiap order ditandai masuk pencairan itu (Order.payoutId).
+//
+// Idempoten: dijalankan ulang akan menimpa jumlahnya, bukan menambah baris baru.
+export async function syncShopeePayouts(
+  storeId: string,
+  from: Date,
+  to: Date,
+  opts: { deadlineMs?: number } = {}
+): Promise<{ payouts: number; orders: number; amount: number }> {
+  const store = await prisma.store.findUnique({ where: { id: storeId } });
+  if (!store) throw new Error("Toko tidak ditemukan");
+  const accessToken = await ensureFreshToken(store);
+  const shopId = store.shopIdApi!;
+
+  const list = await getEscrowList(
+    accessToken,
+    shopId,
+    Math.floor(from.getTime() / 1000),
+    Math.floor(to.getTime() / 1000),
+    { deadlineMs: opts.deadlineMs }
+  );
+  if (list.length === 0) return { payouts: 0, orders: 0, amount: 0 };
+
+  // kelompokkan per TANGGAL RILIS (WIB) — itu yang dilihat user di mutasi bank
+  const byDate = new Map<string, { amount: number; orderSns: string[] }>();
+  for (const e of list) {
+    const released = new Date(e.escrow_release_time * 1000);
+    const key = dateKey(released);
+    const g = byDate.get(key) ?? { amount: 0, orderSns: [] };
+    g.amount += Math.round(e.payout_amount || 0);
+    g.orderSns.push(e.order_sn);
+    byDate.set(key, g);
+  }
+
+  let orders = 0;
+  let amount = 0;
+  for (const [key, g] of byDate) {
+    const reference = `ESCROW-${key}`;
+    // tanggal disimpan di tengah hari WIB supaya tidak geser saat dibaca ulang
+    const payoutDate = new Date(`${key}T12:00:00+07:00`);
+
+    const existing = await prisma.payout.findFirst({ where: { storeId, reference } });
+    const payout = existing
+      ? await prisma.payout.update({
+          where: { id: existing.id },
+          data: { amount: g.amount, payoutDate },
+        })
+      : await prisma.payout.create({
+          data: { storeId, reference, amount: g.amount, payoutDate },
+        });
+
+    const r = await prisma.order.updateMany({
+      where: { storeId, marketplaceOrderId: { in: g.orderSns } },
+      data: { payoutId: payout.id },
+    });
+    orders += r.count;
+    amount += g.amount;
+  }
+
+  return { payouts: byDate.size, orders, amount };
 }

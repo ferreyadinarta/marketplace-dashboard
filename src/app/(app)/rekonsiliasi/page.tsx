@@ -2,12 +2,22 @@ import { CheckCircle2, AlertTriangle, Clock, Wallet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { rupiah, MARKETPLACE_LABEL } from "@/lib/format";
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
+import { waktu } from "@/lib/format";
+import { SyncPayoutsButton } from "@/components/SyncPayoutsButton";
+import { syncPayouts } from "./actions";
 
 export const dynamic = "force-dynamic";
+// tarik pencairan bisa memakan waktu (banyak halaman escrow) → batas maksimum
+export const maxDuration = 60;
 
 // Rekonsiliasi: bandingkan net order selesai vs dana yang benar-benar cair.
 export default async function RekonsiliasiPage() {
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
+  const recentPayouts = await prisma.payout.findMany({
+    orderBy: { payoutDate: "desc" },
+    take: 12,
+    include: { store: { select: { name: true } }, _count: { select: { orders: true } } },
+  });
 
   const rows = await Promise.all(
     stores.map(async (s) => {
@@ -37,12 +47,16 @@ export default async function RekonsiliasiPage() {
           <EmptyState
             icon={<Wallet size={40} />}
             title="Belum ada toko"
-            description="Rekonsiliasi muncul setelah ada toko dan data pencairan dari marketplace."
+            description="Rekonsiliasi muncul setelah ada toko Shopee terhubung dan data pencairannya ditarik."
           />
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <CardHeader title="Per Toko" subtitle="Data payout terisi otomatis lewat sync marketplace." />
+          <CardHeader
+            title="Per Toko"
+            subtitle="Dana cair diambil dari escrow Shopee yang sudah rilis. Klik tarik data untuk memperbarui."
+            action={<SyncPayoutsButton action={syncPayouts} />}
+          />
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
@@ -144,6 +158,39 @@ export default async function RekonsiliasiPage() {
                 </div>
               );
             })}
+          </div>
+        </Card>
+      )}
+
+      {recentPayouts.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader
+            title="Pencairan Terakhir"
+            subtitle="Order yang dananya rilis di hari yang sama digabung jadi satu pencairan."
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 font-medium">Tanggal cair</th>
+                  <th className="px-5 py-3 font-medium">Toko</th>
+                  <th className="px-5 py-3 text-right font-medium">Jumlah</th>
+                  <th className="px-5 py-3 text-right font-medium">Order</th>
+                  <th className="px-5 py-3 font-medium">Referensi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentPayouts.map((p) => (
+                  <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
+                    <td className="px-5 py-3 text-slate-700">{waktu(p.payoutDate).split(",")[0]}</td>
+                    <td className="px-5 py-3 text-slate-600">{p.store.name}</td>
+                    <td className="px-5 py-3 text-right font-medium text-slate-800">{rupiah(p.amount)}</td>
+                    <td className="px-5 py-3 text-right text-slate-500">{p._count.orders}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-400">{p.reference ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}
