@@ -31,6 +31,39 @@ model Store {
   mappings ProductMapping[]
   orders   Order[]
   payouts  Payout[]
+  syncJobs SyncJob[]
+}
+
+// Progres sync yang sedang berjalan — ditulis tiap batch oleh proses sync,
+// dibaca UI lewat polling supaya user lihat "lagi ngapain", bukan spinner buta.
+// Juga bikin sync terjadwal (cron) kelihatan hasilnya.
+model SyncJob {
+  id      String  @id @default(cuid())
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  storeName String // disalin: job tetap kebaca walau toko dihapus
+  scope     String // ALL = tombol "Sync semua toko" / cron, STORE = tombol per toko
+  phase     String // queued | orders | done | error
+
+  // posisi kerja — dipakai untuk bar progres
+  storeIndex  Int @default(0) // toko ke-berapa (scope ALL)
+  storeTotal  Int @default(1)
+  windowIndex Int @default(0) // periode 15 harian ke-berapa
+  windowTotal Int @default(0)
+
+  ordersDone Int     @default(0) // order yang sudah diproses di job ini
+  created    Int     @default(0)
+  updated    Int     @default(0)
+  partial    Boolean @default(false) // waktu habis, masih ada sisa
+  message    String? // teks pendek untuk UI
+  error      String?
+
+  startedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  finishedAt DateTime?
+
+  @@index([finishedAt, updatedAt])
 }
 
 model BookkeepingGroup {

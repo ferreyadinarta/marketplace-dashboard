@@ -21,6 +21,7 @@ import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
 import { AutoSyncBanner } from "@/components/AutoSyncBanner";
+import { SyncProgressPanel } from "@/components/SyncProgressPanel";
 
 export const dynamic = "force-dynamic";
 // Sync toko (tarik order + escrow) jalan sebagai Server Action di halaman ini.
@@ -60,6 +61,9 @@ export default async function MasterTokoPage({
         title="Master Toko"
         description="Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko."
       />
+
+      {/* progres sync yang sedang jalan (polling) — termasuk sync dari cron/tab lain */}
+      <SyncProgressPanel />
 
       {/* hasil connect / sync */}
       {tiktokStatus === "connected" && (

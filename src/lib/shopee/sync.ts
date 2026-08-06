@@ -1,6 +1,7 @@
 import type { Store } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
+import type { ProgressFn } from "@/lib/syncProgress";
 import type { NormalizedOrder } from "@/lib/adapters/types";
 import type { ImportedProduct } from "@/lib/adapters/types";
 import {
@@ -180,7 +181,7 @@ export async function syncShopeeStore(
   storeId: string,
   from: Date,
   to: Date,
-  opts: { deadlineMs?: number } = {}
+  opts: { deadlineMs?: number; onProgress?: ProgressFn } = {}
 ): Promise<SyncResult> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
@@ -213,12 +214,28 @@ export async function syncShopeeStore(
 
   const BATCH = 50; // batas get_order_detail per panggilan
   const total: SyncResult = { created: 0, updated: 0, unmapped: 0, partial: false };
+  const progress = opts.onProgress;
+  let ordersDone = 0; // order yang sudah dipindai (untuk tampilan progres)
 
-  for (const [ws, we] of windows) {
+  await progress?.({
+    phase: "orders",
+    windowTotal: windows.length,
+    windowIndex: 0,
+    message: `Menarik order ${store.name}…`,
+  });
+
+  for (const [wi, [ws, we]] of windows.entries()) {
     if (outOfTime()) {
       total.partial = true;
       break;
     }
+    await progress?.({
+      windowIndex: wi + 1,
+      ordersDone,
+      created: total.created,
+      updated: total.updated,
+      message: `Periode ${wi + 1}/${windows.length}`,
+    });
     if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
     const sns = await getOrderSnList(accessToken, shopId, ws, we);
 
@@ -238,7 +255,10 @@ export async function syncShopeeStore(
       // semua sudah final & lengkap → lewati, tidak perlu panggil API sama sekali
       const allDone =
         known.length === chunk.length && known.every((k) => FINAL_STATUS.includes(k.status));
-      if (allDone) continue;
+      if (allDone) {
+        ordersDone += chunk.length;
+        continue;
+      }
 
       const cached = new Map<string, CachedFee>(
         known
@@ -252,6 +272,14 @@ export async function syncShopeeStore(
       total.created += r.created;
       total.updated += r.updated;
       total.unmapped += r.unmapped;
+      ordersDone += chunk.length;
+
+      await progress?.({
+        ordersDone,
+        created: total.created,
+        updated: total.updated,
+        message: `Periode ${wi + 1}/${windows.length} · ${ordersDone} order dipindai`,
+      });
     }
     if (total.partial) break;
   }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
 import type { NormalizedOrder, ImportedProduct } from "@/lib/adapters/types";
+import type { ProgressFn } from "@/lib/syncProgress";
 import {
   refreshAccessToken,
   searchOrders,
@@ -57,7 +58,12 @@ function normalize(o: TiktokOrder): NormalizedOrder {
 }
 
 // Sync satu toko TikTok: refresh token kalau perlu → ambil order → normalisasi → simpan.
-export async function syncTiktokStore(storeId: string, from: Date, to: Date) {
+export async function syncTiktokStore(
+  storeId: string,
+  from: Date,
+  to: Date,
+  opts: { onProgress?: ProgressFn } = {}
+) {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
   if (!store.accessToken || !store.shopCipher) {
@@ -86,10 +92,19 @@ export async function syncTiktokStore(storeId: string, from: Date, to: Date) {
   const fromSec = Math.floor(from.getTime() / 1000);
   const toSec = Math.floor(to.getTime() / 1000);
   const orders: TiktokOrder[] = [];
+  const windowTotal = Math.max(1, Math.ceil((toSec - fromSec) / WINDOW));
+  let wi = 0;
+  await opts.onProgress?.({ phase: "orders", windowTotal, windowIndex: 0, message: `Menarik order ${store.name}…` });
   for (let start = fromSec; start < toSec; start += WINDOW) {
     const end = Math.min(start + WINDOW, toSec);
     const chunk = await searchOrders(accessToken, store.shopCipher, start, end);
     orders.push(...chunk);
+    wi++;
+    await opts.onProgress?.({
+      windowIndex: wi,
+      ordersDone: orders.length,
+      message: `Periode ${wi}/${windowTotal} · ${orders.length} order dipindai`,
+    });
   }
 
   const normalized = orders.map(normalize);

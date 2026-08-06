@@ -21,10 +21,11 @@ export function ConfirmDialog({
   busyText = "Menghapus…",
   tone = "danger",
   extraFields,
+  onConfirm,
 }: {
   open: boolean;
   onClose: () => void;
-  action: Action;
+  action?: Action;
   id?: string; // opsional: aksi massal kirim datanya lewat extraFields
   title: string;
   message: ReactNode;
@@ -33,6 +34,7 @@ export function ConfirmDialog({
   busyText?: string;
   tone?: "danger" | "primary";
   extraFields?: ReactNode; // input tersembunyi tambahan untuk form konfirmasi
+  onConfirm?: () => void; // dipakai kalau konfirmasi TIDAK submit form sendiri (mis. cuma ubah state)
 }) {
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
@@ -94,18 +96,30 @@ export function ConfirmDialog({
           >
             Batal
           </button>
-          <form action={action} className="flex-1 sm:flex-none">
-            {id !== undefined && <input type="hidden" name="id" value={id} />}
-            {extraFields}
-            <SubmitButton
-              variant={tone}
-              icon={confirmIcon}
-              pendingText={busyText}
-              className="w-full"
+          {onConfirm ? (
+            <button
+              type="button"
+              onClick={onConfirm}
+              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium text-white transition sm:flex-none ${
+                tone === "danger" ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
+              }`}
             >
               {confirmText}
-            </SubmitButton>
-          </form>
+            </button>
+          ) : (
+            <form action={action} className="flex-1 sm:flex-none">
+              {id !== undefined && <input type="hidden" name="id" value={id} />}
+              {extraFields}
+              <SubmitButton
+                variant={tone}
+                icon={confirmIcon}
+                pendingText={busyText}
+                className="w-full"
+              >
+                {confirmText}
+              </SubmitButton>
+            </form>
+          )}
         </div>
       </div>
     </div>,

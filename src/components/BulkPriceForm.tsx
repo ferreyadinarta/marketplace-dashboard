@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Tags, ChevronDown, Search } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useFormStatus } from "react-dom";
+import { Tags, ChevronDown, Search, Loader2, Wand2 } from "lucide-react";
 import { CurrencyInput } from "@/components/CurrencyInput";
-import { SubmitButton } from "@/components/SubmitButton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -38,21 +39,101 @@ function initUnit(p: PriceRow): UnitVals {
   };
 }
 
-// Isi HPP/harga + satuan (box/sachet/isi/koli) banyak product sekaligus, simpan sekali.
+const sameVals = (a: Vals, b: Vals) => a.hpp === b.hpp && a.retail === b.retail && a.grosir === b.grosir;
+const sameUnits = (a: UnitVals, b: UnitVals) =>
+  a.mainUnit === b.mainUnit &&
+  a.smallUnit === b.smallUnit &&
+  a.isi === b.isi &&
+  a.koliUnit === b.koliUnit &&
+  a.isiKoli === b.isiKoli;
+
+// Bar simpan yang cuma muncul kalau ADA perubahan belum disimpan.
+// Dipisah jadi komponen sendiri karena useFormStatus harus di dalam <form>.
+function SaveBar({
+  dirtyCount,
+  onStart,
+  onDone,
+}: {
+  dirtyCount: number;
+  onStart: () => void;
+  onDone: () => void;
+}) {
+  const { pending } = useFormStatus();
+  const prev = useRef(false);
+  const cbs = useRef({ onStart, onDone });
+
+  useEffect(() => {
+    cbs.current = { onStart, onDone };
+  }, [onStart, onDone]);
+
+  useEffect(() => {
+    if (pending && !prev.current) cbs.current.onStart();
+    if (!pending && prev.current) {
+      cbs.current.onDone();
+      window.dispatchEvent(new CustomEvent("app:toast", { detail: "Tersimpan" }));
+    }
+    prev.current = pending;
+  }, [pending]);
+
+  if (!pending && dirtyCount === 0) return null;
+
+  return (
+    <div className="sticky bottom-0 -mx-5 -mb-5 mt-3 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur">
+      <p className="text-sm text-slate-600">
+        {pending ? (
+          <span className="inline-flex items-center gap-2 text-slate-500">
+            <Loader2 size={14} className="animate-spin" /> Menyimpan…
+          </span>
+        ) : (
+          <>
+            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400 align-middle" />
+            <strong className="font-medium text-slate-800">{dirtyCount} product</strong> belum disimpan
+          </>
+        )}
+      </p>
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+      >
+        Simpan
+      </button>
+    </div>
+  );
+}
+
+// Isi HPP/harga + satuan (box/sachet/isi/koli) banyak product sekaligus.
 // Dirancang untuk SETELAH import: import cuma bawa nama+SKU+harga, satuan & HPP kosong.
+//
+// Alur simpan: tidak ada tombol "Simpan Semua" permanen —
+//  • edit manual per baris → bar "belum disimpan" muncul sendiri di bawah;
+//  • "Terapkan ke semua" → konfirmasi dulu, lalu langsung tersimpan.
+// Yang dikirim ke server HANYA baris yang berubah.
 export function BulkPriceForm({ products, action }: { products: PriceRow[]; action: Action }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("harga");
   const [q, setQ] = useState("");
   const [onlyEmpty, setOnlyEmpty] = useState(false);
+  const [confirmTpl, setConfirmTpl] = useState(false);
+
   const [rows, setRows] = useState<Record<string, Vals>>(() =>
     Object.fromEntries(products.map((p) => [p.id, { hpp: p.hpp, retail: p.priceRetail, grosir: p.priceGrosir }]))
   );
   const [units, setUnits] = useState<Record<string, UnitVals>>(() =>
     Object.fromEntries(products.map((p) => [p.id, initUnit(p)]))
   );
+  // nilai terakhir yang SUDAH tersimpan → pembanding untuk tahu mana yang berubah
+  const [baseRows, setBaseRows] = useState(rows);
+  const [baseUnits, setBaseUnits] = useState(units);
+
   // template "isi sekali → terapkan ke semua" untuk satuan yang seragam
   const [tpl, setTpl] = useState<UnitVals>({ mainUnit: "", smallUnit: "", isi: "", koliUnit: "koli", isiKoli: "" });
+
+  const formRef = useRef<HTMLFormElement>(null);
+  // ditandai saat template diterapkan → form dikirim setelah state satuan kepasang
+  const wantSubmit = useRef(false);
+  // snapshot saat submit mulai → jadi baseline baru kalau submit selesai
+  const inFlight = useRef<{ rows: typeof rows; units: typeof units } | null>(null);
 
   const set = (id: string, key: keyof Vals, val: number) =>
     setRows((prev) => ({ ...prev, [id]: { ...prev[id], [key]: val } }));
@@ -71,24 +152,57 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
     });
   }, [products, rows, q, onlyEmpty]);
 
-  // terapkan template satuan ke semua product yang sedang TAMPIL (bisa difilter dulu)
-  const tplHasValue = !!(tpl.mainUnit || tpl.smallUnit || tpl.isi || tpl.koliUnit || tpl.isiKoli);
-  const applyTpl = () =>
+  // baris yang berubah dari nilai tersimpan → cuma ini yang dikirim
+  const dirtyIds = useMemo(
+    () =>
+      products
+        .filter(
+          (p) => !sameVals(rows[p.id], baseRows[p.id]) || !sameUnits(units[p.id], baseUnits[p.id])
+        )
+        .map((p) => p.id),
+    [products, rows, units, baseRows, baseUnits]
+  );
+  const payload = dirtyIds.map((id) => ({ id, ...rows[id], ...units[id] }));
+
+  // terapkan template satuan ke semua product yang sedang TAMPIL, lalu simpan
+  const tplHasValue = !!(tpl.mainUnit || tpl.smallUnit || tpl.isi || tpl.isiKoli);
+  const applyTplAndSave = useCallback(() => {
     setUnits((prev) => {
       const next = { ...prev };
       for (const p of filtered) next[p.id] = { ...tpl };
       return next;
     });
+    setConfirmTpl(false);
+    wantSubmit.current = true; // submit setelah state kepasang (lihat effect di bawah)
+  }, [filtered, tpl]);
 
-  // kirim harga + satuan sekaligus (state = nilai sekarang, jadi baris tak disentuh tetap sama)
-  const payload = products.map((p) => ({ id: p.id, ...rows[p.id], ...units[p.id] }));
+  // begitu satuan hasil template sudah masuk state (dan hidden input ikut
+  // terbarui), langsung kirim — user tidak perlu klik Simpan lagi.
+  useEffect(() => {
+    if (!wantSubmit.current) return;
+    wantSubmit.current = false;
+    formRef.current?.requestSubmit();
+  }, [units]);
 
   if (products.length === 0) return null;
 
-  const inputCls =
-    "h-9 w-full rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+  // dasar tanpa lebar — lebarnya ditentukan di tempat pakai (jangan gabung
+  // w-full dengan w-24, Tailwind akan bentrok dan yang menang tak tentu)
+  const fieldCls =
+    "h-9 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+  const inputCls = `${fieldCls} w-full`;
   const tabCls = (t: Tab) =>
-    `rounded-lg px-3 py-1.5 text-sm font-medium ${tab === t ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"}`;
+    `rounded-lg px-4 py-1.5 text-sm font-medium transition ${
+      tab === t ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"
+    }`;
+
+  // ringkasan template dalam bahasa manusia — dipakai di modal konfirmasi
+  const tplLines: string[] = [];
+  if (tpl.smallUnit && Number(tpl.isi) >= 2)
+    tplLines.push(`1 ${tpl.mainUnit || "pcs"} = ${tpl.isi} ${tpl.smallUnit}`);
+  if (tpl.koliUnit && Number(tpl.isiKoli) >= 2 && tpl.smallUnit && Number(tpl.isi) >= 2)
+    tplLines.push(`1 ${tpl.koliUnit} = ${tpl.isiKoli} ${tpl.mainUnit || "pcs"}`);
+  if (tplLines.length === 0) tplLines.push(`Satuan: ${tpl.mainUnit || "pcs"} (tanpa satuan kecil)`);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -113,11 +227,11 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
       </button>
 
       {open && (
-        <form action={action} className="border-t border-slate-100 p-5">
+        <form ref={formRef} action={action} className="border-t border-slate-100 p-5">
           <input type="hidden" name="prices" value={JSON.stringify(payload)} />
 
           {/* tab: harga / satuan */}
-          <div className="mb-3 inline-flex gap-1 rounded-xl bg-slate-50 p-1">
+          <div className="mb-3 inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button type="button" onClick={() => setTab("harga")} className={tabCls("harga")}>
               Harga
             </button>
@@ -151,34 +265,71 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
           </div>
 
           {tab === "satuan" && (
-            <>
-              <p className="mb-2 text-xs text-slate-400">
-                Satuan utama = yang dipakai sehari-hari (mis. box). Kecil = eceran (mis. sachet). Isi = 1 utama berapa
-                kecil. Koli = satuan terbesar saat barang masuk (isi = 1 koli berapa box). Kosongkan yang tidak dipakai.
-              </p>
-              {/* isi sekali → terapkan ke semua yang tampil */}
-              <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
-                <p className="mb-2 text-xs font-medium text-indigo-900">
-                  Isi sekali, terapkan ke semua yang tampil
-                  <span className="ml-1 font-normal text-indigo-500">(pakai kotak Cari dulu kalau mau sebagian)</span>
-                </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(2,6rem)_4rem_6rem_4rem_auto]">
-                  <input value={tpl.mainUnit} onChange={(e) => setTplField("mainUnit", e.target.value)} placeholder="box" className={inputCls} />
-                  <input value={tpl.smallUnit} onChange={(e) => setTplField("smallUnit", e.target.value)} placeholder="sachet" className={inputCls} />
-                  <input value={tpl.isi} onChange={(e) => setTplField("isi", e.target.value)} type="number" min="0" placeholder="12" className={inputCls} />
-                  <input value={tpl.koliUnit} onChange={(e) => setTplField("koliUnit", e.target.value)} placeholder="koli" className={inputCls} />
-                  <input value={tpl.isiKoli} onChange={(e) => setTplField("isiKoli", e.target.value)} type="number" min="0" placeholder="6" className={inputCls} />
-                  <button
-                    type="button"
-                    onClick={applyTpl}
-                    disabled={!tplHasValue || filtered.length === 0}
-                    className="col-span-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 sm:col-span-1"
-                  >
-                    Terapkan ke {filtered.length}
-                  </button>
-                </div>
+            <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
+              {/* dibaca seperti kalimat: 1 box berisi 12 sachet · 1 koli berisi 24 box */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-600">
+                <span className="text-xs font-medium text-indigo-900">Isi sekali:</span>
+                <span>1</span>
+                <input
+                  value={tpl.mainUnit}
+                  onChange={(e) => setTplField("mainUnit", e.target.value)}
+                  placeholder="box"
+                  aria-label="Satuan utama"
+                  className={`${fieldCls} w-24`}
+                />
+                <span>berisi</span>
+                <input
+                  value={tpl.isi}
+                  onChange={(e) => setTplField("isi", e.target.value)}
+                  type="number"
+                  min="0"
+                  placeholder="12"
+                  aria-label="Isi per satuan utama"
+                  className={`${fieldCls} w-16`}
+                />
+                <input
+                  value={tpl.smallUnit}
+                  onChange={(e) => setTplField("smallUnit", e.target.value)}
+                  placeholder="sachet"
+                  aria-label="Satuan kecil"
+                  className={`${fieldCls} w-24`}
+                />
+                <span className="text-slate-300">·</span>
+                <span>1</span>
+                <input
+                  value={tpl.koliUnit}
+                  onChange={(e) => setTplField("koliUnit", e.target.value)}
+                  placeholder="koli"
+                  aria-label="Satuan koli"
+                  className={`${fieldCls} w-20`}
+                />
+                <span>berisi</span>
+                <input
+                  value={tpl.isiKoli}
+                  onChange={(e) => setTplField("isiKoli", e.target.value)}
+                  type="number"
+                  min="0"
+                  placeholder="24"
+                  aria-label="Isi per koli"
+                  className={`${fieldCls} w-16`}
+                />
+                <span>{tpl.mainUnit || "box"}</span>
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmTpl(true)}
+                  disabled={!tplHasValue || filtered.length === 0}
+                  className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
+                >
+                  <Wand2 size={15} />
+                  Terapkan ke {filtered.length}
+                </button>
               </div>
-            </>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Berlaku untuk {filtered.length} product yang tampil (saring dulu pakai kotak Cari kalau mau
+                sebagian). Satuan kecil & koli boleh dikosongkan.
+              </p>
+            </div>
           )}
 
           {/* header kolom (desktop) */}
@@ -205,10 +356,13 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
             {filtered.map((p) => {
               const v = rows[p.id];
               const u = units[p.id];
+              const dirty = dirtyIds.includes(p.id);
               return tab === "harga" ? (
                 <div
                   key={p.id}
-                  className="grid grid-cols-1 gap-2 rounded-xl border border-slate-100 p-2 sm:grid-cols-[1fr_repeat(3,7rem)] sm:items-center sm:border-0 sm:p-1"
+                  className={`grid grid-cols-1 gap-2 rounded-xl border p-2 sm:grid-cols-[1fr_repeat(3,7rem)] sm:items-center sm:p-1 ${
+                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-0"
+                  }`}
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
@@ -221,17 +375,19 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
               ) : (
                 <div
                   key={p.id}
-                  className="grid grid-cols-2 gap-2 rounded-xl border border-slate-100 p-2 sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem] sm:items-center sm:border-0 sm:p-1"
+                  className={`grid grid-cols-2 gap-2 rounded-xl border p-2 sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem] sm:items-center sm:p-1 ${
+                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-0"
+                  }`}
                 >
                   <div className="col-span-2 min-w-0 sm:col-span-1">
                     <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
                     <p className="truncate text-xs text-slate-400">{p.sku}</p>
                   </div>
-                  <input value={u.mainUnit} onChange={(e) => setU(p.id, "mainUnit", e.target.value)} placeholder="box" className={inputCls} />
-                  <input value={u.smallUnit} onChange={(e) => setU(p.id, "smallUnit", e.target.value)} placeholder="sachet" className={inputCls} />
-                  <input value={u.isi} onChange={(e) => setU(p.id, "isi", e.target.value)} type="number" min="0" placeholder="12" className={inputCls} />
-                  <input value={u.koliUnit} onChange={(e) => setU(p.id, "koliUnit", e.target.value)} placeholder="koli" className={inputCls} />
-                  <input value={u.isiKoli} onChange={(e) => setU(p.id, "isiKoli", e.target.value)} type="number" min="0" placeholder="6" className={inputCls} />
+                  <input value={u.mainUnit} onChange={(e) => setU(p.id, "mainUnit", e.target.value)} placeholder="box" aria-label="Satuan utama" className={inputCls} />
+                  <input value={u.smallUnit} onChange={(e) => setU(p.id, "smallUnit", e.target.value)} placeholder="sachet" aria-label="Satuan kecil" className={inputCls} />
+                  <input value={u.isi} onChange={(e) => setU(p.id, "isi", e.target.value)} type="number" min="0" placeholder="12" aria-label="Isi per satuan utama" className={inputCls} />
+                  <input value={u.koliUnit} onChange={(e) => setU(p.id, "koliUnit", e.target.value)} placeholder="koli" aria-label="Satuan koli" className={inputCls} />
+                  <input value={u.isiKoli} onChange={(e) => setU(p.id, "isiKoli", e.target.value)} type="number" min="0" placeholder="24" aria-label="Isi per koli" className={inputCls} />
                 </div>
               );
             })}
@@ -240,18 +396,50 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
             )}
           </div>
 
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            <SubmitButton
-              variant="primary"
-              pendingText="Menyimpan…"
-              notify="Tersimpan"
-              className="w-full justify-center sm:w-auto"
-            >
-              Simpan Semua
-            </SubmitButton>
-          </div>
+          <SaveBar
+            dirtyCount={dirtyIds.length}
+            onStart={() => {
+              inFlight.current = { rows, units };
+            }}
+            onDone={() => {
+              if (!inFlight.current) return;
+              setBaseRows(inFlight.current.rows);
+              setBaseUnits(inFlight.current.units);
+              inFlight.current = null;
+            }}
+          />
         </form>
       )}
+
+      {/* konfirmasi sebelum satuan ditimpa massal — langsung tersimpan setelah OK */}
+      <ConfirmDialog
+        open={confirmTpl}
+        onClose={() => setConfirmTpl(false)}
+        onConfirm={applyTplAndSave}
+        tone="primary"
+        title={`Terapkan satuan ke ${filtered.length} product?`}
+        confirmText="Terapkan & Simpan"
+        message={
+          <>
+            <ul className="mb-2 space-y-0.5 font-medium text-slate-700">
+              {tplLines.map((l) => (
+                <li key={l}>• {l}</li>
+              ))}
+            </ul>
+            <p>
+              Satuan lama {filtered.length} product ini akan <strong>ditimpa</strong> dan langsung tersimpan.
+              Product yang tidak tampil di daftar tidak berubah.
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              {filtered
+                .slice(0, 4)
+                .map((p) => p.name)
+                .join(", ")}
+              {filtered.length > 4 ? ` + ${filtered.length - 4} lainnya` : ""}
+            </p>
+          </>
+        }
+      />
     </div>
   );
 }
