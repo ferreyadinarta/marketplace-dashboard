@@ -1,10 +1,12 @@
-import { CheckCircle2, AlertTriangle, Clock, Wallet } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Clock, Wallet, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { rupiah, MARKETPLACE_LABEL } from "@/lib/format";
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
-import { waktu } from "@/lib/format";
+import { waktu, dateKey } from "@/lib/format";
 import { SyncPayoutsButton } from "@/components/SyncPayoutsButton";
-import { syncPayouts } from "./actions";
+import { ManualPayoutForm } from "@/components/ManualPayoutForm";
+import { ConfirmModalButton } from "@/components/ConfirmModalButton";
+import { syncPayouts, addManualPayout, deletePayout } from "./actions";
 
 export const dynamic = "force-dynamic";
 // tarik pencairan bisa memakan waktu (banyak halaman escrow) → batas maksimum
@@ -13,6 +15,10 @@ export const maxDuration = 60;
 // Rekonsiliasi: bandingkan net order selesai vs dana yang benar-benar cair.
 export default async function RekonsiliasiPage() {
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
+  const today = dateKey(new Date());
+  // toko tanpa API → pencairannya dicatat manual (grosir/reseller, WA, dll)
+  const isManual = (marketplace: string, hasToken: boolean) =>
+    marketplace === "KONSINYASI" || marketplace === "WA" || !hasToken;
   const recentPayouts = await prisma.payout.findMany({
     orderBy: { payoutDate: "desc" },
     take: 12,
@@ -31,7 +37,10 @@ export default async function RekonsiliasiPage() {
       });
       const netSeharusnya = netAgg._sum.netAmount ?? 0;
       const danaCair = payoutAgg._sum.amount ?? 0;
-      return { store: s, netSeharusnya, danaCair, selisih: netSeharusnya - danaCair };
+      // Selisih dilihat dari sisi UANG MASUK: cair − seharusnya.
+      // plus  = dana yang cair LEBIH dari perkiraan (mis. ada penyesuaian/bonus)
+      // minus = masih KURANG (belum cair semua / ada potongan tak terduga)
+      return { store: s, netSeharusnya, danaCair, selisih: danaCair - netSeharusnya };
     })
   );
 
@@ -39,7 +48,7 @@ export default async function RekonsiliasiPage() {
     <div className="space-y-6">
       <PageHeader
         title="Rekonsiliasi Dana"
-        description="Cocokkan dana yang seharusnya cair (dari order selesai) dengan pencairan nyata dari marketplace. Selisih = perlu dicek."
+        description="Cocokkan dana yang seharusnya cair (dari order selesai) dengan pencairan nyata dari marketplace. Selisih = dana cair − seharusnya: minus berarti masih kurang, plus berarti cair lebih banyak."
       />
 
       {stores.length === 0 ? (
@@ -66,6 +75,7 @@ export default async function RekonsiliasiPage() {
                   <th className="px-5 py-3 text-right font-medium">Dana Cair</th>
                   <th className="px-5 py-3 text-right font-medium">Selisih</th>
                   <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -82,10 +92,20 @@ export default async function RekonsiliasiPage() {
                       <td className="px-5 py-3 text-right text-slate-600">{rupiah(r.danaCair)}</td>
                       <td
                         className={`px-5 py-3 text-right font-semibold ${
-                          r.selisih === 0 ? "text-slate-400" : "text-amber-600"
+                          r.selisih === 0
+                            ? "text-slate-400"
+                            : r.selisih > 0
+                              ? "text-emerald-600"
+                              : "text-amber-600"
                         }`}
                       >
-                        {rupiah(r.selisih)}
+                        {r.selisih > 0 ? "+" : r.selisih < 0 ? "−" : ""}
+                        {rupiah(Math.abs(r.selisih))}
+                        {r.selisih !== 0 && (
+                          <span className="ml-1 text-[11px] font-normal text-slate-400">
+                            {r.selisih > 0 ? "lebih" : "kurang"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3">
                         {belumAdaPayout ? (
@@ -100,6 +120,16 @@ export default async function RekonsiliasiPage() {
                           <Badge color="amber">
                             <AlertTriangle size={13} /> Perlu dicek
                           </Badge>
+                        )}
+                      </td>
+                      <td className="px-5 py-3">
+                        {isManual(r.store.marketplace, !!r.store.accessToken) && (
+                          <ManualPayoutForm
+                            storeId={r.store.id}
+                            storeName={r.store.name}
+                            today={today}
+                            action={addManualPayout}
+                          />
                         )}
                       </td>
                     </tr>
@@ -148,13 +178,34 @@ export default async function RekonsiliasiPage() {
                       <span className="text-[11px] text-slate-400">Selisih</span>
                       <span
                         className={`font-semibold tabular-nums ${
-                          r.selisih === 0 ? "text-slate-400" : "text-amber-600"
+                          r.selisih === 0
+                            ? "text-slate-400"
+                            : r.selisih > 0
+                              ? "text-emerald-600"
+                              : "text-amber-600"
                         }`}
                       >
-                        {rupiah(r.selisih)}
+                        {r.selisih > 0 ? "+" : r.selisih < 0 ? "−" : ""}
+                        {rupiah(Math.abs(r.selisih))}
+                        {r.selisih !== 0 && (
+                          <span className="ml-1 text-[11px] font-normal text-slate-400">
+                            {r.selisih > 0 ? "lebih" : "kurang"}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
+
+                  {isManual(r.store.marketplace, !!r.store.accessToken) && (
+                    <div className="mt-3">
+                      <ManualPayoutForm
+                        storeId={r.store.id}
+                        storeName={r.store.name}
+                        today={today}
+                        action={addManualPayout}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -177,6 +228,7 @@ export default async function RekonsiliasiPage() {
                   <th className="px-5 py-3 text-right font-medium">Jumlah</th>
                   <th className="px-5 py-3 text-right font-medium">Order</th>
                   <th className="px-5 py-3 font-medium">Referensi</th>
+                  <th className="px-5 py-3 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -187,6 +239,21 @@ export default async function RekonsiliasiPage() {
                     <td className="px-5 py-3 text-right font-medium text-slate-800">{rupiah(p.amount)}</td>
                     <td className="px-5 py-3 text-right text-slate-500">{p._count.orders}</td>
                     <td className="px-5 py-3 font-mono text-xs text-slate-400">{p.reference ?? "—"}</td>
+                    <td className="px-5 py-3 text-right">
+                      <ConfirmModalButton
+                        action={deletePayout}
+                        id={p.id}
+                        trigger={<Trash2 size={15} />}
+                        triggerClassName="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        title="Hapus pencairan ini?"
+                        message={
+                          <>
+                            Pencairan <strong className="text-slate-700">{rupiah(p.amount)}</strong> untuk{" "}
+                            {p.store.name} akan dihapus. Order yang tertaut jadi belum cair lagi.
+                          </>
+                        }
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

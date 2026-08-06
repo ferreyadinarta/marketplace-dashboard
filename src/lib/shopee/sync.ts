@@ -334,7 +334,7 @@ export async function syncShopeePayouts(
   from: Date,
   to: Date,
   opts: { deadlineMs?: number } = {}
-): Promise<{ payouts: number; orders: number; amount: number }> {
+): Promise<{ payouts: number; orders: number; amount: number; unmatched: number }> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
   const accessToken = await ensureFreshToken(store);
@@ -347,7 +347,7 @@ export async function syncShopeePayouts(
     Math.floor(to.getTime() / 1000),
     { deadlineMs: opts.deadlineMs }
   );
-  if (list.length === 0) return { payouts: 0, orders: 0, amount: 0 };
+  if (list.length === 0) return { payouts: 0, orders: 0, amount: 0, unmatched: 0 };
 
   // kelompokkan per TANGGAL RILIS (WIB) — itu yang dilihat user di mutasi bank
   const byDate = new Map<string, { amount: number; orderSns: string[] }>();
@@ -362,6 +362,9 @@ export async function syncShopeePayouts(
 
   let orders = 0;
   let amount = 0;
+  // order_sn yang dananya sudah cair tapi ordernya BELUM ada di database
+  // (biasanya karena rentang sync order lebih pendek dari rentang pencairan)
+  let unmatched = 0;
   for (const [key, g] of byDate) {
     const reference = `ESCROW-${key}`;
     // tanggal disimpan di tengah hari WIB supaya tidak geser saat dibaca ulang
@@ -382,8 +385,9 @@ export async function syncShopeePayouts(
       data: { payoutId: payout.id },
     });
     orders += r.count;
+    unmatched += g.orderSns.length - r.count;
     amount += g.amount;
   }
 
-  return { payouts: byDate.size, orders, amount };
+  return { payouts: byDate.size, orders, amount, unmatched };
 }

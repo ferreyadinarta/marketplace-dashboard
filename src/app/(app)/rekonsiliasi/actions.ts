@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncShopeePayouts } from "@/lib/shopee/sync";
+import { eventDateFromInput } from "@/lib/format";
 
 // Tarik data PENCAIRAN dari Shopee (escrow yang sudah rilis) untuk semua toko
 // Shopee yang terhubung. Order yang dananya sudah cair ditandai ke payout-nya,
@@ -22,6 +23,7 @@ export async function syncPayouts(days = 90) {
   let payouts = 0;
   let orders = 0;
   let amount = 0;
+  let unmatched = 0;
   const errors: string[] = [];
 
   // bagi jatah waktu function (maks 60 detik) ke semua toko
@@ -38,6 +40,7 @@ export async function syncPayouts(days = 90) {
       payouts += r.payouts;
       orders += r.orders;
       amount += r.amount;
+      unmatched += r.unmatched;
     } catch (e) {
       errors.push(`${s.name}: ${e instanceof Error ? e.message : "unknown"}`);
     }
@@ -45,5 +48,40 @@ export async function syncPayouts(days = 90) {
 
   revalidatePath("/rekonsiliasi");
   revalidatePath("/");
-  return { payouts, orders, amount, errors, stores: stores.length };
+  return { payouts, orders, amount, unmatched, errors, stores: stores.length };
+}
+
+// ---------- Pencairan manual ----------
+// Untuk toko yang TIDAK punya API (Grosir/Reseller, WA, atau marketplace yang
+// datanya diinput manual): catat sendiri uang yang benar-benar diterima.
+// Selisihnya jadi piutang — berapa yang sudah dijual tapi belum dibayar.
+export async function addManualPayout(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const amountRaw = Number(formData.get("amount") ?? 0);
+  const amount = Number.isFinite(amountRaw) ? Math.floor(amountRaw) : 0;
+  const reference = String(formData.get("reference") ?? "").trim();
+  const tanggal = String(formData.get("tanggal") ?? "").trim();
+  if (!storeId || amount <= 0) return;
+
+  await prisma.payout.create({
+    data: {
+      storeId,
+      amount,
+      reference: reference || null,
+      payoutDate: eventDateFromInput(tanggal),
+    },
+  });
+
+  revalidatePath("/rekonsiliasi");
+  revalidatePath("/");
+}
+
+// Hapus pencairan (salah input). Order yang tadinya menempel jadi lepas sendiri
+// karena relasinya SetNull.
+export async function deletePayout(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.payout.deleteMany({ where: { id } });
+  revalidatePath("/rekonsiliasi");
+  revalidatePath("/");
 }

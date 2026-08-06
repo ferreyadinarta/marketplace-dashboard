@@ -4,7 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Loader2 } from "lucide-react";
 
-type Result = { payouts: number; orders: number; amount: number; errors: string[]; stores: number };
+type Result = {
+  payouts: number;
+  orders: number;
+  amount: number;
+  unmatched: number; // order sudah cair tapi belum ada di database
+  errors: string[];
+  stores: number;
+};
 
 const toast = (msg: string) => window.dispatchEvent(new CustomEvent("app:toast", { detail: msg }));
 
@@ -20,7 +27,13 @@ export function SyncPayoutsButton({ action }: { action: (days?: number) => Promi
       const r = await action(90);
       if (r.stores === 0) toast("Belum ada toko Shopee yang terhubung");
       else if (r.errors.length) toast(`Sebagian gagal: ${r.errors[0]}`);
-      else toast(`${r.payouts} pencairan · ${r.orders} order ditandai cair`);
+      else
+        toast(
+          `${r.payouts} pencairan · ${r.orders} order ditandai cair` +
+            (r.unmatched
+              ? ` · ${r.unmatched} order belum ada di database (tarik order lebih lama dulu di Master Toko)`
+              : "")
+        );
       startTransition(() => router.refresh());
     } catch (e) {
       toast(`Gagal: ${e instanceof Error ? e.message : "unknown"}`);
