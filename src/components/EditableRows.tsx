@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Pencil, Copy, Sparkles, Boxes } from "lucide-react";
 import { Select, type SelectOption, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -299,6 +299,12 @@ export function MappingRow({
     setTier(s.tier);
   };
 
+  // Pakai saran = langsung tersimpan. Baris ini isinya cuma product + isi, dan
+  // saran sudah mengisi keduanya, jadi menyuruh user klik Simpan lagi cuma
+  // menambah 1 klik × ribuan baris.
+  const formRef = useRef<HTMLFormElement>(null);
+  const wantSubmit = useRef(false);
+
   const applySuggestion = () => {
     if (!suggestion) return;
     const nextTiers = tiersOf(unitInfo?.[suggestion.productId]);
@@ -306,10 +312,17 @@ export function MappingRow({
     setValue(suggestion.productId);
     setQty(String(s.qty));
     setTier(s.tier);
+    wantSubmit.current = true; // dikirim setelah state kepasang (efek di bawah)
   };
 
+  useEffect(() => {
+    if (!wantSubmit.current) return;
+    wantSubmit.current = false;
+    formRef.current?.requestSubmit();
+  }, [value, qty, tier]);
+
   return (
-    <form action={action} className="w-full space-y-1.5">
+    <form ref={formRef} action={action} className="w-full space-y-1.5">
       <input type="hidden" name="mappingId" value={mappingId} />
       {/* yang dikirim ke server tetap satuan dasar */}
       <input type="hidden" name="baseQtyPerUnit" value={baseQty} />
@@ -326,7 +339,7 @@ export function MappingRow({
           <span className="truncate">
             Saran: <b>{suggestion.productName}</b> · isi {suggestion.baseQty}
           </span>
-          <span className="shrink-0 font-semibold underline">Pakai</span>
+          <span className="shrink-0 font-semibold underline">Pakai &amp; simpan</span>
         </button>
       )}
 
