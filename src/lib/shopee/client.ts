@@ -106,8 +106,11 @@ export type ShopeeOrderDetail = {
   total_amount?: number;
   currency?: string;
   item_list?: {
+    item_id?: number;
     item_name?: string;
     item_sku?: string;
+    model_id?: number;
+    model_name?: string;
     model_sku?: string;
     model_quantity_purchased?: number;
     model_discounted_price?: number;
@@ -153,9 +156,35 @@ type ShopeeItem = {
   price_info?: { current_price?: number }[];
 };
 type ShopeeModel = {
+  model_id?: number;
+  model_name?: string;
   model_sku?: string;
   price_info?: { current_price?: number }[];
 };
+
+// Kunci identitas product Shopee. Banyak seller TIDAK mengisi SKU di listing-nya,
+// jadi jangan pernah balikin kosong: pakai item_id/model_id Shopee sebagai
+// cadangan (selalu ada & stabil). WAJIB dipakai di DUA tempat dengan aturan yang
+// sama — import katalog & normalisasi order — supaya mapping-nya cocok.
+export function shopeeSku(o: {
+  itemSku?: string;
+  modelSku?: string;
+  itemId?: number | string;
+  modelId?: number | string;
+}): string {
+  const modelSku = String(o.modelSku ?? "").trim();
+  if (modelSku) return modelSku;
+
+  // varian tanpa SKU sendiri → bedakan pakai model_id, jangan sampai semua
+  // varian jatuh ke SKU yang sama
+  const modelId = o.modelId != null && String(o.modelId) !== "0" ? String(o.modelId) : "";
+  const itemSku = String(o.itemSku ?? "").trim();
+  if (itemSku) return modelId ? `${itemSku}-${modelId}` : itemSku;
+
+  const itemId = o.itemId != null ? String(o.itemId) : "";
+  if (!itemId) return "";
+  return modelId ? `SHP-${itemId}-${modelId}` : `SHP-${itemId}`;
+}
 
 // Ambil semua product toko (termasuk varian/model) → normalized ImportedProduct.
 export async function fetchShopeeCatalog(
@@ -198,14 +227,15 @@ export async function fetchShopeeCatalog(
         );
         for (const md of m.model ?? []) {
           out.push({
-            sku: md.model_sku || "",
-            name,
+            // varian: tambahkan nama varian biar bisa dibedakan di Master Product
+            sku: shopeeSku({ itemSku: it.item_sku, modelSku: md.model_sku, itemId: it.item_id, modelId: md.model_id }),
+            name: md.model_name ? `${name} - ${md.model_name}` : name,
             price: Math.round(md.price_info?.[0]?.current_price ?? 0),
           });
         }
       } else {
         out.push({
-          sku: it.item_sku || "",
+          sku: shopeeSku({ itemSku: it.item_sku, itemId: it.item_id }),
           name,
           price: Math.round(it.price_info?.[0]?.current_price ?? 0),
         });

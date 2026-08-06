@@ -9,6 +9,7 @@ import {
   getOrderDetails,
   getEscrowDetail,
   fetchShopeeCatalog,
+  shopeeSku,
   type ShopeeOrderDetail,
   type ShopeeIncome,
 } from "./client";
@@ -59,9 +60,17 @@ function normalize(o: ShopeeOrderDetail): NormalizedOrder {
   const items = (o.item_list ?? []).map((li) => {
     const price = toRp(li.model_discounted_price ?? li.model_original_price);
     const qty = li.model_quantity_purchased ?? 1;
+    const baseName = li.item_name || "(tanpa nama)";
     return {
-      marketplaceSku: li.model_sku || li.item_sku || "",
-      productName: li.item_name || "(tanpa nama)",
+      // aturan SKU HARUS sama dengan import katalog (lihat shopeeSku) supaya
+      // order otomatis ketemu mapping product-nya, walau listing tanpa SKU.
+      marketplaceSku: shopeeSku({
+        itemSku: li.item_sku,
+        modelSku: li.model_sku,
+        itemId: li.item_id,
+        modelId: li.model_id,
+      }),
+      productName: li.model_name ? `${baseName} - ${li.model_name}` : baseName,
       qty,
       price,
       subtotal: price * qty,
