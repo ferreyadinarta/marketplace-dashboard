@@ -1,12 +1,13 @@
 import { Package, Search, CheckCircle, XCircle, PackageOpen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices } from "./actions";
+import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices, deleteProducts } from "./actions";
 import { importStoreProducts } from "../toko/import-actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
 import { AddProductForm, AddGroupForm } from "@/components/ProductForms";
 import { ProductRow } from "@/components/EditableRows";
 import { BulkPriceForm } from "@/components/BulkPriceForm";
+import { BulkDeleteProducts } from "@/components/BulkDeleteProducts";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Pagination, PaginationControls } from "@/components/Pagination";
 import { MARKETPLACE_LABEL } from "@/lib/format";
@@ -37,12 +38,11 @@ export default async function MasterProductPage({
     : {};
 
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  const importStatus = one(sp.import);
-  const reason = one(sp.reason);
   const addStatus = one(sp.add);
   const dupeSku = one(sp.sku);
+  const deletedCount = Number(one(sp.deleted) ?? 0) || 0;
 
-  const [products, total, groups, priceRows, connectedStores] = await Promise.all([
+  const [products, total, groups, priceRows, connectedStores, cleanupRaw] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { group: true },
@@ -65,7 +65,27 @@ export default async function MasterProductPage({
       where: { marketplace: { in: ["SHOPEE", "TIKTOK"] }, accessToken: { not: null } },
       orderBy: { name: "asc" },
     }),
+    // untuk panel hapus massal: sekalian hitung keterkaitannya biar aman
+    prisma.product.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        hpp: true,
+        _count: { select: { orderItems: true, opnames: true, restocks: true } },
+      },
+    }),
   ]);
+
+  const cleanupRows = cleanupRaw.map((p) => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    hpp: p.hpp,
+    orderItems: p._count.orderItems,
+    stockRecords: p._count.opnames + p._count.restocks,
+  }));
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const from = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
@@ -86,18 +106,13 @@ export default async function MasterProductPage({
         description="Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit."
       />
 
-      {importStatus === "ok" && (
+      {/* hasil import sekarang tampil di halaman Mapping SKU (import tidak lagi
+          membuat product), jadi di sini cukup notifikasi hapus & tambah. */}
+      {deletedCount > 0 && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          Import selesai: <strong>{one(sp.created) ?? 0} product baru</strong>, {one(sp.existing) ?? 0} sudah ada
-          {Number(one(sp.nosku) ?? 0) > 0 ? `, ${one(sp.nosku)} dilewati (tanpa SKU)` : ""}. Lengkapi HPP-nya
-          lewat “Isi Harga Massal” di bawah.
-        </div>
-      )}
-      {importStatus === "error" && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
-          <XCircle size={18} className="shrink-0 text-red-500" />
-          Import gagal: {reason ?? "unknown"}
+          <strong>{deletedCount} product dihapus.</strong> Order yang tadinya memakai product itu jadi belum
+          dipetakan — atur ulang di Mapping SKU kalau perlu.
         </div>
       )}
       {addStatus === "dupe" && (
@@ -141,6 +156,9 @@ export default async function MasterProductPage({
 
       {/* isi harga massal (HPP / retail / grosir sekaligus) */}
       <BulkPriceForm products={priceRows} action={saveBulkPrices} />
+
+      {/* bersihkan product sampah (mis. sisa import lama) */}
+      <BulkDeleteProducts products={cleanupRows} action={deleteProducts} />
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* form tambah product */}

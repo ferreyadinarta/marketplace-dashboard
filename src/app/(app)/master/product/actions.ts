@@ -162,6 +162,31 @@ export async function deleteProduct(formData: FormData) {
   revalidatePath("/stok");
 }
 
+// Hapus BANYAK product sekaligus — dipakai membersihkan product sampah hasil
+// import lama (1 product per varian marketplace, nama panjang, HPP 0).
+// Aman: order & mapping TIDAK ikut terhapus (onDelete: SetNull), hanya kehilangan
+// kaitan ke product-nya dan bisa dipetakan ulang. Riwayat opname/restock product
+// itu memang ikut terhapus (Cascade) — makanya UI memberi peringatan.
+export async function deleteProducts(formData: FormData) {
+  let ids: string[] = [];
+  try {
+    const arr = JSON.parse(String(formData.get("ids") ?? "[]"));
+    if (Array.isArray(arr)) ids = arr.map((x) => String(x)).filter(Boolean);
+  } catch {
+    ids = [];
+  }
+  if (ids.length === 0) return;
+
+  // deleteMany → idempoten, tidak crash kalau ada yang sudah terhapus
+  const r = await prisma.product.deleteMany({ where: { id: { in: ids } } });
+
+  revalidatePath("/master/product");
+  revalidatePath("/master/mapping");
+  revalidatePath("/stok");
+  revalidatePath("/pembukuan");
+  redirect(`/master/product?deleted=${r.count}`);
+}
+
 export async function createGroup(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return;

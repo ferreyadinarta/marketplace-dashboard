@@ -20,17 +20,19 @@ export function ConfirmDialog({
   confirmIcon,
   busyText = "Menghapus…",
   tone = "danger",
+  extraFields,
 }: {
   open: boolean;
   onClose: () => void;
   action: Action;
-  id: string;
+  id?: string; // opsional: aksi massal kirim datanya lewat extraFields
   title: string;
   message: ReactNode;
   confirmText?: string;
   confirmIcon?: ReactNode;
   busyText?: string;
   tone?: "danger" | "primary";
+  extraFields?: ReactNode; // input tersembunyi tambahan untuk form konfirmasi
 }) {
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
@@ -93,7 +95,8 @@ export function ConfirmDialog({
             Batal
           </button>
           <form action={action} className="flex-1 sm:flex-none">
-            <input type="hidden" name="id" value={id} />
+            {id !== undefined && <input type="hidden" name="id" value={id} />}
+            {extraFields}
             <SubmitButton
               variant={tone}
               icon={confirmIcon}
