@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { getPembukuanByGroup, getOrdersDetail } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { prisma } from "@/lib/prisma";
-import { tanggal, MARKETPLACE_LABEL } from "@/lib/format";
+import { tanggal, jakartaParts, TZ, MARKETPLACE_LABEL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
   // ---------- Ringkasan PER TAHUN (data multi-tahun jadi mudah dibandingkan) ----------
   const yearAgg = new Map<number, { qty: number; total: number; modal: number }>();
   for (const r of detailRows) {
-    const y = r.orderDate.getFullYear();
+    const y = jakartaParts(r.orderDate).year;
     const a = yearAgg.get(y) ?? { qty: 0, total: 0, modal: 0 };
     a.qty += r.qty;
     a.total += r.total;
@@ -175,8 +175,11 @@ export async function GET(req: NextRequest) {
   // (bulan berikutnya di sebelah kanan), dipisah 4 kolom kosong.
   // Kolom "Order" = SKU. Baris per tanggal, tanggal ditulis sekali per hari.
   const monthLabel = (d: Date) =>
-    new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(d).toUpperCase();
-  const monthKeyOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+    new Intl.DateTimeFormat("id-ID", { timeZone: TZ, month: "long", year: "numeric" }).format(d).toUpperCase();
+  const monthKeyOf = (d: Date) => {
+    const p = jakartaParts(d);
+    return `${p.year}-${String(p.month).padStart(2, "0")}`;
+  };
 
   const rowsByGroup = new Map<string, typeof detailRows>();
   for (const r of detailRows) {
@@ -312,7 +315,7 @@ export async function GET(req: NextRequest) {
 
     const byYear = new Map<number, typeof detailRows>();
     for (const r of rows) {
-      const y = r.orderDate.getFullYear();
+      const y = jakartaParts(r.orderDate).year;
       const arr = byYear.get(y) ?? [];
       arr.push(r);
       byYear.set(y, arr);

@@ -1,12 +1,8 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { Store as StoreIcon, CheckCircle2, AlertCircle, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { waktu, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
-import { syncTiktok } from "./tiktok-actions";
-import { syncShopee } from "./shopee-actions";
-import { syncAll } from "./sync-actions";
 import {
   Card,
   CardHeader,
@@ -20,8 +16,8 @@ import {
 import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
-import { AutoSyncBanner } from "@/components/AutoSyncBanner";
 import { SyncProgressPanel } from "@/components/SyncProgressPanel";
+import { SyncAllButton, StoreSyncButton } from "@/components/SyncButtons";
 
 export const dynamic = "force-dynamic";
 // Sync toko (tarik order + escrow) jalan sebagai Server Action di halaman ini.
@@ -43,7 +39,6 @@ export default async function MasterTokoPage({
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tiktokStatus = one(sp.tiktok);
   const shopeeStatus = one(sp.shopee);
-  const syncStatus = one(sp.sync);
   const reason = one(sp.reason);
   // Halaman ini khusus toko MARKETPLACE. Channel manual (Grosir/Reseller &
   // WA/Offline) dikelola di halamannya masing-masing, jadi tidak ikut dilist.
@@ -96,23 +91,6 @@ export default async function MasterTokoPage({
           Kredensial Shopee belum di-set (SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY).
         </div>
       )}
-      {syncStatus === "ok" && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
-          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          Sync selesai: {one(sp.created) ?? 0} order baru, {one(sp.updated) ?? 0} diperbarui.
-        </div>
-      )}
-      {syncStatus === "partial" && (
-        <Suspense fallback={null}>
-          <AutoSyncBanner action={syncShopee} />
-        </Suspense>
-      )}
-      {syncStatus === "error" && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
-          <XCircle size={18} className="shrink-0 text-red-500" />
-          Sync gagal: {reason ?? "unknown"}
-        </div>
-      )}
 
       {/* Hubungkan marketplace via API (TikTok/Tokopedia) */}
       <Card className="p-5">
@@ -145,16 +123,7 @@ export default async function MasterTokoPage({
               Tarik order terbaru dari semua toko sekaligus. Order sebenarnya masuk realtime lewat
               webhook; sync ini untuk menambal kalau ada yang terlewat.
             </p>
-            <form action={syncAll}>
-              <SubmitButton
-                variant="outline"
-                className="text-sm"
-                icon={<RefreshCw size={14} />}
-                pendingText="Menyinkron…"
-              >
-                Sync semua toko
-              </SubmitButton>
-            </form>
+            <SyncAllButton />
           </div>
         )}
       </Card>
@@ -229,30 +198,7 @@ export default async function MasterTokoPage({
                           <AlertCircle size={13} /> Belum terhubung
                         </Badge>
                       ))}
-                    {isOauth && connected && (
-                      <form action={isShopee ? syncShopee : syncTiktok} className="flex items-center gap-1.5">
-                        <input type="hidden" name="storeId" value={s.id} />
-                        {isShopee && (
-                          <select
-                            name="days"
-                            defaultValue="90"
-                            aria-label="Rentang order yang ditarik"
-                            title="Periode order yang ditarik dari Shopee"
-                            className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          >
-                            <option value="30">30 hari</option>
-                            <option value="90">90 hari</option>
-                            <option value="180">6 bulan</option>
-                            <option value="365">1 tahun</option>
-                            <option value="730">2 tahun</option>
-                            <option value="1095">3 tahun</option>
-                          </select>
-                        )}
-                        <SubmitButton variant="outline" className="px-3 py-1.5 text-xs" icon={<RefreshCw size={14} />} pendingText="Sync…">
-                          Sync sekarang
-                        </SubmitButton>
-                      </form>
-                    )}
+                    {isOauth && connected && <StoreSyncButton storeId={s.id} isShopee={isShopee} />}
                     <ConfirmModalButton
                       action={deleteStore}
                       id={s.id}

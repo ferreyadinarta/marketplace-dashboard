@@ -2,10 +2,11 @@ import { Link2, AlertTriangle, Search, CheckCircle, XCircle } from "lucide-react
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { MARKETPLACE_LABEL } from "@/lib/format";
-import { assignMapping } from "./actions";
+import { assignMapping, bulkAssignMappings } from "./actions";
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
 import { MappingRow } from "@/components/EditableRows";
 import { MappingFilters } from "@/components/MappingFilters";
+import { BulkMappingBar } from "@/components/BulkMappingBar";
 import { Pagination, PaginationControls } from "@/components/Pagination";
 import { suggestProduct } from "@/lib/suggestMapping";
 
@@ -38,6 +39,10 @@ export default async function MappingPage({
     ];
   }
 
+  // cakupan tombol massal = filter yang sama, TAPI selalu hanya yang belum
+  // dipetakan (status di filter tidak ikut supaya "semua yang tampil" konsisten)
+  const bulkWhere: Prisma.ProductMappingWhereInput = { ...where, productId: null };
+
   const [mappings, total, totalUnmapped, products, stores] = await Promise.all([
     prisma.productMapping.findMany({
       where,
@@ -51,6 +56,14 @@ export default async function MappingPage({
     prisma.product.findMany({ orderBy: { name: "asc" } }),
     prisma.store.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
+
+  // untuk tombol massal: semua baris belum dipetakan di filter ini (bukan cuma
+  // halaman ini) — cuma nama yang diambil, jadi ringan walau ribuan baris
+  const unmappedRows = await prisma.productMapping.findMany({
+    where: bulkWhere,
+    select: { marketplaceProductName: true, marketplaceSku: true },
+    take: 3_000,
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const fromRow = total === 0 ? 0 : (page - 1) * PER_PAGE + 1;
@@ -83,6 +96,11 @@ export default async function MappingPage({
   }
   const baseUnitOf = (productId: string | null) =>
     productId ? products.find((p) => p.id === productId)?.unit : undefined;
+
+  // berapa banyak dari baris belum dipetakan itu yang punya saran cukup yakin
+  const suggestable = unmappedRows.filter(
+    (r) => !!suggestProduct(r.marketplaceProductName || r.marketplaceSku, lite)
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -119,9 +137,37 @@ export default async function MappingPage({
         </div>
       )}
 
+      {one(sp.bulk) === "ok" && (
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="mt-0.5 shrink-0 text-emerald-500" />
+          <span>
+            <strong>{one(sp.n) || 0} SKU dipetakan.</strong> Order lama ikut diperbarui — pembukuan & stok
+            sudah menyesuaikan.
+            {Number(one(sp.skip) || 0) > 0
+              ? ` ${one(sp.skip)} SKU dilewati (tidak ada saran yang cukup yakin).`
+              : ""}
+          </span>
+        </div>
+      )}
+      {one(sp.bulk) === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Gagal memetakan massal: {one(sp.reason) || "unknown"}
+        </div>
+      )}
+
       <Card className="p-5">
         <MappingFilters stores={stores} />
       </Card>
+
+      <BulkMappingBar
+        action={bulkAssignMappings}
+        unmappedInFilter={unmappedRows.length}
+        suggestable={suggestable}
+        options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+        filters={{ q, marketplace, storeId }}
+        isFiltered={!!(q || marketplace || storeId)}
+      />
 
       <Card className="overflow-hidden">
         <CardHeader

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { dateKey } from "./format";
 
 // HPP (modal) per item: pakai snapshot yang dibekukan saat jual; kalau 0
 // (data lama / order marketplace) fallback ke HPP product saat ini.
@@ -73,7 +74,7 @@ export async function getDailyTrend(f: DashboardFilter) {
 
   const map = new Map<string, { omzet: number; profit: number }>();
   for (const o of orders) {
-    const key = o.orderDate.toISOString().slice(0, 10);
+    const key = dateKey(o.orderDate); // dikelompokkan per hari WIB, bukan UTC
     const cur = map.get(key) ?? { omzet: 0, profit: 0 };
     let hpp = 0;
     for (const it of o.items) hpp += itemHpp(it) * itemBaseQty(it);

@@ -6,29 +6,51 @@ export function rupiah(value: number): string {
   }).format(value);
 }
 
+// Server (Vercel) jalan di UTC, user & toko di WIB. Tanpa dipatok, jam sync
+// tampil mundur 7 jam dan order jam 00.00–07.00 WIB kehitung ke tanggal kemarin.
+// Semua tampilan & pengelompokan tanggal WAJIB lewat sini.
+export const TZ = "Asia/Jakarta";
+
+// "YYYY-MM-DD" menurut kalender Jakarta (en-CA kebetulan formatnya persis ini).
+export function dateKey(date: Date | string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(date));
+}
+
+// Bagian tahun/bulan/tanggal versi Jakarta — untuk pengelompokan (bukan tampilan).
+export function jakartaParts(date: Date | string): { year: number; month: number; day: number } {
+  const [y, m, d] = dateKey(date).split("-").map(Number);
+  return { year: y, month: m, day: d };
+}
+
 // Ubah input tanggal (YYYY-MM-DD) jadi Date untuk event (restock/penjualan).
 // Kalau tanggalnya HARI INI (atau kosong) → pakai timestamp SEKARANG, supaya
 // event ini urut SETELAH opname yang mungkin dilakukan hari ini juga (kalau
 // pakai tengah malam, event hari ini bisa dianggap "sebelum" opname → tidak terhitung).
 export function eventDateFromInput(dateStr: string): Date {
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  if (!dateStr || dateStr === todayStr) return now;
-  return new Date(`${dateStr}T12:00:00`);
+  if (!dateStr || dateStr === dateKey(now)) return now;
+  // +07:00 eksplisit: tanpa itu string ini dibaca sebagai waktu server (UTC)
+  return new Date(`${dateStr}T12:00:00+07:00`);
 }
 
 export function tanggal(date: Date | string): string {
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: TZ,
     day: "2-digit",
     month: "short",
     year: "numeric",
   }).format(new Date(date));
 }
 
-// Tanggal + jam (mis. untuk waktu sync terakhir): "30 Jul 2026, 14.05".
+// Tanggal + jam (mis. untuk waktu sync terakhir): "30 Jul 2026, 14.05" WIB.
 export function waktu(date: Date | string): string {
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: TZ,
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -37,13 +59,10 @@ export function waktu(date: Date | string): string {
   }).format(new Date(date));
 }
 
-// Rentang default: awal bulan berjalan sampai hari ini (format YYYY-MM-DD).
+// Rentang default: awal bulan berjalan sampai hari ini (format YYYY-MM-DD), WIB.
 export function currentMonthRange(): { from: string; to: string } {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const y = now.getFullYear();
-  const m = pad(now.getMonth() + 1);
-  return { from: `${y}-${m}-01`, to: `${y}-${m}-${pad(now.getDate())}` };
+  const today = dateKey(new Date());
+  return { from: `${today.slice(0, 7)}-01`, to: today };
 }
 
 export const MARKETPLACE_LABEL: Record<string, string> = {

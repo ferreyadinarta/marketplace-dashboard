@@ -10,8 +10,10 @@ export function parseFilter(sp: Record<string, string | string[] | undefined>): 
   const from = one(sp.from);
   const to = one(sp.to);
   return {
-    from: from ? new Date(`${from}T00:00:00`) : undefined,
-    to: to ? new Date(`${to}T23:59:59`) : undefined,
+    // batas hari mengikuti WIB (+07:00) — tanpa offset ini server (UTC) memotong
+    // rentang 7 jam meleset: order sore hari terakhir bisa ikut/terbuang
+    from: from ? new Date(`${from}T00:00:00+07:00`) : undefined,
+    to: to ? new Date(`${to}T23:59:59+07:00`) : undefined,
     marketplace: one(sp.marketplace) || undefined,
     storeId: one(sp.storeId) || undefined,
     groupId: one(sp.groupId) || undefined,
