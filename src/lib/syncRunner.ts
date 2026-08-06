@@ -121,10 +121,16 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
   }
 }
 
-// Alamat deployment sendiri — untuk memanggil putaran berikutnya.
+// Alamat untuk memanggil putaran berikutnya.
+// Pakai origin REQUEST dulu (domain yang benar-benar dibuka user), baru env.
+// VERCEL_URL menunjuk ke URL deployment, yang bisa kena Deployment Protection
+// dan menolak panggilan server-ke-server — alias domainnya lebih aman.
 function selfOrigin(reqUrl: string): string {
-  const fromEnv = process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  return fromEnv || new URL(reqUrl).origin;
+  try {
+    return new URL(reqUrl).origin;
+  } catch {
+    return process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  }
 }
 
 // Bisa lanjut sendiri hanya kalau ada CRON_SECRET (dipakai menandatangani
