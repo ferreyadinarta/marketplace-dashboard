@@ -49,27 +49,18 @@ const sameUnits = (a: UnitVals, b: UnitVals) =>
 
 // Bar simpan yang cuma muncul kalau ADA perubahan belum disimpan.
 // Dipisah jadi komponen sendiri karena useFormStatus harus di dalam <form>.
-function SaveBar({
-  dirtyCount,
-  onStart,
-  onDone,
-}: {
-  dirtyCount: number;
-  onStart: () => void;
-  onDone: () => void;
-}) {
+function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => void }) {
   const { pending } = useFormStatus();
   const prev = useRef(false);
-  const cbs = useRef({ onStart, onDone });
+  const cb = useRef(onDone);
 
   useEffect(() => {
-    cbs.current = { onStart, onDone };
-  }, [onStart, onDone]);
+    cb.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
-    if (pending && !prev.current) cbs.current.onStart();
     if (!pending && prev.current) {
-      cbs.current.onDone();
+      cb.current();
       window.dispatchEvent(new CustomEvent("app:toast", { detail: "Tersimpan" }));
     }
     prev.current = pending;
@@ -116,15 +107,17 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
   const [onlyEmpty, setOnlyEmpty] = useState(false);
   const [confirmTpl, setConfirmTpl] = useState(false);
 
-  const [rows, setRows] = useState<Record<string, Vals>>(() =>
-    Object.fromEntries(products.map((p) => [p.id, { hpp: p.hpp, retail: p.priceRetail, grosir: p.priceGrosir }]))
-  );
-  const [units, setUnits] = useState<Record<string, UnitVals>>(() =>
-    Object.fromEntries(products.map((p) => [p.id, initUnit(p)]))
-  );
-  // nilai terakhir yang SUDAH tersimpan → pembanding untuk tahu mana yang berubah
-  const [baseRows, setBaseRows] = useState(rows);
-  const [baseUnits, setBaseUnits] = useState(units);
+  // State cuma menyimpan PERUBAHAN user (override per product), bukan salinan
+  // penuh daftar product. Penting: daftar product bisa berubah kapan saja
+  // (tambah/hapus product lalu halaman di-revalidate) — kalau state menyalin
+  // daftar saat mount, product baru tidak punya entri dan barisnya crash.
+  const [rows, setRows] = useState<Record<string, Vals>>({});
+  const [units, setUnits] = useState<Record<string, UnitVals>>({});
+
+  // nilai tersimpan = yang datang dari server; jadi acuan "belum disimpan"
+  const savedVals = (p: PriceRow): Vals => ({ hpp: p.hpp, retail: p.priceRetail, grosir: p.priceGrosir });
+  const valsOf = (p: PriceRow): Vals => rows[p.id] ?? savedVals(p);
+  const unitsOf = (p: PriceRow): UnitVals => units[p.id] ?? initUnit(p);
 
   // template "isi sekali → terapkan ke semua" untuk satuan yang seragam
   const [tpl, setTpl] = useState<UnitVals>({ mainUnit: "", smallUnit: "", isi: "", koliUnit: "koli", isiKoli: "" });
@@ -132,37 +125,46 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
   const formRef = useRef<HTMLFormElement>(null);
   // ditandai saat template diterapkan → form dikirim setelah state satuan kepasang
   const wantSubmit = useRef(false);
-  // snapshot saat submit mulai → jadi baseline baru kalau submit selesai
-  const inFlight = useRef<{ rows: typeof rows; units: typeof units } | null>(null);
 
   const set = (id: string, key: keyof Vals, val: number) =>
-    setRows((prev) => ({ ...prev, [id]: { ...prev[id], [key]: val } }));
+    setRows((prev) => {
+      const p = products.find((x) => x.id === id);
+      const cur = prev[id] ?? (p ? savedVals(p) : { hpp: 0, retail: 0, grosir: 0 });
+      return { ...prev, [id]: { ...cur, [key]: val } };
+    });
   const setU = (id: string, key: keyof UnitVals, val: string) =>
-    setUnits((prev) => ({ ...prev, [id]: { ...prev[id], [key]: val } }));
+    setUnits((prev) => {
+      const p = products.find((x) => x.id === id);
+      const cur = prev[id] ?? (p ? initUnit(p) : { mainUnit: "", smallUnit: "", isi: "", koliUnit: "koli", isiKoli: "" });
+      return { ...prev, [id]: { ...cur, [key]: val } };
+    });
   const setTplField = (key: keyof UnitVals, val: string) => setTpl((p) => ({ ...p, [key]: val }));
 
-  const emptyCount = products.filter((p) => (rows[p.id]?.hpp ?? 0) <= 0).length;
+  const emptyCount = products.filter((p) => valsOf(p).hpp <= 0).length;
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return products.filter((p) => {
-      if (onlyEmpty && (rows[p.id]?.hpp ?? 0) > 0) return false;
+      if (onlyEmpty && (rows[p.id]?.hpp ?? p.hpp) > 0) return false;
       if (needle && !`${p.name} ${p.sku}`.toLowerCase().includes(needle)) return false;
       return true;
     });
   }, [products, rows, q, onlyEmpty]);
 
-  // baris yang berubah dari nilai tersimpan → cuma ini yang dikirim
+  // baris yang berubah dari nilai tersimpan → cuma ini yang dikirim.
+  // Setelah simpan sukses, server mengirim data baru → otomatis tidak dirty lagi.
   const dirtyIds = useMemo(
     () =>
       products
-        .filter(
-          (p) => !sameVals(rows[p.id], baseRows[p.id]) || !sameUnits(units[p.id], baseUnits[p.id])
-        )
+        .filter((p) => !sameVals(valsOf(p), savedVals(p)) || !sameUnits(unitsOf(p), initUnit(p)))
         .map((p) => p.id),
-    [products, rows, units, baseRows, baseUnits]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, rows, units]
   );
-  const payload = dirtyIds.map((id) => ({ id, ...rows[id], ...units[id] }));
+  const payload = dirtyIds.map((id) => {
+    const p = products.find((x) => x.id === id)!;
+    return { id, ...valsOf(p), ...unitsOf(p) };
+  });
 
   // terapkan template satuan ke semua product yang sedang TAMPIL, lalu simpan
   const tplHasValue = !!(tpl.mainUnit || tpl.smallUnit || tpl.isi || tpl.isiKoli);
@@ -354,8 +356,8 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
           {/* daftar */}
           <div className="max-h-[26rem] space-y-2 overflow-y-auto pr-1">
             {filtered.map((p) => {
-              const v = rows[p.id];
-              const u = units[p.id];
+              const v = valsOf(p);
+              const u = unitsOf(p);
               const dirty = dirtyIds.includes(p.id);
               return tab === "harga" ? (
                 <div
@@ -396,16 +398,13 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
             )}
           </div>
 
+          {/* Selesai simpan → buang override; nilai tersimpan datang dari server
+              (halaman di-revalidate), jadi barisnya otomatis balik "bersih". */}
           <SaveBar
             dirtyCount={dirtyIds.length}
-            onStart={() => {
-              inFlight.current = { rows, units };
-            }}
             onDone={() => {
-              if (!inFlight.current) return;
-              setBaseRows(inFlight.current.rows);
-              setBaseUnits(inFlight.current.units);
-              inFlight.current = null;
+              setRows({});
+              setUnits({});
             }}
           />
         </form>
