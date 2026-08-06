@@ -20,7 +20,14 @@ const RANGE_OPTIONS: SelectOption[] = [
 const MAX_ROUNDS = 80;
 
 type RunBody = { scope: "all" } | { scope: "store"; storeId: string; days: number };
-type RunResult = { created: number; updated: number; partial?: boolean; error?: string };
+type RunResult = {
+  created: number;
+  updated: number;
+  partial?: boolean;
+  // true = sisanya dilanjutkan SERVER (halaman boleh ditutup)
+  background?: boolean;
+  error?: string;
+};
 
 const toast = (msg: string) => window.dispatchEvent(new CustomEvent("app:toast", { detail: msg }));
 
@@ -65,6 +72,13 @@ function useSyncRunner() {
 
           if (!d.partial) {
             toast(`Sync selesai: ${acc.created} order baru, ${acc.updated} diperbarui`);
+            break;
+          }
+          // Server sudah menjadwalkan sisanya sendiri → tab boleh ditutup.
+          if (d.background) {
+            toast(
+              `${acc.created} order baru sejauh ini — sisanya lanjut di latar belakang, halaman boleh ditutup`
+            );
             break;
           }
           if (stop.current) {
