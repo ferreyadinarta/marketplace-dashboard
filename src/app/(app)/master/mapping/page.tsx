@@ -27,7 +27,11 @@ export default async function MappingPage({
   const storeId = one(sp.storeId);
   const page = Math.max(1, parseInt(one(sp.page) || "1", 10) || 1);
 
-  const where: Prisma.ProductMappingWhereInput = {};
+  // Halaman ini khusus SKU MARKETPLACE. Toko Grosir/Reseller & WA dikelola di
+  // halamannya sendiri dan tidak punya SKU marketplace → jangan ikut terdaftar.
+  const MP_ONLY = { marketplace: { notIn: ["KONSINYASI", "WA"] } };
+
+  const where: Prisma.ProductMappingWhereInput = { store: MP_ONLY };
   if (status === "unmapped") where.productId = null;
   if (status === "mapped") where.productId = { not: null };
   if (storeId) where.storeId = storeId;
@@ -52,9 +56,15 @@ export default async function MappingPage({
       take: PER_PAGE,
     }),
     prisma.productMapping.count({ where }),
-    prisma.productMapping.count({ where: { productId: null } }),
+    prisma.productMapping.count({ where: { productId: null, store: MP_ONLY } }),
     prisma.product.findMany({ orderBy: { name: "asc" } }),
-    prisma.store.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    // filter toko = toko MARKETPLACE saja (sama seperti Master Toko).
+    // Grosir/Reseller & WA tidak punya SKU marketplace, jadi tak ada gunanya di sini.
+    prisma.store.findMany({
+      where: { marketplace: { notIn: ["KONSINYASI", "WA"] } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   // untuk tombol massal: semua baris belum dipetakan di filter ini (bukan cuma

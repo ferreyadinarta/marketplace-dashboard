@@ -312,64 +312,9 @@ export function MappingRow({
       <input type="hidden" name="mappingId" value={mappingId} />
       {/* yang dikirim ke server tetap satuan dasar */}
       <input type="hidden" name="baseQtyPerUnit" value={baseQty} />
-      <div className="flex w-full flex-wrap items-center gap-2">
-        <Select
-          name="productId"
-          value={value}
-          onValueChange={chooseProduct}
-          placeholder="— Belum dipetakan —"
-          className="w-56"
-          options={options}
-          searchable
-        />
-        <div className="flex items-center gap-1 text-xs text-slate-500">
-          isi
-          <input
-            aria-label="Isi per unit yang dijual"
-            type="number"
-            min="1"
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            title={`Berapa banyak untuk 1 unit yang dijual di marketplace (disimpan sebagai ${baseUnit})`}
-            className="h-9 w-14 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-          />
-          {tiers.length > 1 ? (
-            <div className="flex h-9 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
-              {tiers.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTier(t.key)}
-                  className={
-                    tier === t.key
-                      ? "bg-indigo-600 px-2 font-medium text-white"
-                      : "px-2 text-slate-600 hover:bg-slate-50"
-                  }
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <span className="text-slate-400">{baseUnit}</span>
-          )}
-          {factor > 1 && (
-            <span className="whitespace-nowrap text-slate-400">
-              = {baseQty} {baseUnit}
-            </span>
-          )}
-        </div>
-        <SubmitButton
-          variant={dirty ? "primary" : "outline"}
-          disabled={!dirty}
-          className={`ml-auto w-24 shrink-0 justify-center px-3 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : ""}`}
-          pendingText="…"
-        >
-          {dirty ? "Simpan" : "Tersimpan"}
-        </SubmitButton>
-      </div>
 
-      {/* saran otomatis — hanya muncul kalau belum dipetakan */}
+      {/* saran otomatis — DI ATAS input-nya supaya jelas milik baris ini,
+          dan hanya muncul selama belum dipetakan */}
       {suggestion && !value && (
         <button
           type="button"
@@ -383,6 +328,73 @@ export function MappingRow({
           <span className="shrink-0 font-semibold underline">Pakai</span>
         </button>
       )}
+
+      <div className="flex w-full items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Select
+            name="productId"
+            value={value}
+            onValueChange={chooseProduct}
+            placeholder="— Belum dipetakan —"
+            className="w-full"
+            options={options}
+            searchable
+          />
+        </div>
+
+        {/* Isi baru berarti kalau product-nya sudah dipilih — sebelum itu
+            satuannya belum diketahui, jadi kolomnya disembunyikan biar bersih. */}
+        {value && (
+          <div className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
+            isi
+            <input
+              aria-label="Isi per unit yang dijual"
+              type="number"
+              min="1"
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              title={`Berapa banyak untuk 1 unit yang dijual di marketplace (disimpan sebagai ${baseUnit})`}
+              className="h-9 w-14 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            />
+            {tiers.length > 1 ? (
+              <div className="flex h-9 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
+                {tiers.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTier(t.key)}
+                    className={
+                      tier === t.key
+                        ? "bg-indigo-600 px-2 font-medium text-white"
+                        : "px-2 text-slate-600 hover:bg-slate-50"
+                    }
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="whitespace-nowrap text-slate-400">{baseUnit}</span>
+            )}
+          </div>
+        )}
+        <SubmitButton
+          variant={dirty ? "primary" : "ghost"}
+          disabled={!dirty}
+          className={`w-20 shrink-0 justify-center px-2 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : "text-slate-400"}`}
+          pendingText="…"
+        >
+          {dirty ? "Simpan" : "Tersimpan"}
+        </SubmitButton>
+      </div>
+
+      {/* total dalam satuan dasar — cuma perlu ditampilkan kalau bukan 1:1 */}
+      {value && factor > 1 && (
+        <p className="text-[11px] text-slate-400">
+          = {baseQty} {baseUnit} per 1 unit terjual
+        </p>
+      )}
+
     </form>
   );
 }

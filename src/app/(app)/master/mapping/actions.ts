@@ -63,7 +63,10 @@ function mappingWhere(f: {
   marketplace?: string;
   storeId?: string;
 }): Prisma.ProductMappingWhereInput {
-  const where: Prisma.ProductMappingWhereInput = {};
+  // toko marketplace saja — samakan dengan daftar di halaman Mapping SKU
+  const where: Prisma.ProductMappingWhereInput = {
+    store: { marketplace: { notIn: ["KONSINYASI", "WA"] } },
+  };
   if (f.storeId) where.storeId = f.storeId;
   if (f.marketplace) where.store = { marketplace: f.marketplace };
   if (f.q) {
