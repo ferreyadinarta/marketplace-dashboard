@@ -136,7 +136,7 @@ export default async function MasterProductPage({
               <h2 className="text-sm font-semibold text-slate-900">Import Produk dari Marketplace</h2>
               <p className="mt-0.5 text-sm text-slate-500">
                 Tarik katalog dari toko terhubung → masuk ke <strong>Mapping SKU</strong>. Product di sini tetap
-                product <strong>dasar</strong> buatanmu; beberapa varian marketplace (mis. “1 box” &amp; “10
+                product <strong>dasar </strong> buatanmu; beberapa varian marketplace (mis. “1 box” &amp; “10
                 sachet”) bisa menunjuk ke satu product yang sama.
               </p>
             </div>
