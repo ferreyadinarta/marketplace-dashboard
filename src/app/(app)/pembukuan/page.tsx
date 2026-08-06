@@ -69,29 +69,36 @@ export default async function PembukuanPage({
                   <span className="font-semibold text-emerald-600">{rupiah(g.subtotal.profit)}</span>
                 </span>
               </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
+              {/* table-fixed + lebar kolom eksplisit → semua grup sejajar & muat
+                  tanpa scroll ke kanan. Jumlah terjual pindah jadi sub-teks nama. */}
+              <div className="hidden md:block">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-5 py-2.5 font-medium">Product</th>
-                      <th className="px-5 py-2.5 font-medium">SKU</th>
-                      <th className="px-5 py-2.5 text-right font-medium">Terjual</th>
-                      <th className="px-5 py-2.5 text-right font-medium">Omzet</th>
-                      <th className="px-5 py-2.5 text-right font-medium">
+                      <th className="w-[32%] px-5 py-2.5 font-medium">Product</th>
+                      <th className="w-[18%] px-5 py-2.5 font-medium">SKU</th>
+                      <th className="w-[16%] px-5 py-2.5 text-right font-medium">Omzet</th>
+                      <th className="w-[12%] px-5 py-2.5 text-right font-medium">
                         Fee<HelpHint text="Potongan marketplace, dibagi rata per item dalam order." />
                       </th>
-                      <th className="px-5 py-2.5 text-right font-medium">
+                      <th className="w-[12%] px-5 py-2.5 text-right font-medium">
                         HPP/unit<HelpHint text="Modal per satu unit product." />
                       </th>
-                      <th className="px-5 py-2.5 text-right font-medium">Profit</th>
+                      <th className="w-[16%] px-5 py-2.5 text-right font-medium">Profit</th>
                     </tr>
                   </thead>
                   <tbody>
                     {g.rows.map((r) => (
                       <tr key={r.productId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                        <td className="px-5 py-2.5 font-medium text-slate-900">{r.name}</td>
-                        <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.sku}</td>
-                        <td className="px-5 py-2.5 text-right text-slate-600">{r.terjual}</td>
+                        <td className="px-5 py-2.5">
+                          <p className="truncate font-medium text-slate-900" title={r.name}>
+                            {r.name}
+                          </p>
+                          <p className="text-[11px] text-slate-400">{r.terjual} terjual</p>
+                        </td>
+                        <td className="truncate px-5 py-2.5 font-mono text-xs text-slate-500" title={r.sku}>
+                          {r.sku}
+                        </td>
                         <td className="px-5 py-2.5 text-right text-slate-600">{rupiah(r.omzet)}</td>
                         <td className="px-5 py-2.5 text-right text-red-500">{rupiah(r.fee)}</td>
                         <td className="px-5 py-2.5 text-right text-slate-400">{rupiah(r.hpp)}</td>
@@ -100,7 +107,7 @@ export default async function PembukuanPage({
                     ))}
                     {g.rows.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="px-5 py-6 text-center text-slate-400">
+                        <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
                           Belum ada product di grup ini
                         </td>
                       </tr>
@@ -111,7 +118,6 @@ export default async function PembukuanPage({
                       <td className="px-5 py-2.5" colSpan={2}>
                         Subtotal {g.groupName}
                       </td>
-                      <td className="px-5 py-2.5 text-right">{g.subtotal.terjual}</td>
                       <td className="px-5 py-2.5 text-right">{rupiah(g.subtotal.omzet)}</td>
                       <td className="px-5 py-2.5 text-right text-red-500">{rupiah(g.subtotal.fee)}</td>
                       <td className="px-5 py-2.5"></td>

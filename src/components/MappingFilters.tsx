@@ -16,7 +16,8 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
     if (value) next.set(key, value);
     else next.delete(key);
     next.delete("page"); // balik ke halaman 1 tiap ganti filter
-    router.push(`/master/mapping?${next.toString()}`);
+    // scroll:false → jangan lompat ke atas tiap ganti filter/pencarian
+    router.push(`/master/mapping?${next.toString()}`, { scroll: false });
   }
 
   // search (debounce)
@@ -101,7 +102,7 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
 
       {hasFilter && (
         <button
-          onClick={() => router.push("/master/mapping")}
+          onClick={() => router.push("/master/mapping", { scroll: false })}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
         >
           <RotateCcw size={15} /> Reset

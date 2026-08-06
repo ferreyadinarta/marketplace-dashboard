@@ -90,6 +90,10 @@ model ProductMapping {
   store                  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   marketplaceSku         String
   marketplaceProductName String
+  // Berapa SATUAN DASAR (mis. sachet) untuk 1 unit yang dijual di marketplace.
+  // Contoh: varian "1 box (16 sachet)" → 16, varian "10 sachet" → 10.
+  // Master Product = product DASAR; varian marketplace dibedakan oleh angka ini.
+  baseQtyPerUnit         Int     @default(1)
   productId              String?
   product                Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 

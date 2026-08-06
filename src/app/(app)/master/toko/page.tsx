@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2, AlertTriangle } from "lucide-react";
+import { Suspense } from "react";
+import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { waktu, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
@@ -19,6 +20,7 @@ import {
 import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
+import { AutoSyncBanner } from "@/components/AutoSyncBanner";
 
 export const dynamic = "force-dynamic";
 // Sync toko (tarik order + escrow) jalan sebagai Server Action di halaman ini.
@@ -42,7 +44,12 @@ export default async function MasterTokoPage({
   const shopeeStatus = one(sp.shopee);
   const syncStatus = one(sp.sync);
   const reason = one(sp.reason);
-  const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
+  // Halaman ini khusus toko MARKETPLACE. Channel manual (Grosir/Reseller &
+  // WA/Offline) dikelola di halamannya masing-masing, jadi tidak ikut dilist.
+  const stores = await prisma.store.findMany({
+    where: { marketplace: { notIn: ["KONSINYASI", "WA"] } },
+    orderBy: { name: "asc" },
+  });
   const hasConnected = stores.some(
     (s) => (s.marketplace === "TIKTOK" || s.marketplace === "SHOPEE") && !!s.accessToken
   );
@@ -92,14 +99,9 @@ export default async function MasterTokoPage({
         </div>
       )}
       {syncStatus === "partial" && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
-          <span>
-            Sync berjalan sebagian: <strong>{one(sp.created) ?? 0} order baru</strong>, {one(sp.updated) ?? 0}{" "}
-            diperbarui — dan sudah tersimpan. Data toko ini banyak, jadi belum semuanya tertarik.{" "}
-            <strong>Klik “Sync sekarang” lagi</strong> untuk melanjutkan (yang sudah masuk tidak diulang).
-          </span>
-        </div>
+        <Suspense fallback={null}>
+          <AutoSyncBanner action={syncShopee} />
+        </Suspense>
       )}
       {syncStatus === "error" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
@@ -154,7 +156,10 @@ export default async function MasterTokoPage({
       </Card>
 
       <Card>
-        <CardHeader title="Tambah Toko Manual" subtitle="Untuk toko yang tidak lewat API (mis. konsinyasi)." />
+        <CardHeader
+          title="Tambah Toko Manual"
+          subtitle="Untuk toko marketplace yang datanya diinput manual (belum/tidak lewat API). Toko grosir/reseller diatur di halaman Grosir / Reseller."
+        />
         <AddStoreForm action={createStore} />
       </Card>
 

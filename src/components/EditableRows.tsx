@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Copy } from "lucide-react";
+import { Pencil, Copy, Sparkles } from "lucide-react";
 import { Select, type SelectOption, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CurrencyInput } from "@/components/CurrencyInput";
@@ -52,7 +52,9 @@ export function ProductRow({
   // tampilan "box-first": satuan utama = pack kalau ada, kecil = base
   const [mainUnit, setMainUnit] = useState(packSize > 0 ? packUnit : unit);
   const [smallUnit, setSmallUnit] = useState(packSize > 0 ? unit : "");
-  const [koliU, setKoliU] = useState(koliUnit ?? "");
+  // default "koli" (satuan terbesar hampir selalu koli), tetap bisa diganti user.
+  // Kalau isi koli tidak diisi, teks ini diabaikan → aman.
+  const [koliU, setKoliU] = useState(koliUnit || "koli");
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -200,39 +202,84 @@ export function ProductRow({
 }
 
 // ---------- Baris Mapping SKU ----------
+// Satu product DASAR bisa punya banyak varian marketplace ("1 box" vs "10 sachet"),
+// jadi selain product-nya, baris ini juga menyimpan ISI per unit yang dijual.
 export function MappingRow({
   mappingId,
   initialProductId,
+  initialBaseQty,
+  baseUnit,
+  suggestion,
   options,
   action,
 }: {
   mappingId: string;
   initialProductId: string;
+  initialBaseQty: number;
+  baseUnit?: string;
+  suggestion?: { productId: string; productName: string; baseQty: number } | null;
   options: SelectOption[];
   action: Action;
 }) {
   const [value, setValue] = useState(initialProductId);
-  const dirty = value !== initialProductId;
+  const [qty, setQty] = useState(String(initialBaseQty || 1));
+  const dirty = value !== initialProductId || qty !== String(initialBaseQty || 1);
+
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    setValue(suggestion.productId);
+    setQty(String(suggestion.baseQty));
+  };
 
   return (
-    <form action={action} className="flex w-full items-center gap-2">
+    <form action={action} className="w-full space-y-1.5">
       <input type="hidden" name="mappingId" value={mappingId} />
-      <Select
-        name="productId"
-        value={value}
-        onValueChange={setValue}
-        placeholder="— Belum dipetakan —"
-        className="w-64"
-        options={options}
-      />
-      <SubmitButton
-        variant={dirty ? "primary" : "outline"}
-        disabled={!dirty}
-        className={`ml-auto w-24 shrink-0 justify-center px-3 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : ""}`}
-        pendingText="…"
-      >
-        {dirty ? "Simpan" : "Tersimpan"}
-      </SubmitButton>
+      <div className="flex w-full flex-wrap items-center gap-2">
+        <Select
+          name="productId"
+          value={value}
+          onValueChange={setValue}
+          placeholder="— Belum dipetakan —"
+          className="w-56"
+          options={options}
+        />
+        <label className="flex items-center gap-1 text-xs text-slate-500">
+          isi
+          <input
+            name="baseQtyPerUnit"
+            type="number"
+            min="1"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            title={`Berapa ${baseUnit || "satuan dasar"} untuk 1 unit yang dijual di marketplace`}
+            className="h-9 w-16 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+          />
+          {baseUnit && <span className="text-slate-400">{baseUnit}</span>}
+        </label>
+        <SubmitButton
+          variant={dirty ? "primary" : "outline"}
+          disabled={!dirty}
+          className={`ml-auto w-24 shrink-0 justify-center px-3 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : ""}`}
+          pendingText="…"
+        >
+          {dirty ? "Simpan" : "Tersimpan"}
+        </SubmitButton>
+      </div>
+
+      {/* saran otomatis — hanya muncul kalau belum dipetakan */}
+      {suggestion && !value && (
+        <button
+          type="button"
+          onClick={applySuggestion}
+          className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-left text-xs text-indigo-700 hover:bg-indigo-100"
+        >
+          <Sparkles size={12} className="shrink-0" />
+          <span className="truncate">
+            Saran: <b>{suggestion.productName}</b> · isi {suggestion.baseQty}
+          </span>
+          <span className="shrink-0 font-semibold underline">Pakai</span>
+        </button>
+      )}
     </form>
   );
 }

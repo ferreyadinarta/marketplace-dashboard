@@ -6,6 +6,7 @@ import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { DatePicker } from "@/components/DatePicker";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { rupiah } from "@/lib/format";
 
 type Option = { value: string; label: string };
@@ -51,6 +52,8 @@ export function AddKonsinyasiStoreForm({
 }
 
 // Chip toko/reseller dengan tombol hapus + konfirmasi (warning kalau ada penjualan).
+// Konfirmasi hapus pakai ConfirmDialog (dirender lewat portal) — popover absolute
+// sebelumnya terpotong karena daftar chip-nya punya max-h + overflow-y-auto.
 export function StoreChip({
   store,
   deleteAction,
@@ -58,72 +61,28 @@ export function StoreChip({
   store: { id: string; name: string; count: number };
   deleteAction: Action;
 }) {
-  const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  function toggle() {
-    if (!open && ref.current) {
-      const r = ref.current.getBoundingClientRect();
-      setAlignRight(r.left + 260 > window.innerWidth - 8);
-    }
-    setOpen((o) => !o);
-  }
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
   return (
-    <div ref={ref} className="relative inline-flex max-w-full">
-      <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-3 pr-1 text-xs font-medium text-slate-600">
-        <span className="truncate">{store.name}</span>
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={`Hapus ${store.name}`}
-          className="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
-        >
-          <X size={12} />
-        </button>
-      </span>
-      {open && (
-        <div
-          className={`absolute top-full z-30 mt-1 w-60 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg ${
-            alignRight ? "right-0" : "left-0"
-          }`}
-        >
-          <p className="text-xs leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
-            Hapus toko <span className="font-semibold text-slate-800">{store.name}</span>?
+    <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-3 pr-1 text-xs font-medium text-slate-600">
+      <span className="truncate">{store.name}</span>
+      <ConfirmModalButton
+        action={deleteAction}
+        id={store.id}
+        trigger={<X size={12} />}
+        triggerClassName="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
+        title="Hapus toko ini?"
+        message={
+          <>
+            <span className="font-medium text-slate-700">{store.name}</span> akan dihapus permanen.
             {store.count > 0 && (
               <>
                 {" "}
-                <span className="font-medium text-red-600">{store.count} penjualan</span> toko ini ikut terhapus permanen.
+                <span className="font-medium text-red-600">{store.count} penjualan</span> toko ini ikut terhapus.
               </>
             )}
-          </p>
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
-            >
-              Batal
-            </button>
-            <form action={deleteAction}>
-              <input type="hidden" name="id" value={store.id} />
-              <SubmitButton variant="danger" className="px-2.5 py-1 text-xs" pendingText="…">
-                Hapus
-              </SubmitButton>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        }
+      />
+    </span>
   );
 }
 

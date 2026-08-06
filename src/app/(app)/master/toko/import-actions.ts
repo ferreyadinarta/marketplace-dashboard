@@ -6,10 +6,11 @@ import { prisma } from "@/lib/prisma";
 import type { ImportedProduct } from "@/lib/adapters/types";
 import { getShopeeCatalog } from "@/lib/shopee/sync";
 import { getTiktokCatalog } from "@/lib/tiktok/sync";
+import { parseBaseQty } from "@/lib/suggestMapping";
 
-// Import katalog product dari marketplace toko → Master Product.
-// Dedup by SKU: product yang SKU-nya sudah ada TIDAK disentuh (lindungi HPP/harga
-// yang diinput manual) — cuma di-link ke mapping. SKU baru → dibuat.
+// Tarik katalog toko marketplace → siapkan daftar Mapping SKU.
+// TIDAK membuat product: Master Product berisi product DASAR buatan user, dan
+// beberapa varian marketplace bisa menunjuk ke satu product dasar yang sama.
 // Sekalian bikin/again ProductMapping biar order yang masuk otomatis ke-attribute.
 export async function importStoreProducts(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
@@ -38,8 +39,12 @@ export async function importStoreProducts(formData: FormData) {
     }
     const skus = [...bySku.keys()];
 
-    // Kerjakan per potongan & secara BULK — jangan 2-3 query per product, toko
-    // dengan ratusan/ribuan product akan kena timeout function.
+    // Import TIDAK membuat product. Master Product = product DASAR yang dibuat
+    // user sendiri (mis. "Flimty Fiber Blackcurrant"); satu product dasar bisa
+    // punya banyak varian marketplace ("1 box 16 sachet", "10 sachet"). Import
+    // hanya menyiapkan baris Mapping SKU + menebak isi per unit, lalu user yang
+    // memilih product-nya di halaman Mapping SKU.
+    // Product dipetakan otomatis HANYA kalau SKU-nya persis sama (aman).
     const CHUNK = 300;
     let created = 0;
     let existing = 0;
@@ -47,55 +52,35 @@ export async function importStoreProducts(formData: FormData) {
     for (let i = 0; i < skus.length; i += CHUNK) {
       const part = skus.slice(i, i + CHUNK);
 
-      // 1. product yang sudah ada → sekali query
       const found = await prisma.product.findMany({
         where: { sku: { in: part } },
         select: { id: true, sku: true },
       });
       const idBySku = new Map(found.map((p) => [p.sku, p.id]));
-      existing += found.length;
 
-      // 2. product baru → sekali insert (SKU yang sudah ada tidak disentuh,
-      //    supaya HPP/harga yang diinput manual aman)
-      const toCreate = part
-        .filter((s) => !idBySku.has(s))
-        .map((s) => {
-          const p = bySku.get(s)!;
-          return { name: p.name, sku: s, priceRetail: p.price, hpp: 0, priceGrosir: 0, unit: "pcs" };
-        });
-      if (toCreate.length) {
-        const rows = await prisma.product.createManyAndReturn({
-          data: toCreate,
-          select: { id: true, sku: true },
-        });
-        for (const r of rows) idBySku.set(r.sku, r.id);
-        created += rows.length;
-      }
-
-      // 3. mapping (biar order marketplace otomatis ke product ini) → sekali query
       const maps = await prisma.productMapping.findMany({
         where: { storeId, marketplaceSku: { in: part } },
-        select: { id: true, marketplaceSku: true, productId: true },
+        select: { id: true, marketplaceSku: true },
       });
-      const mapBySku = new Map(maps.map((m) => [m.marketplaceSku, m]));
+      const known = new Set(maps.map((m) => m.marketplaceSku));
+      existing += known.size;
 
-      const newMaps: { storeId: string; marketplaceSku: string; marketplaceProductName: string; productId: string }[] = [];
-      for (const s of part) {
-        const productId = idBySku.get(s);
-        if (!productId) continue;
-        const p = bySku.get(s)!;
-        const ex = mapBySku.get(s);
-        if (!ex) {
-          newMaps.push({ storeId, marketplaceSku: s, marketplaceProductName: p.name, productId });
-        } else if (ex.productId !== productId) {
-          // hanya update kalau memang berubah
-          await prisma.productMapping.update({
-            where: { id: ex.id },
-            data: { productId, marketplaceProductName: p.name },
-          });
-        }
+      const newMaps = part
+        .filter((s) => !known.has(s))
+        .map((s) => {
+          const p = bySku.get(s)!;
+          return {
+            storeId,
+            marketplaceSku: s,
+            marketplaceProductName: p.name,
+            baseQtyPerUnit: parseBaseQty(p.name), // tebakan, bisa diubah user
+            productId: idBySku.get(s) ?? null,
+          };
+        });
+      if (newMaps.length) {
+        await prisma.productMapping.createMany({ data: newMaps, skipDuplicates: true });
+        created += newMaps.length;
       }
-      if (newMaps.length) await prisma.productMapping.createMany({ data: newMaps, skipDuplicates: true });
     }
 
     q = `import=ok&created=${created}&existing=${existing}&nosku=${noSku}`;
@@ -107,5 +92,6 @@ export async function importStoreProducts(formData: FormData) {
   revalidatePath("/master/product");
   revalidatePath("/master/toko");
   revalidatePath("/master/mapping");
-  redirect(`/master/product?${q}`);
+  // hasil import muncul di Mapping SKU (di situ user memilih product dasarnya)
+  redirect(`/master/mapping?${q}`);
 }

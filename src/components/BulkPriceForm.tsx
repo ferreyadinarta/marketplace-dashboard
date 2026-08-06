@@ -32,7 +32,8 @@ function initUnit(p: PriceRow): UnitVals {
     mainUnit: hasPack ? p.packUnit : p.unit,
     smallUnit: hasPack ? p.unit : "",
     isi: hasPack ? String(p.packSize) : "",
-    koliUnit: p.koliUnit,
+    // default "koli" — diabaikan kalau isi koli kosong, jadi aman
+    koliUnit: p.koliUnit || "koli",
     isiKoli: p.koliSize > 0 ? String(p.koliSize) : "",
   };
 }

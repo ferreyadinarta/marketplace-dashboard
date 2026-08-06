@@ -25,6 +25,12 @@ function safeSheetName(name: string, fallback = "Grup") {
   return name.replace(/[\\/?*[\]:]/g, "").slice(0, 31) || fallback;
 }
 
+// Nama sheet "<Grup> <Tahun>" — sisakan ruang untuk tahun (batas Excel 31 karakter).
+function sheetNameForYear(name: string, year: number, fallback = "Grup") {
+  const clean = name.replace(/[\\/?*[\]:]/g, "").trim() || fallback;
+  return `${clean.slice(0, 26)} ${year}`;
+}
+
 // Export pembukuan ke Excel (.xlsx). Sheet Ringkasan + satu sheet per grup.
 export async function GET(req: NextRequest) {
   const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
@@ -132,6 +138,38 @@ export async function GET(req: NextRequest) {
   totalRow.getCell(6).numFmt = CURRENCY_NEG;
   totalRow.getCell(7).numFmt = PERCENT;
 
+  // ---------- Ringkasan PER TAHUN (data multi-tahun jadi mudah dibandingkan) ----------
+  const yearAgg = new Map<number, { qty: number; total: number; modal: number }>();
+  for (const r of detailRows) {
+    const y = r.orderDate.getFullYear();
+    const a = yearAgg.get(y) ?? { qty: 0, total: 0, modal: 0 };
+    a.qty += r.qty;
+    a.total += r.total;
+    a.modal += r.modal;
+    yearAgg.set(y, a);
+  }
+
+  if (yearAgg.size > 1) {
+    sum.addRow([]);
+    sum.addRow(["Per Tahun"]).getCell(1).font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
+    const yHead = sum.addRow(["Tahun", "Terjual", "Omzet", "", "Modal", "Laba", "Margin"]);
+    yHead.eachCell((c) => {
+      c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      c.fill = HEADER_FILL;
+      c.alignment = { vertical: "middle" };
+    });
+    for (const y of [...yearAgg.keys()].sort((a, b) => b - a)) {
+      const a = yearAgg.get(y)!;
+      const laba = a.total - a.modal;
+      const row = sum.addRow([y, a.qty, a.total, "", a.modal, laba, a.total ? laba / a.total : 0]);
+      row.getCell(2).numFmt = INT;
+      row.getCell(3).numFmt = CURRENCY;
+      row.getCell(5).numFmt = CURRENCY;
+      row.getCell(6).numFmt = CURRENCY_NEG;
+      row.getCell(7).numFmt = PERCENT;
+    }
+  }
+
   // ---------- Satu sheet LEDGER per brand (grup) ----------
   // Format ala kakak: setiap BULAN = tabel sendiri, disusun ke KANAN
   // (bulan berikutnya di sebelah kanan), dipisah 4 kolom kosong.
@@ -155,14 +193,8 @@ export async function GET(req: NextRequest) {
   const GAP = 4;
   const BLOCK = COLS + GAP; // lebar 1 tabel bulan + jarak
 
-  for (const g of groups) {
-    const ws = wb.addWorksheet(safeSheetName(g.groupName));
-    const rows = rowsByGroup.get(g.groupName) ?? [];
-    if (rows.length === 0) {
-      ws.getCell(1, 1).value = "Belum ada penjualan (selesai) untuk filter ini.";
-      continue;
-    }
-
+  // Render tabel-tabel bulan (disusun ke kanan) untuk SATU sheet.
+  const renderMonths = (ws: ExcelJS.Worksheet, rows: typeof detailRows) => {
     // kelompokkan per bulan (urut kronologis) — rows sudah urut tanggal asc
     const byMonth = new Map<string, typeof detailRows>();
     for (const r of rows) {
@@ -256,6 +288,40 @@ export async function GET(req: NextRequest) {
         r += 1;
       }
     });
+  };
+
+  // Satu sheet per GRUP per TAHUN, tahun TERBARU lebih dulu. Kalau semua bulan
+  // ditaruh di satu sheet, 2 tahun = 24 tabel ke kanan (300+ kolom) dan bulan
+  // terbaru paling jauh — susah dicari. Dipecah per tahun: maksimal 12 tabel.
+  const usedNames = new Set<string>();
+  const uniqueName = (base: string) => {
+    let name = base;
+    let n = 2;
+    while (usedNames.has(name)) name = `${base.slice(0, 28)} (${n++})`;
+    usedNames.add(name);
+    return name;
+  };
+
+  for (const g of groups) {
+    const rows = rowsByGroup.get(g.groupName) ?? [];
+    if (rows.length === 0) {
+      const ws = wb.addWorksheet(uniqueName(safeSheetName(g.groupName)));
+      ws.getCell(1, 1).value = "Belum ada penjualan (selesai) untuk filter ini.";
+      continue;
+    }
+
+    const byYear = new Map<number, typeof detailRows>();
+    for (const r of rows) {
+      const y = r.orderDate.getFullYear();
+      const arr = byYear.get(y) ?? [];
+      arr.push(r);
+      byYear.set(y, arr);
+    }
+
+    for (const year of [...byYear.keys()].sort((a, b) => b - a)) {
+      const ws = wb.addWorksheet(uniqueName(sheetNameForYear(g.groupName, year)));
+      renderMonths(ws, byYear.get(year)!);
+    }
   }
 
   if (groups.length === 0) {

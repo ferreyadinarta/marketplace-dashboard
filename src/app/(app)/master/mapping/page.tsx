@@ -1,4 +1,4 @@
-import { Link2, AlertTriangle, Search } from "lucide-react";
+import { Link2, AlertTriangle, Search, CheckCircle, XCircle } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { MARKETPLACE_LABEL } from "@/lib/format";
@@ -7,6 +7,7 @@ import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui
 import { MappingRow } from "@/components/EditableRows";
 import { MappingFilters } from "@/components/MappingFilters";
 import { Pagination, PaginationControls } from "@/components/Pagination";
+import { suggestProduct } from "@/lib/suggestMapping";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,17 @@ export default async function MappingPage({
     ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
   ];
 
+  // Saran otomatis untuk baris yang belum dipetakan: tebak product dasar dari
+  // nama listing + isi per unit dari teks variannya. User tetap yang memutuskan.
+  const lite = products.map((p) => ({ id: p.id, name: p.name, sku: p.sku }));
+  const suggestions = new Map<string, ReturnType<typeof suggestProduct>>();
+  for (const m of mappings) {
+    if (m.productId) continue;
+    suggestions.set(m.id, suggestProduct(m.marketplaceProductName || m.marketplaceSku, lite));
+  }
+  const baseUnitOf = (productId: string | null) =>
+    productId ? products.find((p) => p.id === productId)?.unit : undefined;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -79,11 +91,30 @@ export default async function MappingPage({
         description="Satu product bisa punya SKU berbeda di tiap marketplace. Hubungkan tiap SKU ke product internal supaya penjualannya masuk pembukuan."
       />
 
+      {one(sp.import) === "ok" && (
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="mt-0.5 shrink-0 text-emerald-500" />
+          <span>
+            Import selesai: <strong>{one(sp.created) || 0} SKU baru</strong>, {one(sp.existing) || 0} sudah ada
+            {Number(one(sp.nosku) || 0) > 0 ? `, ${one(sp.nosku)} dilewati (tanpa SKU)` : ""}. Pilih product
+            dasarnya di bawah — pakai tombol <strong>Saran</strong> kalau cocok.
+          </span>
+        </div>
+      )}
+      {one(sp.import) === "error" && (
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="shrink-0 text-red-500" />
+          Import gagal: {one(sp.reason) || "unknown"}
+        </div>
+      )}
+
       {totalUnmapped > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
-          <AlertTriangle size={18} className="shrink-0 text-amber-500" />
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
             <strong>{totalUnmapped} SKU belum dipetakan.</strong> Penjualannya belum dihitung sampai dipetakan.
+            Kolom <strong>isi</strong> = berapa satuan dasar untuk 1 unit yang dijual (mis. varian “1 box” →
+            isi 16), supaya stok & profit-nya benar.
           </span>
         </div>
       )}
@@ -113,14 +144,16 @@ export default async function MappingPage({
             />
           )
         ) : (
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
+          // SKU marketplace sengaja TIDAK jadi kolom sendiri: kodenya (mis.
+          // SHP-1739…-1764…) tidak informatif buat user. Tetap disimpan &
+          // ditampilkan kecil karena itu kunci pencocokan order dari Shopee.
+          <div className="hidden md:block">
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Toko</th>
-                  <th className="px-5 py-3 font-medium">SKU Marketplace</th>
-                  <th className="px-5 py-3 font-medium">Nama di Marketplace</th>
-                  <th className="px-5 py-3 font-medium">Product Internal</th>
+                  <th className="w-[13%] px-5 py-3 font-medium">Toko</th>
+                  <th className="w-[45%] px-5 py-3 font-medium">Product di Marketplace</th>
+                  <th className="w-[42%] px-5 py-3 font-medium">Product Internal (punya kamu)</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,16 +164,23 @@ export default async function MappingPage({
                       !m.productId ? "bg-amber-50/50" : "hover:bg-slate-50/50"
                     }`}
                   >
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 align-top">
                       <Badge color="slate">{MARKETPLACE_LABEL[m.store.marketplace]}</Badge>
-                      <p className="mt-1 text-xs text-slate-400">{m.store.name}</p>
+                      <p className="mt-1 truncate text-xs text-slate-400">{m.store.name}</p>
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-slate-600">{m.marketplaceSku}</td>
-                    <td className="px-5 py-3 text-slate-600">{m.marketplaceProductName}</td>
-                    <td className="px-5 py-3">
+                    <td className="px-5 py-3 align-top">
+                      <p className="text-slate-700">{m.marketplaceProductName}</p>
+                      <p className="mt-0.5 truncate font-mono text-[10px] text-slate-300" title={m.marketplaceSku}>
+                        {m.marketplaceSku}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3 align-top">
                       <MappingRow
                         mappingId={m.id}
                         initialProductId={m.productId ?? ""}
+                        initialBaseQty={m.baseQtyPerUnit}
+                        baseUnit={baseUnitOf(m.productId) ?? m.product?.unit}
+                        suggestion={suggestions.get(m.id) ?? null}
                         action={assignMapping}
                         options={productOptions}
                       />
@@ -160,7 +200,9 @@ export default async function MappingPage({
                   !m.productId ? "bg-amber-50/50" : ""
                 }`}
               >
-                <p className="font-mono text-sm font-bold text-slate-900">{m.marketplaceSku}</p>
+                {/* nama product yang dipentingkan, bukan kode SKU marketplace */}
+                <p className="text-sm font-semibold text-slate-900">{m.marketplaceProductName}</p>
+                <p className="mt-0.5 truncate font-mono text-[10px] text-slate-300">{m.marketplaceSku}</p>
                 <div className="mt-3 space-y-3">
                   <div className="flex flex-col">
                     <span className="text-[11px] text-slate-400">Toko</span>
@@ -170,15 +212,14 @@ export default async function MappingPage({
                     </div>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Nama di Marketplace</span>
-                    <span className="mt-0.5 text-sm text-slate-600">{m.marketplaceProductName}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Product Internal</span>
+                    <span className="text-[11px] text-slate-400">Product Internal (punya kamu)</span>
                     <div className="mt-1">
                       <MappingRow
                         mappingId={m.id}
                         initialProductId={m.productId ?? ""}
+                        initialBaseQty={m.baseQtyPerUnit}
+                        baseUnit={baseUnitOf(m.productId) ?? m.product?.unit}
+                        suggestion={suggestions.get(m.id) ?? null}
                         action={assignMapping}
                         options={productOptions}
                       />

@@ -18,7 +18,7 @@ export function RememberFilters({ storageKey }: { storageKey: string }) {
     restored.current = true;
     if (!params.toString()) {
       const saved = typeof window !== "undefined" ? localStorage.getItem(storageKey) : null;
-      if (saved) router.replace(`${pathname}?${saved}`);
+      if (saved) router.replace(`${pathname}?${saved}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

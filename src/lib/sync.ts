@@ -32,11 +32,16 @@ export async function ingestOrders(storeId: string, orders: NormalizedOrder[]) {
           });
         }
 
+        // Varian marketplace bisa "1 box (16 sachet)" atau "10 sachet" untuk
+        // product DASAR yang sama → konversi ke satuan dasar pakai faktor mapping,
+        // kalau tidak stok berkurang salah (1 box dihitung 1 sachet).
+        const factor = Math.max(1, mapping?.baseQtyPerUnit ?? 1);
         return {
           productId: mapping?.productId ?? null,
           marketplaceSku: it.marketplaceSku,
           productName: it.productName,
           qty: it.qty,
+          baseQty: it.qty * factor,
           price: it.price,
           subtotal: it.subtotal,
         };

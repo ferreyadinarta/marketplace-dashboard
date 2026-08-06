@@ -100,7 +100,7 @@ export default function DateRangePicker({
     next.delete("all");
     next.set("from", ymd(from));
     next.set("to", ymd(to));
-    router.push(`${basePath}?${next.toString()}`);
+    router.push(`${basePath}?${next.toString()}`, { scroll: false });
     if (close) setOpen(false);
   }
 
@@ -110,7 +110,7 @@ export default function DateRangePicker({
     next.delete("from");
     next.delete("to");
     next.set("all", "1");
-    router.push(`${basePath}?${next.toString()}`);
+    router.push(`${basePath}?${next.toString()}`, { scroll: false });
     setOpen(false);
   }
 

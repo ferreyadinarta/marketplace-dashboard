@@ -22,7 +22,8 @@ export function ProductSearch({ defaultValue }: { defaultValue: string }) {
       if (q) next.set("q", q);
       else next.delete("q");
       next.delete("page"); // reset ke halaman 1 saat cari
-      router.push(`/master/product?${next.toString()}`);
+      // scroll:false → posisi baca tidak lompat ke atas saat mengetik pencarian
+      router.push(`/master/product?${next.toString()}`, { scroll: false });
     }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

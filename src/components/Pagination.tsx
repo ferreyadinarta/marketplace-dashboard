@@ -18,7 +18,7 @@ export function PaginationControls({
   return (
     <div className="flex items-center gap-1">
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={on} aria-label="Sebelumnya">
+        <Link scroll={false} href={hrefFor(page - 1)} className={on} aria-label="Sebelumnya">
           <ChevronLeft size={15} />
         </Link>
       ) : (
@@ -30,7 +30,7 @@ export function PaginationControls({
         Hal. {page} / {totalPages}
       </span>
       {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={on} aria-label="Berikutnya">
+        <Link scroll={false} href={hrefFor(page + 1)} className={on} aria-label="Berikutnya">
           <ChevronRight size={15} />
         </Link>
       ) : (
@@ -75,7 +75,7 @@ export function Pagination({
   const controls = (
     <div className="flex items-center gap-1">
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={btnOn}>
+        <Link scroll={false} href={hrefFor(page - 1)} className={btnOn}>
           <ChevronLeft size={15} /> Sebelumnya
         </Link>
       ) : (
@@ -87,7 +87,7 @@ export function Pagination({
         Halaman {page} / {totalPages}
       </span>
       {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={btnOn}>
+        <Link scroll={false} href={hrefFor(page + 1)} className={btnOn}>
           Berikutnya <ChevronRight size={15} />
         </Link>
       ) : (
