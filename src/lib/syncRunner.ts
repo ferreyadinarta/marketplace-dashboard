@@ -100,14 +100,19 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
     const created = accCreated + r.created;
     const updated = accUpdated + r.updated;
 
+    // pesan harus jujur: "lanjut sendiri" hanya kalau server memang bisa
+    // menyambung (butuh CRON_SECRET) dan belum kena batas putaran
+    const willContinue = r.partial && canRunInBackground() && round < MAX_ROUNDS;
     await finishSyncJob(jobId, {
       phase: "done",
       created,
       updated,
       partial: r.partial,
-      message: r.partial
-        ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — lanjut sendiri`
-        : `Selesai: ${created} baru, ${updated} diperbarui`,
+      message: !r.partial
+        ? `Selesai: ${created} baru, ${updated} diperbarui`
+        : willContinue
+          ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — lanjut otomatis ke putaran ${round + 1}`
+          : `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — klik Sync lagi untuk melanjutkan`,
     });
 
     revalidatePath("/master/toko");
