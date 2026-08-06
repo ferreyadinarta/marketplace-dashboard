@@ -1,6 +1,6 @@
 import { Package, Search, CheckCircle, XCircle, PackageOpen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices, deleteProducts } from "./actions";
+import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices, deleteProducts, updateBundle } from "./actions";
 import { importStoreProducts } from "../toko/import-actions";
 import { Card, CardHeader, PageHeader, EmptyState } from "@/components/ui";
 import { ProductSearch } from "@/components/ProductControls";
@@ -45,7 +45,8 @@ export default async function MasterProductPage({
   const [products, total, groups, priceRows, connectedStores, cleanupRaw] = await Promise.all([
     prisma.product.findMany({
       where,
-      include: { group: true },
+      // bundleComponents = isi bundle (buat listing "mix": 1 box = beberapa product)
+      include: { group: true, bundleComponents: { select: { componentId: true, qty: true } } },
       orderBy: { name: "asc" },
       skip: (page - 1) * PER_PAGE,
       take: PER_PAGE,
@@ -222,7 +223,14 @@ export default async function MasterProductPage({
                   { value: "", label: "— Tanpa grup —" },
                   ...groups.map((g) => ({ value: g.id, label: g.name })),
                 ]}
+                isBundle={p.isBundle}
+                components={p.bundleComponents}
+                // calon isi bundle: product lain yang bukan bundle
+                productOptions={priceRows
+                  .filter((o) => o.id !== p.id)
+                  .map((o) => ({ value: o.id, label: `${o.name} (${o.sku})` }))}
                 updateAction={updateProduct}
+                bundleAction={updateBundle}
                 deleteAction={deleteProduct}
                 duplicateAction={duplicateProduct}
               />

@@ -88,14 +88,25 @@ export default async function MappingPage({
 
   // Saran otomatis untuk baris yang belum dipetakan: tebak product dasar dari
   // nama listing + isi per unit dari teks variannya. User tetap yang memutuskan.
-  const lite = products.map((p) => ({ id: p.id, name: p.name, sku: p.sku }));
+  const lite = products.map((p) => ({ id: p.id, name: p.name, sku: p.sku, packSize: p.packSize, isBundle: p.isBundle }));
   const suggestions = new Map<string, ReturnType<typeof suggestProduct>>();
   for (const m of mappings) {
     if (m.productId) continue;
     suggestions.set(m.id, suggestProduct(m.marketplaceProductName || m.marketplaceSku, lite));
   }
-  const baseUnitOf = (productId: string | null) =>
-    productId ? products.find((p) => p.id === productId)?.unit : undefined;
+  // satuan tiap product (koli/box/sachet) → dipakai toggle satuan di kolom isi
+  const unitInfo = Object.fromEntries(
+    products.map((p) => [
+      p.id,
+      {
+        unit: p.unit,
+        packUnit: p.packUnit,
+        packSize: p.packSize,
+        koliUnit: p.koliUnit,
+        koliSize: p.koliSize,
+      },
+    ])
+  );
 
   // berapa banyak dari baris belum dipetakan itu yang punya saran cukup yakin
   const suggestable = unmappedRows.filter(
@@ -225,7 +236,7 @@ export default async function MappingPage({
                         mappingId={m.id}
                         initialProductId={m.productId ?? ""}
                         initialBaseQty={m.baseQtyPerUnit}
-                        baseUnit={baseUnitOf(m.productId) ?? m.product?.unit}
+                        unitInfo={unitInfo}
                         suggestion={suggestions.get(m.id) ?? null}
                         action={assignMapping}
                         options={productOptions}
@@ -264,7 +275,7 @@ export default async function MappingPage({
                         mappingId={m.id}
                         initialProductId={m.productId ?? ""}
                         initialBaseQty={m.baseQtyPerUnit}
-                        baseUnit={baseUnitOf(m.productId) ?? m.product?.unit}
+                        unitInfo={unitInfo}
                         suggestion={suggestions.get(m.id) ?? null}
                         action={assignMapping}
                         options={productOptions}

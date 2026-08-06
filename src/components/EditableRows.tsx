@@ -6,6 +6,7 @@ import { Select, type SelectOption, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { DeleteProductButton } from "@/components/ProductControls";
+import { BundleEditor } from "@/components/BundleEditor";
 import { rupiah } from "@/lib/format";
 
 type Action = (formData: FormData) => void | Promise<void>;
@@ -26,7 +27,11 @@ export function ProductRow({
   groupId,
   groupName,
   groupOptions,
+  isBundle,
+  components,
+  productOptions,
   updateAction,
+  bundleAction,
   deleteAction,
   duplicateAction,
 }: {
@@ -44,7 +49,11 @@ export function ProductRow({
   groupId: string;
   groupName?: string;
   groupOptions: SelectOption[];
+  isBundle: boolean;
+  components: { componentId: string; qty: number }[];
+  productOptions: SelectOption[]; // product lain (calon isi bundle)
   updateAction: Action;
+  bundleAction: Action;
   deleteAction: Action;
   duplicateAction: Action;
 }) {
@@ -197,6 +206,18 @@ export function ProductRow({
           </div>
         </form>
       )}
+
+      {/* Bundle (isi gabungan): form terpisah karena aksinya beda.
+          Dipakai untuk listing "mix" — 1 box berisi beberapa product sekaligus. */}
+      {open && (
+        <BundleEditor
+          productId={id}
+          initialIsBundle={isBundle}
+          initialComponents={components}
+          productOptions={productOptions}
+          action={bundleAction}
+        />
+      )}
     </div>
   );
 }
@@ -204,11 +225,46 @@ export function ProductRow({
 // ---------- Baris Mapping SKU ----------
 // Satu product DASAR bisa punya banyak varian marketplace ("1 box" vs "10 sachet"),
 // jadi selain product-nya, baris ini juga menyimpan ISI per unit yang dijual.
+//
+// Yang DISIMPAN selalu satuan dasar (sachet). Tapi mengetik "24" untuk varian
+// 2 BOX gampang salah, jadi input-nya sama seperti Stok Opname: angka + toggle
+// satuan (koli › box › sachet) mengikuti satuan product yang dipilih.
+export type MappingUnitInfo = {
+  unit: string; // satuan dasar (mis. sachet)
+  packUnit: string; // mis. box
+  packSize: number; // 1 box = berapa sachet
+  koliUnit: string;
+  koliSize: number; // 1 koli = berapa box
+};
+
+type Tier = { key: string; label: string; factor: number };
+
+// Tingkatan satuan yang tersedia untuk product ini, terbesar → terkecil.
+function tiersOf(u?: MappingUnitInfo): Tier[] {
+  const out: Tier[] = [];
+  if (!u) return [{ key: "base", label: "satuan dasar", factor: 1 }];
+  const hasPack = u.packSize >= 2 && !!u.packUnit;
+  const hasKoli = hasPack && u.koliSize >= 2 && !!u.koliUnit;
+  if (hasKoli) out.push({ key: "koli", label: u.koliUnit, factor: u.koliSize * u.packSize });
+  if (hasPack) out.push({ key: "pack", label: u.packUnit, factor: u.packSize });
+  out.push({ key: "base", label: u.unit || "satuan dasar", factor: 1 });
+  return out;
+}
+
+// Pilih tampilan paling enak dibaca untuk nilai tersimpan: 24 sachet dengan
+// 1 box = 12 → tampil "2 box". Kalau tidak habis dibagi, tetap satuan dasar.
+function splitBase(base: number, tiers: Tier[]): { qty: number; tier: string } {
+  for (const t of tiers) {
+    if (t.factor > 1 && base % t.factor === 0) return { qty: base / t.factor, tier: t.key };
+  }
+  return { qty: base, tier: "base" };
+}
+
 export function MappingRow({
   mappingId,
   initialProductId,
   initialBaseQty,
-  baseUnit,
+  unitInfo,
   suggestion,
   options,
   action,
@@ -216,46 +272,93 @@ export function MappingRow({
   mappingId: string;
   initialProductId: string;
   initialBaseQty: number;
-  baseUnit?: string;
+  unitInfo?: Record<string, MappingUnitInfo>; // per productId — ikut dropdown, bukan cuma yang tersimpan
   suggestion?: { productId: string; productName: string; baseQty: number } | null;
   options: SelectOption[];
   action: Action;
 }) {
   const [value, setValue] = useState(initialProductId);
-  const [qty, setQty] = useState(String(initialBaseQty || 1));
-  const dirty = value !== initialProductId || qty !== String(initialBaseQty || 1);
+  const tiers = tiersOf(unitInfo?.[value]);
+
+  const init = splitBase(Math.max(1, initialBaseQty || 1), tiers);
+  const [qty, setQty] = useState(String(init.qty));
+  const [tier, setTier] = useState(init.tier);
+
+  const factor = tiers.find((t) => t.key === tier)?.factor ?? 1;
+  const baseQty = Math.max(1, Math.floor(Number(qty) || 0)) * factor;
+  const baseUnit = tiers[tiers.length - 1].label;
+  const dirty = value !== initialProductId || baseQty !== (initialBaseQty || 1);
+
+  // ganti product → satuannya bisa beda; pertahankan jumlah dalam satuan dasar
+  const chooseProduct = (next: string) => {
+    const nextTiers = tiersOf(unitInfo?.[next]);
+    const s = splitBase(baseQty, nextTiers);
+    setValue(next);
+    setQty(String(s.qty));
+    setTier(s.tier);
+  };
 
   const applySuggestion = () => {
     if (!suggestion) return;
+    const nextTiers = tiersOf(unitInfo?.[suggestion.productId]);
+    const s = splitBase(Math.max(1, suggestion.baseQty), nextTiers);
     setValue(suggestion.productId);
-    setQty(String(suggestion.baseQty));
+    setQty(String(s.qty));
+    setTier(s.tier);
   };
 
   return (
     <form action={action} className="w-full space-y-1.5">
       <input type="hidden" name="mappingId" value={mappingId} />
+      {/* yang dikirim ke server tetap satuan dasar */}
+      <input type="hidden" name="baseQtyPerUnit" value={baseQty} />
       <div className="flex w-full flex-wrap items-center gap-2">
         <Select
           name="productId"
           value={value}
-          onValueChange={setValue}
+          onValueChange={chooseProduct}
           placeholder="— Belum dipetakan —"
           className="w-56"
           options={options}
+          searchable
         />
-        <label className="flex items-center gap-1 text-xs text-slate-500">
+        <div className="flex items-center gap-1 text-xs text-slate-500">
           isi
           <input
-            name="baseQtyPerUnit"
+            aria-label="Isi per unit yang dijual"
             type="number"
             min="1"
             value={qty}
             onChange={(e) => setQty(e.target.value)}
-            title={`Berapa ${baseUnit || "satuan dasar"} untuk 1 unit yang dijual di marketplace`}
-            className="h-9 w-16 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            title={`Berapa banyak untuk 1 unit yang dijual di marketplace (disimpan sebagai ${baseUnit})`}
+            className="h-9 w-14 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
-          {baseUnit && <span className="text-slate-400">{baseUnit}</span>}
-        </label>
+          {tiers.length > 1 ? (
+            <div className="flex h-9 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
+              {tiers.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTier(t.key)}
+                  className={
+                    tier === t.key
+                      ? "bg-indigo-600 px-2 font-medium text-white"
+                      : "px-2 text-slate-600 hover:bg-slate-50"
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-slate-400">{baseUnit}</span>
+          )}
+          {factor > 1 && (
+            <span className="whitespace-nowrap text-slate-400">
+              = {baseQty} {baseUnit}
+            </span>
+          )}
+        </div>
         <SubmitButton
           variant={dirty ? "primary" : "outline"}
           disabled={!dirty}

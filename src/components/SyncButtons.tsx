@@ -3,6 +3,17 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Loader2, Pause } from "lucide-react";
+import { Select, type SelectOption } from "@/components/Select";
+
+// periode order yang ditarik dari Shopee
+const RANGE_OPTIONS: SelectOption[] = [
+  { value: "30", label: "30 hari" },
+  { value: "90", label: "90 hari" },
+  { value: "180", label: "6 bulan" },
+  { value: "365", label: "1 tahun" },
+  { value: "730", label: "2 tahun" },
+  { value: "1095", label: "3 tahun" },
+];
 
 // Batas pengaman: 1 putaran ≈ 45 detik kerja, jadi 80 putaran ≈ 1 jam.
 // Cukup untuk riwayat bertahun-tahun tanpa jadi loop tak berujung.
@@ -114,21 +125,13 @@ export function StoreSyncButton({ storeId, isShopee }: { storeId: string; isShop
   return (
     <div className="flex items-center gap-1.5">
       {isShopee && (
-        <select
+        <Select
           value={days}
-          onChange={(e) => setDays(e.target.value)}
+          onValueChange={setDays}
           disabled={running}
-          aria-label="Rentang order yang ditarik"
-          title="Periode order yang ditarik dari Shopee"
-          className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-60"
-        >
-          <option value="30">30 hari</option>
-          <option value="90">90 hari</option>
-          <option value="180">6 bulan</option>
-          <option value="365">1 tahun</option>
-          <option value="730">2 tahun</option>
-          <option value="1095">3 tahun</option>
-        </select>
+          className="w-28"
+          options={RANGE_OPTIONS}
+        />
       )}
       <button
         type="button"

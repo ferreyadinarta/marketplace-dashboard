@@ -3,9 +3,14 @@
 import { useState } from "react";
 import { Wand2, Link2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Select, type SelectOption as Option } from "@/components/Select";
 
 type Action = (formData: FormData) => void | Promise<void>;
-type Option = { value: string; label: string };
+
+const ISI_OPTIONS: Option[] = [
+  { value: "auto", label: "isi: tebak dari nama" },
+  ...[1, 6, 10, 12, 16, 20, 30].map((n) => ({ value: String(n), label: `isi: ${n}` })),
+];
 
 // Petakan banyak SKU sekaligus. Dua jalur, dua-duanya cuma menyentuh baris yang
 // SEDANG TERSARING dan BELUM dipetakan:
@@ -65,36 +70,21 @@ export function BulkMappingBar({
 
         <span className="text-xs text-slate-400">atau</span>
 
-        <select
+        <Select
           value={productId}
-          onChange={(e) => setProductId(e.target.value)}
-          aria-label="Product internal tujuan"
-          className="h-9 max-w-[16rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-        >
-          <option value="">— Pilih product tujuan —</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onValueChange={setProductId}
+          placeholder="— Pilih product tujuan —"
+          className="w-56"
+          options={options}
+          searchable
+        />
 
-        <select
+        <Select
           value={baseQty}
-          onChange={(e) => setBaseQty(e.target.value)}
-          aria-label="Isi per unit"
-          title="Berapa satuan dasar untuk 1 unit yang dijual"
-          className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-        >
-          <option value="auto">isi: tebak dari nama</option>
-          <option value="1">isi: 1</option>
-          <option value="6">isi: 6</option>
-          <option value="10">isi: 10</option>
-          <option value="12">isi: 12</option>
-          <option value="16">isi: 16</option>
-          <option value="20">isi: 20</option>
-          <option value="30">isi: 30</option>
-        </select>
+          onValueChange={setBaseQty}
+          className="w-44"
+          options={ISI_OPTIONS}
+        />
 
         <button
           type="button"

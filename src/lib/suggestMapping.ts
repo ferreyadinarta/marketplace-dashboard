@@ -32,24 +32,74 @@ export function variantOf(name: string): string {
   return i >= 0 ? name.slice(i + 3) : name;
 }
 
-// Tebak berapa SATUAN DASAR (sachet) untuk 1 unit yang dijual.
-// "Blackcurrant,1 BOX 16 sachet" → 16 · "10 sachet" → 10 · "1 POUCH Purto" → 1.
-// Dibaca dari bagian varian dulu supaya angka di judul listing tidak salah ambil.
-export function parseBaseQty(name: string): number {
-  const tryParse = (s: string): number | null => {
-    const m = s.match(/(\d{1,3})\s*(?:x\s*)?(?:sachet|saset|sct|pcs|stick|stik)\b/i);
-    if (m) return Number(m[1]);
-    const isi = s.match(/\bisi\s*(\d{1,3})\b/i);
-    if (isi) return Number(isi[1]);
-    return null;
-  };
-  const fromVariant = tryParse(variantOf(name));
-  const n = fromVariant ?? tryParse(name);
-  if (n == null || !Number.isFinite(n) || n < 1 || n > 500) return 1;
-  return Math.floor(n);
+// Jumlah satuan DASAR yang disebut langsung (mis. "10 sachet" → 10).
+function directBaseUnits(s: string): number | null {
+  const m = s.match(/(\d{1,3})\s*(?:x\s*)?(?:sachet|saset|sct|pcs|stick|stik)\b/i);
+  return m ? Number(m[1]) : null;
 }
 
-export type ProductLite = { id: string; name: string; sku: string };
+// Berapa BUNGKUS yang dijual dalam satu unit varian: "2 BOX" → 2, "1 POUCH" → 1.
+// Dibaca dari bagian VARIAN saja — angka di judul listing ("1 box isi 12 sachet")
+// menjelaskan isi per box, bukan berapa box yang dikirim.
+export function parsePackMultiplier(name: string): number | null {
+  const v = variantOf(name);
+  const m = v.match(/(\d{1,3})\s*(?:x\s*)?(?:box|pouch|pack|paket|dus|karton|botol|btl|kaleng|jar|tub)\b/i);
+  return m ? Number(m[1]) : null;
+}
+
+// Isi satu bungkus menurut judul listing: "1 box isi 12 sachet" → 12.
+export function parsePerPack(name: string): number | null {
+  const direct = directBaseUnits(name);
+  if (direct != null) return direct;
+  const isi = name.match(/\bisi\s*(\d{1,3})\b/i);
+  return isi ? Number(isi[1]) : null;
+}
+
+// Tebak berapa SATUAN DASAR (mis. sachet) untuk 1 unit yang dijual.
+//
+// Kuncinya varian "2 BOX" HARUS dikali isi per box, kalau tidak stok cuma
+// berkurang 1 box padahal yang dikirim 2:
+//   "…1 box isi 12 sachet… - Milk Choco,2 BOX" → 2 × 12 = 24
+//   "…1 box isi 16 sachet… - Blackcurrant,3 BOX" → 3 × 16 = 48
+//   "Hotto Purto - 10 sachet" → 10 (varian sudah menyebut satuan dasar)
+//
+// `packSize` = isi per bungkus dari MASTER PRODUCT (kalau product-nya sudah
+// diketahui). Itu lebih dipercaya daripada tebakan dari judul listing.
+export function parseBaseQty(name: string, packSize?: number): number {
+  const clamp = (n: number) => (Number.isFinite(n) && n >= 1 && n <= 5_000 ? Math.floor(n) : 1);
+
+  // varian menyebut satuan dasar langsung → itu jawabannya
+  const fromVariant = directBaseUnits(variantOf(name));
+  if (fromVariant != null) return clamp(fromVariant);
+
+  const mult = parsePackMultiplier(name);
+  const per = packSize && packSize > 0 ? packSize : parsePerPack(name);
+
+  if (mult != null && per != null) return clamp(mult * per);
+  if (per != null) return clamp(per); // tak ada varian → anggap 1 bungkus
+  if (mult != null) return clamp(mult); // isi per bungkus tidak diketahui
+  return 1;
+}
+
+// packSize = isi 1 bungkus dalam satuan dasar (mis. 1 box = 12 sachet).
+// Dipakai untuk mengalikan varian "2 BOX" dengan angka yang benar.
+// isBundle = product gabungan (mis. box mix 3 rasa): isinya dijabarkan lewat
+// ProductComponent, jadi "isi" di mapping dihitung per BOX, bukan per sachet.
+export type ProductLite = {
+  id: string;
+  name: string;
+  sku: string;
+  packSize?: number;
+  isBundle?: boolean;
+};
+
+// Isi per unit yang benar untuk sebuah product:
+//  - bundle → berapa BOX/bundle yang dikirim ("2 BOX" → 2); isi box diurus BOM
+//  - biasa  → berapa satuan dasar ("2 BOX" × 12 sachet → 24)
+export function baseQtyFor(marketplaceName: string, p: ProductLite): number {
+  if (p.isBundle) return Math.max(1, parsePackMultiplier(marketplaceName) ?? 1);
+  return parseBaseQty(marketplaceName, p.packSize);
+}
 export type Suggestion = { productId: string; productName: string; score: number; baseQty: number };
 
 // Cari product dasar yang paling cocok untuk sebuah nama listing marketplace.
@@ -76,7 +126,8 @@ export function suggestProduct(
         productId: p.id,
         productName: p.name,
         score,
-        baseQty: parseBaseQty(marketplaceName),
+        // isi per bungkus diambil dari master product kalau ada — lebih akurat
+        baseQty: baseQtyFor(marketplaceName, p),
       };
     }
   }

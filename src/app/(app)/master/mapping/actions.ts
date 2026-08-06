@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client"; // dipakai sebagai nilai juga (Prisma.join)
-import { suggestProduct, parseBaseQty } from "@/lib/suggestMapping";
+import { suggestProduct, baseQtyFor } from "@/lib/suggestMapping";
 
 // Petakan satu baris mapping ke product DASAR + berapa satuan dasar per unit
 // (mis. varian "1 box" = 16 sachet). Lalu backfill order item lama yang SKU-nya
@@ -15,7 +15,7 @@ export async function assignMapping(formData: FormData) {
   if (!mappingId) return;
 
   const rawQty = Number(formData.get("baseQtyPerUnit") ?? 1);
-  const baseQtyPerUnit = Number.isFinite(rawQty) ? Math.min(500, Math.max(1, Math.floor(rawQty))) : 1;
+  const baseQtyPerUnit = Number.isFinite(rawQty) ? Math.min(5_000, Math.max(1, Math.floor(rawQty))) : 1;
 
   // pastikan mapping masih ada (jangan crash P2025 kalau keburu berubah)
   const mapping = await prisma.productMapping.findUnique({ where: { id: mappingId } });
@@ -125,7 +125,12 @@ export async function bulkAssignMappings(formData: FormData) {
     take: BULK_LIMIT,
   });
 
-  const products = await prisma.product.findMany({ select: { id: true, name: true, sku: true } });
+  // packSize & isBundle ikut diambil: varian "2 BOX" dikali isi per box, kecuali
+  // product-nya bundle (isinya dijabarkan BOM, jadi isi = jumlah box saja)
+  const products = await prisma.product.findMany({
+    select: { id: true, name: true, sku: true, packSize: true, isBundle: true },
+  });
+  const productById = new Map(products.map((p) => [p.id, p]));
 
   // kelompokkan jadi (productId + isi per unit) → satu updateMany per kelompok
   const groups = new Map<string, { productId: string; baseQty: number; ids: string[] }>();
@@ -145,9 +150,13 @@ export async function bulkAssignMappings(formData: FormData) {
       productId = s.productId;
       baseQty = s.baseQty;
     } else {
-      baseQty = baseQtyRaw === "auto" ? parseBaseQty(name) : Math.floor(Number(baseQtyRaw) || 1);
+      const target = productById.get(targetProductId);
+      baseQty =
+        baseQtyRaw === "auto" && target
+          ? baseQtyFor(name, target)
+          : Math.floor(Number(baseQtyRaw) || 1);
     }
-    baseQty = Math.min(500, Math.max(1, baseQty));
+    baseQty = Math.min(5_000, Math.max(1, baseQty));
 
     const key = `${productId}|${baseQty}`;
     const g = groups.get(key) ?? { productId, baseQty, ids: [] };
