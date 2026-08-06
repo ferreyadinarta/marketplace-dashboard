@@ -19,6 +19,7 @@ model Store {
   logoUrl     String? // URL foto profil toko (diambil saat authorize)
   isActive    Boolean  @default(true)
   lastSyncAt  DateTime?
+  syncedFrom  DateTime? // tanggal TERTUA yang sudah tersync penuh → periode lama tak perlu dipindai ulang
   createdAt   DateTime @default(now())
 
   // OAuth token per toko (diisi otomatis saat toko authorize app kita)

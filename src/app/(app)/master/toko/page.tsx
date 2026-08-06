@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { Store as StoreIcon, CheckCircle2, AlertCircle, RefreshCw, CheckCircle, XCircle, Trash2, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { waktu, MARKETPLACE_LABEL } from "@/lib/format";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
@@ -21,6 +21,9 @@ import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
+// Sync toko (tarik order + escrow) jalan sebagai Server Action di halaman ini.
+// Default Vercel Hobby cuma ~10 detik → naikkan ke batas maksimum 60 detik.
+export const maxDuration = 60;
 
 const mpColor: Record<string, "amber" | "slate" | "green"> = {
   SHOPEE: "amber",
@@ -86,6 +89,16 @@ export default async function MasterTokoPage({
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
           Sync selesai: {one(sp.created) ?? 0} order baru, {one(sp.updated) ?? 0} diperbarui.
+        </div>
+      )}
+      {syncStatus === "partial" && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
+          <span>
+            Sync berjalan sebagian: <strong>{one(sp.created) ?? 0} order baru</strong>, {one(sp.updated) ?? 0}{" "}
+            diperbarui — dan sudah tersimpan. Data toko ini banyak, jadi belum semuanya tertarik.{" "}
+            <strong>Klik “Sync sekarang” lagi</strong> untuk melanjutkan (yang sudah masuk tidak diulang).
+          </span>
         </div>
       )}
       {syncStatus === "error" && (
@@ -208,8 +221,24 @@ export default async function MasterTokoPage({
                         </Badge>
                       ))}
                     {isOauth && connected && (
-                      <form action={isShopee ? syncShopee : syncTiktok}>
+                      <form action={isShopee ? syncShopee : syncTiktok} className="flex items-center gap-1.5">
                         <input type="hidden" name="storeId" value={s.id} />
+                        {isShopee && (
+                          <select
+                            name="days"
+                            defaultValue="90"
+                            aria-label="Rentang order yang ditarik"
+                            title="Periode order yang ditarik dari Shopee"
+                            className="h-8 rounded-lg border border-slate-300 bg-white px-2 text-xs text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                          >
+                            <option value="30">30 hari</option>
+                            <option value="90">90 hari</option>
+                            <option value="180">6 bulan</option>
+                            <option value="365">1 tahun</option>
+                            <option value="730">2 tahun</option>
+                            <option value="1095">3 tahun</option>
+                          </select>
+                        )}
                         <SubmitButton variant="outline" className="px-3 py-1.5 text-xs" icon={<RefreshCw size={14} />} pendingText="Sync…">
                           Sync sekarang
                         </SubmitButton>

@@ -186,6 +186,21 @@ export function shopeeSku(o: {
   return modelId ? `SHP-${itemId}-${modelId}` : `SHP-${itemId}`;
 }
 
+// Jalankan tugas async paralel dengan batas jumlah bersamaan (hindari rate limit).
+const MODEL_CONCURRENCY = 6;
+
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+}
+
 // Ambil semua product toko (termasuk varian/model) → normalized ImportedProduct.
 export async function fetchShopeeCatalog(
   accessToken: string,
@@ -206,7 +221,9 @@ export async function fetchShopeeCatalog(
     offset = r.next_offset ?? offset + 100;
   }
 
-  // 2. detail per batch 50; varian → ambil model list
+  // 2. detail per batch 50; varian → ambil model list.
+  // get_model_list = 1 panggilan PER product bervarian → jalankan paralel
+  // terbatas, kalau berurutan toko dengan ratusan product kena timeout.
   const out: ImportedProduct[] = [];
   for (let i = 0; i < itemIds.length; i += 50) {
     const chunk = itemIds.slice(i, i + 50);
@@ -216,16 +233,27 @@ export async function fetchShopeeCatalog(
       shopId,
       { item_id_list: chunk.join(",") }
     );
-    for (const it of r.item_list ?? []) {
-      const name = it.item_name || "(tanpa nama)";
-      if (it.has_model) {
+    const list = r.item_list ?? [];
+
+    const modelsByItem = new Map<number, ShopeeModel[]>();
+    await mapLimit(
+      list.filter((it) => it.has_model),
+      MODEL_CONCURRENCY,
+      async (it) => {
         const m = await shopGet<{ model?: ShopeeModel[] }>(
           "/api/v2/product/get_model_list",
           accessToken,
           shopId,
           { item_id: String(it.item_id) }
         );
-        for (const md of m.model ?? []) {
+        modelsByItem.set(it.item_id, m.model ?? []);
+      }
+    );
+
+    for (const it of list) {
+      const name = it.item_name || "(tanpa nama)";
+      if (it.has_model) {
+        for (const md of modelsByItem.get(it.item_id) ?? []) {
           out.push({
             // varian: tambahkan nama varian biar bisa dibedakan di Master Product
             sku: shopeeSku({ itemSku: it.item_sku, modelSku: md.model_sku, itemId: it.item_id, modelId: md.model_id }),

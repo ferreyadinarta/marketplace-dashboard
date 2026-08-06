@@ -102,56 +102,170 @@ function feeFromIncome(inc: ShopeeIncome): number {
   return Number.isFinite(f) ? Math.round(f) : 0;
 }
 
-// Normalisasi + ambil fee escrow per order. Escrow di-skip HANYA untuk UNPAID
-// (belum dibayar → escrow pasti belum ada). CANCELLED & RETURNED tetap dicek:
-// Shopee sering masih memotong sebagian fee / ada penyesuaian refund, jadi butuh
-// datanya biar pembukuan akurat. Escrow gagal → fee tetap 0, sync jalan terus.
+// Escrow = 1 panggilan API PER ORDER. Kalau dijalankan berurutan, toko dengan
+// ribuan order tidak akan selesai sebelum function timeout → jalankan paralel
+// terbatas (jangan terlalu tinggi supaya tidak kena rate limit Shopee).
+const ESCROW_CONCURRENCY = 6;
+
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+export type CachedFee = { marketplaceFee: number; netAmount: number };
+
+// Normalisasi + ambil fee escrow per order. Escrow di-skip untuk:
+//  - UNPAID (belum dibayar → escrow pasti belum ada)
+//  - order yang fee-nya SUDAH pernah diambil (dipakai lagi dari `cached`),
+//    supaya sync ulang tidak memanggil ribuan API lagi.
+// CANCELLED & RETURNED tetap dicek: Shopee sering masih memotong sebagian fee /
+// ada penyesuaian refund, jadi butuh datanya biar pembukuan akurat.
+// Escrow gagal → fee tetap 0, sync jalan terus.
 async function normalizeWithFees(
   accessToken: string,
   shopId: string,
-  details: ShopeeOrderDetail[]
+  details: ShopeeOrderDetail[],
+  cached: Map<string, CachedFee> = new Map()
 ): Promise<NormalizedOrder[]> {
-  const out: NormalizedOrder[] = [];
-  for (const o of details) {
-    const order = normalize(o);
-    const st = (o.order_status || "").toUpperCase();
-    if (st !== "UNPAID") {
-      const inc = await getEscrowDetail(accessToken, shopId, o.order_sn);
-      if (inc) {
-        order.marketplaceFee = feeFromIncome(inc);
-        if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
-          order.netAmount = Math.round(inc.escrow_amount);
-        }
-      }
+  const orders = details.map(normalize);
+  const pending: { sn: string; idx: number }[] = [];
+
+  details.forEach((o, idx) => {
+    const hit = cached.get(o.order_sn);
+    if (hit) {
+      // pakai fee yang sudah tersimpan — JANGAN biarkan 0 menimpa data lama
+      orders[idx].marketplaceFee = hit.marketplaceFee;
+      orders[idx].netAmount = hit.netAmount;
+      return;
     }
-    out.push(order);
-  }
-  return out;
+    if ((o.order_status || "").toUpperCase() !== "UNPAID") pending.push({ sn: o.order_sn, idx });
+  });
+
+  await mapLimit(pending, ESCROW_CONCURRENCY, async ({ sn, idx }) => {
+    const inc = await getEscrowDetail(accessToken, shopId, sn);
+    if (!inc) return;
+    orders[idx].marketplaceFee = feeFromIncome(inc);
+    if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
+      orders[idx].netAmount = Math.round(inc.escrow_amount);
+    }
+  });
+
+  return orders;
 }
 
+export type SyncResult = { created: number; updated: number; unmapped: number; partial: boolean };
+
+// Status yang TIDAK akan berubah lagi → kalau sudah tersimpan lengkap, batch-nya
+// boleh dilewati total (tanpa panggil API) saat sync diulang.
+const FINAL_STATUS = ["COMPLETED", "CANCELLED", "RETURNED"];
+
 // Sync satu toko Shopee: refresh token kalau perlu → ambil order → normalisasi → simpan.
-export async function syncShopeeStore(storeId: string, from: Date, to: Date) {
+//
+// Toko besar tidak mungkin selesai dalam 1 request (Vercel Hobby maks 60 detik),
+// jadi:
+//  1. berhenti SENDIRI sebelum kena timeout (deadlineMs) → balikin partial=true,
+//     bukan crash/504;
+//  2. simpan tiap batch, jadi progres tidak pernah hilang;
+//  3. mulai dari periode TERBARU (yang paling penting masuk duluan);
+//  4. batch yang ordernya sudah final & lengkap dilewati → klik Sync lagi cepat
+//     melanjutkan sisanya.
+export async function syncShopeeStore(
+  storeId: string,
+  from: Date,
+  to: Date,
+  opts: { deadlineMs?: number } = {}
+): Promise<SyncResult> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
   const accessToken = await ensureFreshToken(store);
   const shopId = store.shopIdApi!;
 
-  // Shopee batasi window get_order_list ≤ 15 hari → pecah.
+  const started = Date.now();
+  const deadline = opts.deadlineMs ?? 45_000; // sisakan headroom dari batas 60s
+  const outOfTime = () => Date.now() - started > deadline;
+
+  // Shopee batasi window get_order_list ≤ 15 hari → pecah, lalu balik urutannya
+  // supaya periode terbaru diproses lebih dulu.
   const WINDOW = 15 * 24 * 3600;
   const fromSec = Math.floor(from.getTime() / 1000);
   const toSec = Math.floor(to.getTime() / 1000);
-  const sns: string[] = [];
+  const windows: [number, number][] = [];
   for (let start = fromSec; start < toSec; start += WINDOW) {
-    const end = Math.min(start + WINDOW, toSec);
-    const chunk = await getOrderSnList(accessToken, shopId, start, end);
-    sns.push(...chunk);
+    windows.push([start, Math.min(start + WINDOW, toSec)]);
+  }
+  windows.reverse();
+
+  // Periode LAMA yang sudah pernah tersync penuh tidak perlu dipindai lagi:
+  // order di situ statusnya sudah final. Yang masih mungkin berubah (order baru,
+  // status berubah, retur) hanya RECHECK_DAYS terakhir → itu selalu dipindai.
+  const RECHECK_DAYS = 30;
+  const recheckCutoff = Math.floor(Date.now() / 1000) - RECHECK_DAYS * 24 * 3600;
+  const syncedFromSec = store.syncedFrom ? Math.floor(store.syncedFrom.getTime() / 1000) : null;
+  const alreadyCovered = (ws: number, we: number) =>
+    syncedFromSec != null && we < recheckCutoff && ws >= syncedFromSec;
+
+  const BATCH = 50; // batas get_order_detail per panggilan
+  const total: SyncResult = { created: 0, updated: 0, unmapped: 0, partial: false };
+
+  for (const [ws, we] of windows) {
+    if (outOfTime()) {
+      total.partial = true;
+      break;
+    }
+    if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
+    const sns = await getOrderSnList(accessToken, shopId, ws, we);
+
+    for (let i = 0; i < sns.length; i += BATCH) {
+      if (outOfTime()) {
+        total.partial = true;
+        break;
+      }
+      const chunk = sns.slice(i, i + BATCH);
+
+      // order yang sudah tersimpan + fee-nya sudah ada
+      const known = await prisma.order.findMany({
+        where: { storeId: store.id, marketplaceOrderId: { in: chunk }, marketplaceFee: { gt: 0 } },
+        select: { marketplaceOrderId: true, marketplaceFee: true, netAmount: true, status: true },
+      });
+
+      // semua sudah final & lengkap → lewati, tidak perlu panggil API sama sekali
+      const allDone =
+        known.length === chunk.length && known.every((k) => FINAL_STATUS.includes(k.status));
+      if (allDone) continue;
+
+      const cached = new Map<string, CachedFee>(
+        known
+          .filter((k) => FINAL_STATUS.includes(k.status))
+          .map((k) => [k.marketplaceOrderId, { marketplaceFee: k.marketplaceFee, netAmount: k.netAmount }])
+      );
+
+      const details = await getOrderDetails(accessToken, shopId, chunk);
+      const normalized = await normalizeWithFees(accessToken, shopId, details, cached);
+      const r = await ingestOrders(store.id, normalized);
+      total.created += r.created;
+      total.updated += r.updated;
+      total.unmapped += r.unmapped;
+    }
+    if (total.partial) break;
   }
 
-  const details = await getOrderDetails(accessToken, shopId, sns);
-  const normalized = await normalizeWithFees(accessToken, shopId, details);
-  const r = await ingestOrders(store.id, normalized);
-  await prisma.store.update({ where: { id: store.id }, data: { lastSyncAt: new Date() } });
-  return r;
+  // Catat sampai kapan riwayat sudah tersync PENUH. Hanya kalau tidak partial —
+  // kalau terputus, jangan mengaku sudah lengkap.
+  const syncedFrom =
+    !total.partial && (!store.syncedFrom || from < store.syncedFrom) ? from : store.syncedFrom;
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: { lastSyncAt: new Date(), syncedFrom },
+  });
+  return total;
 }
 
 // Ambil katalog product toko Shopee (untuk import ke Master Product).

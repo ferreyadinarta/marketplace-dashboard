@@ -12,6 +12,9 @@ import { Pagination, PaginationControls } from "@/components/Pagination";
 import { MARKETPLACE_LABEL } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
+// Import katalog marketplace jalan sebagai Server Action di halaman ini dan bisa
+// lama untuk toko dengan banyak product → pakai batas maksimum Vercel Hobby.
+export const maxDuration = 60;
 
 const PER_PAGE = 10;
 

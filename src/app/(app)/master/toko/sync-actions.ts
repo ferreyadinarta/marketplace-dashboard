@@ -9,7 +9,7 @@ export async function syncAll() {
   let q: string;
   try {
     const r = await syncAllStores(90);
-    q = `sync=ok&created=${r.created}&updated=${r.updated}`;
+    q = `sync=${r.partial ? "partial" : "ok"}&created=${r.created}&updated=${r.updated}`;
     if (r.errors.length) q += `&err=${r.errors.length}`;
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
