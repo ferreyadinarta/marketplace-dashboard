@@ -158,8 +158,8 @@ export function AddProductForm({
       </Field>
       {!isBundle && (
         <Field
-          label="HPP / Modal (Rp)"
-          hint="Harga Pokok Penjualan: modal untuk 1 unit product."
+          label={`HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`}
+          hint={`Modal untuk 1 ${mainUnit.trim() || "satuan utama"} — satuan yang biasa kamu beli. Bukan per ${smallUnit.trim() || "satuan kecil"}, bukan per koli.`}
         >
           <CurrencyInput name="hpp" placeholder="0" />
         </Field>

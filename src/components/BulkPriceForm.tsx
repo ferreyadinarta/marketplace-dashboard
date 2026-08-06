@@ -219,7 +219,7 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold text-slate-900">Isi Harga & Satuan Massal</span>
           <span className="block text-xs text-slate-500">
-            Lengkapi HPP, harga jual, dan satuan (box/sachet/koli) banyak product sekaligus — cocok setelah import.
+            Lengkapi HPP (per satuan utama), harga jual, dan satuan (box/sachet/koli) banyak product sekaligus.
             {emptyCount > 0 && (
               <span className="ml-1 font-medium text-amber-600">{emptyCount} belum ada HPP.</span>
             )}
@@ -338,7 +338,7 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
           {tab === "harga" ? (
             <div className="hidden gap-2 px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(3,7rem)]">
               <span>Product</span>
-              <span>HPP (modal)</span>
+              <span>HPP (modal) / satuan utama</span>
               <span>Retail</span>
               <span>Grosir</span>
             </div>
@@ -370,7 +370,12 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
                     <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
                     <p className="truncate text-xs text-slate-400">{p.sku}</p>
                   </div>
-                  <CurrencyInput value={v.hpp} onValueChange={(n) => set(p.id, "hpp", n)} placeholder="HPP" className="h-9" />
+                  <CurrencyInput
+                    value={v.hpp}
+                    onValueChange={(n) => set(p.id, "hpp", n)}
+                    placeholder={`per ${p.packSize > 0 ? p.packUnit : p.unit}`}
+                    className="h-9"
+                  />
                   <CurrencyInput value={v.retail} onValueChange={(n) => set(p.id, "retail", n)} placeholder="Retail" className="h-9" />
                   <CurrencyInput value={v.grosir} onValueChange={(n) => set(p.id, "grosir", n)} placeholder="Grosir" className="h-9" />
                 </div>

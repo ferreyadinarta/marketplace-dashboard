@@ -148,7 +148,10 @@ export function ProductRow({
             // bundle: modal = jumlah HPP isinya, jadi field-nya tidak ditampilkan
             <input type="hidden" name="hpp" value={0} />
           ) : (
-            <Field label="HPP / Modal (Rp)" hint="Harga modal / beli per unit. Dipakai untuk menghitung profit (bukan harga jual).">
+            <Field
+              label={`HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`}
+              hint={`Modal untuk 1 ${mainUnit.trim() || "satuan utama"} (bukan per ${smallUnit.trim() || "satuan kecil"}). Dipakai menghitung profit, bukan harga jual.`}
+            >
               <CurrencyInput name="hpp" defaultValue={hpp} />
             </Field>
           )}

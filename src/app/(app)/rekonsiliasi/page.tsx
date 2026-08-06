@@ -107,7 +107,7 @@ export default async function RekonsiliasiPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="whitespace-nowrap px-5 py-3">
                         {belumAdaPayout ? (
                           <Badge color="slate">
                             <Clock size={13} /> Payout belum masuk
@@ -122,7 +122,7 @@ export default async function RekonsiliasiPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="whitespace-nowrap px-5 py-3 text-right">
                         {isManual(r.store.marketplace, !!r.store.accessToken) && (
                           <ManualPayoutForm
                             storeId={r.store.id}

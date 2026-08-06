@@ -45,3 +45,19 @@ export function bundleUnitInfo(u: UnitInfo): UnitInfo {
     koliSize: 0,
   };
 }
+
+// ---------- Modal / HPP ----------
+// HPP di Master Product disimpan per SATUAN UTAMA (yang biasa dibeli/dijual,
+// mis. per box) — bukan per sachet dan bukan per koli. Stok & penjualan dihitung
+// dalam satuan DASAR, jadi konversinya lewat sini supaya semua tempat sama.
+
+// berapa satuan dasar dalam 1 satuan utama (1 kalau tanpa satuan kecil)
+export function basePerMain(packSize: number): number {
+  return packSize >= 2 ? packSize : 1;
+}
+
+// modal untuk sejumlah satuan dasar. Sengaja tidak dibulatkan per item —
+// pembulatan dilakukan setelah dijumlahkan supaya tidak menumpuk selisih.
+export function modalOf(hppPerMain: number, packSize: number, baseQty: number): number {
+  return (hppPerMain * baseQty) / basePerMain(packSize);
+}

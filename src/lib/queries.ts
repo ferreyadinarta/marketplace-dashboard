@@ -1,10 +1,22 @@
 import { prisma } from "./prisma";
 import { dateKey } from "./format";
+import { modalOf } from "./units";
 
-// HPP (modal) per item: pakai snapshot yang dibekukan saat jual; kalau 0
+// HPP (modal) per SATUAN UTAMA: pakai snapshot yang dibekukan saat jual; kalau 0
 // (data lama / order marketplace) fallback ke HPP product saat ini.
 function itemHpp(it: { hppSnapshot?: number | null; product?: { hpp: number } | null }): number {
   return it.hppSnapshot && it.hppSnapshot > 0 ? it.hppSnapshot : it.product?.hpp ?? 0;
+}
+
+// Modal total item ini. HPP per satuan utama (mis. per box) sedangkan baseQty
+// dalam satuan dasar (mis. sachet) → dibagi isi per box dulu.
+function itemModal(it: {
+  hppSnapshot?: number | null;
+  baseQty?: number | null;
+  qty: number;
+  product?: { hpp: number; packSize?: number } | null;
+}): number {
+  return modalOf(itemHpp(it), it.product?.packSize ?? 0, itemBaseQty(it));
 }
 
 // Jumlah dalam SATUAN DASAR (untuk hitung modal/terjual konsisten). Pakai baseQty;
@@ -57,7 +69,7 @@ export async function getSummary(f: DashboardFilter) {
     omzet += o.totalAmount;
     fee += o.marketplaceFee;
     for (const it of o.items) {
-      hpp += itemHpp(it) * itemBaseQty(it);
+      hpp += itemModal(it);
     }
   }
   const profit = omzet - fee - hpp;
@@ -77,7 +89,7 @@ export async function getDailyTrend(f: DashboardFilter) {
     const key = dateKey(o.orderDate); // dikelompokkan per hari WIB, bukan UTC
     const cur = map.get(key) ?? { omzet: 0, profit: 0 };
     let hpp = 0;
-    for (const it of o.items) hpp += itemHpp(it) * itemBaseQty(it);
+    for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
     cur.profit += o.totalAmount - o.marketplaceFee - hpp;
     map.set(key, cur);
@@ -96,7 +108,7 @@ export async function getByMarketplace(f: DashboardFilter) {
     const key = o.store.marketplace;
     const cur = map.get(key) ?? { omzet: 0, profit: 0, order: 0 };
     let hpp = 0;
-    for (const it of o.items) hpp += itemHpp(it) * itemBaseQty(it);
+    for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
     cur.profit += o.totalAmount - o.marketplaceFee - hpp;
     cur.order += 1;
@@ -138,7 +150,7 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
       r.terjual += itemBaseQty(it); // dalam satuan dasar (konsisten walau jual campur box/sachet)
       r.omzet += it.subtotal;
       r.fee += feePerItem;
-      r.hpp += itemHpp(it) * itemBaseQty(it);
+      r.hpp += itemModal(it);
       perProduct.set(it.productId, r);
     }
   }
@@ -241,7 +253,7 @@ export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> 
         price: it.price,
         fee: Math.round(feePerItem),
         total: Math.round(it.subtotal - feePerItem + shipPerItem),
-        modal: itemHpp(it) * itemBaseQty(it),
+        modal: Math.round(itemModal(it)),
       });
     }
   }
@@ -270,7 +282,7 @@ export async function getBestSellers(f: DashboardFilter, limit = 5) {
         { productId: it.productId, name: it.product.name, sku: it.product.sku, qty: 0, omzet: 0, profit: 0 };
       r.qty += it.qty;
       r.omzet += it.subtotal;
-      r.profit += it.subtotal - feePerItem - it.product.hpp * it.qty;
+      r.profit += it.subtotal - feePerItem - itemModal(it);
       map.set(it.productId, r);
     }
   }

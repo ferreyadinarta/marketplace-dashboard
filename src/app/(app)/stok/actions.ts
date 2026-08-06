@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { computeCurrentStock } from "@/lib/stock";
 import { eventDateFromInput } from "@/lib/format";
+import { basePerMain } from "@/lib/units";
 
 // Barang masuk (restock) — bisa BANYAK product sekaligus (satu tanggal + catatan).
 // Tiap batch simpan harga beli (cost) → HPP product jadi RATA-RATA TERTIMBANG stok:
@@ -59,9 +60,13 @@ export async function restockProducts(formData: FormData) {
       const baseCost = b.cost > 0 ? (factor > 1 ? Math.round(b.cost / factor) : b.cost) : 0;
 
       await prisma.stockRestock.create({ data: { productId, qty: baseQty, cost: baseCost, note, restockAt } });
-      const batchCost = baseCost > 0 ? baseCost : avg; // cost kosong → netral (pakai avg lama)
+
+      // HPP disimpan per SATUAN UTAMA → harga beli batch ini juga dikonversi ke
+      // satuan utama dulu (mis. beli 1 koli isi 6 box → biaya per box).
+      const perMain = basePerMain(product.packSize);
+      const batchCostMain = b.cost > 0 ? (b.cost * perMain) / factor : avg;
       const newQty = onHand + baseQty;
-      avg = newQty > 0 ? Math.round((onHand * avg + baseQty * batchCost) / newQty) : batchCost;
+      avg = newQty > 0 ? Math.round((onHand * avg + baseQty * batchCostMain) / newQty) : Math.round(batchCostMain);
       onHand = newQty;
     }
     await prisma.product.update({ where: { id: productId }, data: { hpp: avg } });

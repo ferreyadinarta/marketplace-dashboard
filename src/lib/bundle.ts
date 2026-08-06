@@ -1,7 +1,9 @@
 import { prisma } from "./prisma";
+import { modalOf } from "./units";
 
-// HPP efektif per product:
-//   - bundle  → Σ (hpp component × qty isi)  (modal gabungan isinya)
+// HPP efektif per product (semuanya PER SATUAN UTAMA):
+//   - bundle  → Σ modal tiap isi (hpp isi per satuan utamanya, qty isi dalam
+//               satuan dasar → dikonversi lewat modalOf)
 //   - biasa   → product.hpp
 // Dipakai saat membekukan hppSnapshot di penjualan (manual & marketplace) supaya
 // profit bundle benar (bukan 0). Balikin Map<productId, hpp>.
@@ -20,13 +22,14 @@ export async function effectiveHppMap(productIds: string[]): Promise<Map<string,
   if (bundleIds.length) {
     const comps = await prisma.productComponent.findMany({
       where: { bundleId: { in: bundleIds } },
-      select: { bundleId: true, qty: true, component: { select: { hpp: true } } },
+      select: { bundleId: true, qty: true, component: { select: { hpp: true, packSize: true } } },
     });
     for (const c of comps) {
-      sumByBundle.set(c.bundleId, (sumByBundle.get(c.bundleId) ?? 0) + c.qty * c.component.hpp);
+      const modal = modalOf(c.component.hpp, c.component.packSize, c.qty);
+      sumByBundle.set(c.bundleId, (sumByBundle.get(c.bundleId) ?? 0) + modal);
     }
   }
 
-  for (const p of products) out.set(p.id, p.isBundle ? sumByBundle.get(p.id) ?? 0 : p.hpp);
+  for (const p of products) out.set(p.id, p.isBundle ? Math.round(sumByBundle.get(p.id) ?? 0) : p.hpp);
   return out;
 }
