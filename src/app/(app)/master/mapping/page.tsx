@@ -9,6 +9,7 @@ import { MappingFilters } from "@/components/MappingFilters";
 import { BulkMappingBar } from "@/components/BulkMappingBar";
 import { Pagination, PaginationControls } from "@/components/Pagination";
 import { suggestProduct } from "@/lib/suggestMapping";
+import { bundleUnitInfo } from "@/lib/units";
 
 export const dynamic = "force-dynamic";
 
@@ -104,18 +105,21 @@ export default async function MappingPage({
     if (m.productId) continue;
     suggestions.set(m.id, suggestProduct(m.marketplaceProductName || m.marketplaceSku, lite));
   }
-  // satuan tiap product (koli/box/sachet) → dipakai toggle satuan di kolom isi
+  // Satuan tiap product (koli/box/sachet) → dipakai toggle satuan di kolom isi.
+  // BUNDLE dipaksa satu tingkat: isinya sudah dijabarkan lewat komponen, jadi
+  // "isi" di sini = jumlah bundle. Kalau box/sachet ikut ditawarkan, memilih
+  // "1 box" akan dikali isi box dan stok komponennya berkurang berlipat.
   const unitInfo = Object.fromEntries(
-    products.map((p) => [
-      p.id,
-      {
+    products.map((p) => {
+      const u = {
         unit: p.unit,
         packUnit: p.packUnit,
         packSize: p.packSize,
         koliUnit: p.koliUnit,
         koliSize: p.koliSize,
-      },
-    ])
+      };
+      return [p.id, p.isBundle ? bundleUnitInfo(u) : u];
+    })
   );
 
   // berapa banyak dari baris belum dipetakan itu yang punya saran cukup yakin

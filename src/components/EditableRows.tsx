@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Copy, Sparkles } from "lucide-react";
+import { Pencil, Copy, Sparkles, Boxes } from "lucide-react";
 import { Select, type SelectOption, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { DeleteProductButton } from "@/components/ProductControls";
 import { BundleEditor } from "@/components/BundleEditor";
 import { rupiah } from "@/lib/format";
+import { tiersOf, splitBase, type UnitInfo } from "@/lib/units";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -30,6 +31,7 @@ export function ProductRow({
   isBundle,
   components,
   productOptions,
+  unitOf,
   updateAction,
   bundleAction,
   deleteAction,
@@ -52,6 +54,7 @@ export function ProductRow({
   isBundle: boolean;
   components: { componentId: string; qty: number }[];
   productOptions: SelectOption[]; // product lain (calon isi bundle)
+  unitOf?: Record<string, UnitInfo>; // satuan tiap product (untuk isi bundle)
   updateAction: Action;
   bundleAction: Action;
   deleteAction: Action;
@@ -69,19 +72,26 @@ export function ProductRow({
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-slate-900">{name}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium text-slate-900">{name}</p>
+            {isBundle && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                <Boxes size={11} /> Bundle
+              </span>
+            )}
+          </div>
           <p className="font-mono text-xs text-slate-500">{sku}</p>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
-            <span>HPP <b className="text-slate-700">{rupiah(hpp)}</b></span>
+            {!isBundle && <span>HPP <b className="text-slate-700">{rupiah(hpp)}</b></span>}
             <span>Retail <b className="text-slate-700">{rupiah(priceRetail)}</b></span>
             <span>Grosir <b className="text-slate-700">{rupiah(priceGrosir)}</b></span>
             <span>Satuan <b className="text-slate-700">{mainUnit}</b></span>
-            {packSize > 0 && (
+            {!isBundle && packSize > 0 && (
               <span>
                 1 {packUnit} = <b className="text-slate-700">{packSize} {unit}</b>
               </span>
             )}
-            {koliSize > 0 && (
+            {!isBundle && koliSize > 0 && (
               <span>
                 1 {koliUnit} = <b className="text-slate-700">{koliSize} {packUnit}</b>
               </span>
@@ -134,16 +144,28 @@ export function ProductRow({
               className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
           </Field>
-          <Field label="HPP / Modal (Rp)" hint="Harga modal / beli per unit. Dipakai untuk menghitung profit (bukan harga jual).">
-            <CurrencyInput name="hpp" defaultValue={hpp} />
-          </Field>
+          {isBundle ? (
+            // bundle: modal = jumlah HPP isinya, jadi field-nya tidak ditampilkan
+            <input type="hidden" name="hpp" value={0} />
+          ) : (
+            <Field label="HPP / Modal (Rp)" hint="Harga modal / beli per unit. Dipakai untuk menghitung profit (bukan harga jual).">
+              <CurrencyInput name="hpp" defaultValue={hpp} />
+            </Field>
+          )}
           <Field label="Harga retail (Rp)" hint="Harga jual eceran ke pembeli langsung. Jadi default saat mencatat penjualan WA/offline.">
             <CurrencyInput name="priceRetail" defaultValue={priceRetail} />
           </Field>
           <Field label="Harga grosir (Rp)" hint="Harga jual ke reseller/toko (lebih murah). Jadi default saat mencatat penjualan grosir.">
             <CurrencyInput name="priceGrosir" defaultValue={priceGrosir} />
           </Field>
-          <Field label="Satuan utama" hint="Satuan yang biasa dipakai (mis. box, botol, pcs).">
+          <Field
+            label={isBundle ? "Satuan jual" : "Satuan utama"}
+            hint={
+              isBundle
+                ? "Satuan saat bundle ini dijual (mis. box). Isinya diatur di daftar isi bundle di bawah."
+                : "Satuan yang biasa dipakai (mis. box, botol, pcs)."
+            }
+          >
             <input
               name="mainUnit"
               value={mainUnit}
@@ -152,50 +174,57 @@ export function ProductRow({
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
           </Field>
-          <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
-            <input
-              name="smallUnit"
-              value={smallUnit}
-              onChange={(e) => setSmallUnit(e.target.value)}
-              placeholder="sachet"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
-          <Field
-            label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
-            hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
-          >
-            <input
-              name="isi"
-              type="number"
-              min="0"
-              defaultValue={packSize || ""}
-              placeholder="12"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
-          <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
-            <input
-              name="koliUnit"
-              value={koliU}
-              onChange={(e) => setKoliU(e.target.value)}
-              placeholder="koli"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
-          <Field
-            label={`Isi koli (1 ${koliU.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
-            hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
-          >
-            <input
-              name="isiKoli"
-              type="number"
-              min="0"
-              defaultValue={koliSize || ""}
-              placeholder="6"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            />
-          </Field>
+          {!isBundle && (
+            <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
+              <input
+                name="smallUnit"
+                value={smallUnit}
+                onChange={(e) => setSmallUnit(e.target.value)}
+                placeholder="sachet"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              />
+            </Field>
+          )}
+          {/* isi/koli tidak berlaku untuk bundle — isinya dari daftar isi di bawah */}
+          {!isBundle && (
+            <>
+              <Field
+                label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
+                hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
+              >
+                <input
+                  name="isi"
+                  type="number"
+                  min="0"
+                  defaultValue={packSize || ""}
+                  placeholder="12"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                />
+              </Field>
+              <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+                <input
+                  name="koliUnit"
+                  value={koliU}
+                  onChange={(e) => setKoliU(e.target.value)}
+                  placeholder="koli"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                />
+              </Field>
+              <Field
+                label={`Isi koli (1 ${koliU.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
+                hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+              >
+                <input
+                  name="isiKoli"
+                  type="number"
+                  min="0"
+                  defaultValue={koliSize || ""}
+                  placeholder="6"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                />
+              </Field>
+            </>
+          )}
           <Field label="Grup pembukuan">
             <Select name="groupId" defaultValue={groupId} placeholder="— Tanpa grup —" options={groupOptions} />
           </Field>
@@ -215,6 +244,7 @@ export function ProductRow({
           initialIsBundle={isBundle}
           initialComponents={components}
           productOptions={productOptions}
+          unitOf={unitOf}
           action={bundleAction}
         />
       )}
@@ -229,36 +259,7 @@ export function ProductRow({
 // Yang DISIMPAN selalu satuan dasar (sachet). Tapi mengetik "24" untuk varian
 // 2 BOX gampang salah, jadi input-nya sama seperti Stok Opname: angka + toggle
 // satuan (koli › box › sachet) mengikuti satuan product yang dipilih.
-export type MappingUnitInfo = {
-  unit: string; // satuan dasar (mis. sachet)
-  packUnit: string; // mis. box
-  packSize: number; // 1 box = berapa sachet
-  koliUnit: string;
-  koliSize: number; // 1 koli = berapa box
-};
-
-type Tier = { key: string; label: string; factor: number };
-
-// Tingkatan satuan yang tersedia untuk product ini, terbesar → terkecil.
-function tiersOf(u?: MappingUnitInfo): Tier[] {
-  const out: Tier[] = [];
-  if (!u) return [{ key: "base", label: "satuan dasar", factor: 1 }];
-  const hasPack = u.packSize >= 2 && !!u.packUnit;
-  const hasKoli = hasPack && u.koliSize >= 2 && !!u.koliUnit;
-  if (hasKoli) out.push({ key: "koli", label: u.koliUnit, factor: u.koliSize * u.packSize });
-  if (hasPack) out.push({ key: "pack", label: u.packUnit, factor: u.packSize });
-  out.push({ key: "base", label: u.unit || "satuan dasar", factor: 1 });
-  return out;
-}
-
-// Pilih tampilan paling enak dibaca untuk nilai tersimpan: 24 sachet dengan
-// 1 box = 12 → tampil "2 box". Kalau tidak habis dibagi, tetap satuan dasar.
-function splitBase(base: number, tiers: Tier[]): { qty: number; tier: string } {
-  for (const t of tiers) {
-    if (t.factor > 1 && base % t.factor === 0) return { qty: base / t.factor, tier: t.key };
-  }
-  return { qty: base, tier: "base" };
-}
+export type MappingUnitInfo = UnitInfo;
 
 export function MappingRow({
   mappingId,

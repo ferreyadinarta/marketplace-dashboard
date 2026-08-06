@@ -59,6 +59,7 @@ export default async function MasterProductPage({
       select: {
         id: true, name: true, sku: true, hpp: true, priceRetail: true, priceGrosir: true,
         unit: true, packUnit: true, packSize: true, koliUnit: true, koliSize: true,
+        isBundle: true,
       },
     }),
     // toko marketplace yang sudah terhubung → sumber import product
@@ -78,6 +79,16 @@ export default async function MasterProductPage({
       },
     }),
   ]);
+
+  // Bundle tidak punya HPP/stok sendiri (modalnya = jumlah isinya) → tidak ikut
+  // panel isi harga massal, dan tidak bisa jadi isi bundle lain.
+  const plainRows = priceRows.filter((p) => !p.isBundle);
+  const unitOf = Object.fromEntries(
+    priceRows.map((p) => [
+      p.id,
+      { unit: p.unit, packUnit: p.packUnit, packSize: p.packSize, koliUnit: p.koliUnit, koliSize: p.koliSize },
+    ])
+  );
 
   const cleanupRows = cleanupRaw.map((p) => ({
     id: p.id,
@@ -156,7 +167,7 @@ export default async function MasterProductPage({
       )}
 
       {/* isi harga massal (HPP / retail / grosir sekaligus) */}
-      <BulkPriceForm products={priceRows} action={saveBulkPrices} />
+      <BulkPriceForm products={plainRows} action={saveBulkPrices} />
 
       {/* bersihkan product sampah (mis. sisa import lama) */}
       <BulkDeleteProducts products={cleanupRows} action={deleteProducts} />
@@ -164,8 +175,16 @@ export default async function MasterProductPage({
       <div className="grid gap-5 lg:grid-cols-3">
         {/* form tambah product */}
         <Card className="lg:col-span-2">
-          <CardHeader title="Tambah Product" subtitle="SKU internal harus unik antar product." />
-          <AddProductForm groups={groups} action={createProduct} />
+          <CardHeader
+            title="Tambah Product"
+            subtitle="SKU internal harus unik antar product. Pilih Bundle kalau 1 unit jual berisi beberapa product lain."
+          />
+          <AddProductForm
+            groups={groups}
+            action={createProduct}
+            productOptions={plainRows.map((o) => ({ value: o.id, label: `${o.name} (${o.sku})` }))}
+            unitOf={unitOf}
+          />
         </Card>
 
         {/* form tambah grup */}
@@ -226,9 +245,10 @@ export default async function MasterProductPage({
                 isBundle={p.isBundle}
                 components={p.bundleComponents}
                 // calon isi bundle: product lain yang bukan bundle
-                productOptions={priceRows
+                productOptions={plainRows
                   .filter((o) => o.id !== p.id)
                   .map((o) => ({ value: o.id, label: `${o.name} (${o.sku})` }))}
+                unitOf={unitOf}
                 updateAction={updateProduct}
                 bundleAction={updateBundle}
                 deleteAction={deleteProduct}

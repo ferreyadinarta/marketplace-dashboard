@@ -52,11 +52,17 @@ export async function createProduct(formData: FormData) {
   const clash = await prisma.product.findUnique({ where: { sku } });
   if (clash) redirect(`/master/product?add=dupe&sku=${encodeURIComponent(sku)}`);
 
-  await prisma.product.create({
+  // Mode bundle: product ini isinya product lain (mis. box mix 3 rasa).
+  // HPP & satuan kecil/koli tidak dipakai — modalnya dihitung dari isinya dan
+  // stok yang berkurang adalah stok tiap isi.
+  const isBundle = formData.get("isBundle") === "true";
+  const comps = isBundle ? parseComponents(formData.get("components")) : [];
+
+  const product = await prisma.product.create({
     data: {
       name,
       sku,
-      hpp: isNaN(hpp) ? 0 : hpp,
+      hpp: isBundle || isNaN(hpp) ? 0 : hpp,
       priceRetail: isNaN(priceRetail) ? 0 : priceRetail,
       priceGrosir: isNaN(priceGrosir) ? 0 : priceGrosir,
       unit,
@@ -65,11 +71,43 @@ export async function createProduct(formData: FormData) {
       koliUnit,
       koliSize,
       groupId: groupId || null,
+      isBundle,
     },
   });
+
+  if (isBundle && comps.length) {
+    await prisma.productComponent.createMany({
+      data: comps.map((c) => ({ bundleId: product.id, ...c })),
+    });
+  }
+
   revalidatePath("/master/product");
   revalidatePath("/stok");
-  redirect("/master/product?add=ok");
+  // TIDAK redirect: navigasi bikin halaman lompat ke atas padahal form-nya di
+  // tengah. Cukup revalidate — daftar product ikut segar di tempat, form-nya
+  // di-reset sendiri di klien (lihat AddProductForm).
+}
+
+// Baca daftar isi bundle dari form: buang yang kosong/duplikat, qty minimal 1.
+function parseComponents(raw: FormDataEntryValue | null, selfId?: string) {
+  let arr: unknown = [];
+  try {
+    arr = JSON.parse(String(raw ?? "[]"));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+
+  const seen = new Set<string>();
+  const out: { componentId: string; qty: number }[] = [];
+  for (const c of arr) {
+    const componentId = String((c as { componentId?: unknown })?.componentId ?? "");
+    const qty = Math.max(1, Math.floor(Number((c as { qty?: unknown })?.qty) || 0));
+    if (!componentId || componentId === selfId || seen.has(componentId)) continue;
+    seen.add(componentId);
+    out.push({ componentId, qty });
+  }
+  return out;
 }
 
 export async function updateProduct(formData: FormData) {

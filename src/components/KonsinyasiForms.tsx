@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
+import { useFormStatus } from "react-dom";
 import { Plus, Store as StoreIcon, X } from "lucide-react";
 import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -96,10 +97,37 @@ type ProductOption = {
   priceRetail?: number;
   priceGrosir?: number;
 };
-type Item = { productId: string; qty: string; price: string; unit: "base" | "pack" };
+// price = TOTAL harga baris ini (bukan per unit) — lebih gampang diisi:
+// user tinggal menyalin angka dari nota. priceEdited = user sudah mengetiknya
+// sendiri, jadi jangan ditimpa lagi saat qty/satuan berubah.
+type Item = {
+  productId: string;
+  qty: string;
+  price: string;
+  unit: "base" | "pack";
+  priceEdited?: boolean;
+};
 
 const cellInput =
   "h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 [color-scheme:light]";
+
+// Pantau submit form induk; sekali selesai → kosongkan form.
+function ResetAfterSave({ onDone }: { onDone: () => void }) {
+  const { pending } = useFormStatus();
+  const prev = useRef(false);
+  const cb = useRef(onDone);
+
+  useEffect(() => {
+    cb.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    if (!pending && prev.current) cb.current();
+    prev.current = pending;
+  }, [pending]);
+
+  return null;
+}
 
 // Form penjualan manual dengan BANYAK product dalam 1 order (WA/offline atau grosir).
 // Satu order = satu toko/pembeli + satu tanggal + beberapa baris product.
@@ -139,7 +167,21 @@ export function MultiItemSaleForm({
   };
   const [storeId, setStoreId] = useState("");
   const [items, setItems] = useState<Item[]>([{ productId: "", qty: "1", price: "", unit: "base" }]);
-  const [errors, setErrors] = useState<{ store?: string; items?: string }>({});
+  const [errors, setErrors] = useState<{ store?: string; items?: string; price?: string }>({});
+  // baris yang harganya masih kosong/0 saat submit → ditandai merah
+  const [badPrice, setBadPrice] = useState<Set<number>>(new Set());
+  // ganti key = form di-mount ulang → DatePicker & input harga ikut bersih
+  const [formKey, setFormKey] = useState(0);
+
+  // Setelah penjualan tercatat: kosongkan form supaya siap untuk entri
+  // berikutnya (server action-nya tidak redirect, jadi state klien tetap ada).
+  const resetForm = () => {
+    setItems([{ productId: "", qty: "1", price: "", unit: "base" }]);
+    setStoreId("");
+    setErrors({});
+    setBadPrice(new Set());
+    setFormKey((k) => k + 1);
+  };
 
   if (isGrosir && (!stores || stores.length === 0)) {
     return (
@@ -157,59 +199,94 @@ export function MultiItemSaleForm({
   }
 
   function setItem(i: number, key: keyof Item, val: string) {
-    setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, [key]: val } : it)));
-    setErrors((s) => ({ ...s, items: undefined }));
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== i) return it;
+        const next = { ...it, [key]: val };
+        // qty berubah & harga belum disentuh user → total ikut menyesuaikan
+        if (key === "qty" && !it.priceEdited) next.price = autoTotal(it.productId, it.unit, val);
+        if (key === "price") next.priceEdited = true;
+        return next;
+      })
+    );
+    setErrors((s) => ({ ...s, items: undefined, price: undefined }));
+    if (key === "price") setBadPrice((prev) => (prev.has(i) ? new Set([...prev].filter((x) => x !== i)) : prev));
   }
   // pilih product → default ke satuan UTAMA (pack kalau ada) + auto-isi harga
   function chooseProduct(i: number, v: string) {
     const u: "base" | "pack" = hasPack(v) ? "pack" : "base";
-    const def = defaultPrice(v, u);
     setItems((prev) =>
-      prev.map((it, idx) => (idx === i ? { ...it, productId: v, unit: u, price: def > 0 ? String(def) : "" } : it))
+      prev.map((it, idx) =>
+        idx === i
+          ? { ...it, productId: v, unit: u, price: autoTotal(v, u, it.qty), priceEdited: false }
+          : it
+      )
     );
-    setErrors((s) => ({ ...s, items: undefined }));
+    setErrors((s) => ({ ...s, items: undefined, price: undefined }));
+    setBadPrice((prev) => (prev.has(i) ? new Set([...prev].filter((x) => x !== i)) : prev));
   }
   // ganti satuan (base ↔ pack) → sesuaikan harga default
   function chooseUnit(i: number, u: "base" | "pack") {
     setItems((prev) =>
       prev.map((it, idx) => {
         if (idx !== i) return it;
-        const def = defaultPrice(it.productId, u);
-        return { ...it, unit: u, price: def > 0 ? String(def) : it.price };
+        const auto = autoTotal(it.productId, u, it.qty);
+        return { ...it, unit: u, price: it.priceEdited || !auto ? it.price : auto };
       })
     );
   }
   function addRow() {
     setItems((prev) => [...prev, { productId: "", qty: "1", price: "", unit: "base" }]);
   }
+  // hitung total default = harga per satuan × jumlah
+  function autoTotal(pid: string, unit: "base" | "pack", qty: string) {
+    const n = Math.max(1, Math.floor(Number(qty) || 0));
+    const per = defaultPrice(pid, unit);
+    return per > 0 ? String(per * n) : "";
+  }
   function removeRow(i: number) {
     setItems((prev) => (prev.length === 1 ? prev : prev.filter((_, idx) => idx !== i)));
   }
 
+  // yang diketik user = TOTAL baris; server menerima subtotal + harga per unit
   const cleanRaw = items
-    .map((it) => ({
-      productId: it.productId,
-      qty: Math.max(1, Math.floor(Number(it.qty) || 0)),
-      price: Math.max(0, Math.floor(Number(it.price) || 0)),
-      unit: it.unit,
-    }))
+    .map((it) => {
+      const qty = Math.max(1, Math.floor(Number(it.qty) || 0));
+      const subtotal = Math.max(0, Math.floor(Number(it.price) || 0));
+      return { productId: it.productId, qty, subtotal, unit: it.unit };
+    })
     .filter((it) => it.productId && it.qty >= 1);
   // gabung baris product+satuan yang sama (beda satuan tidak digabung)
-  const seen = new Map<string, { productId: string; qty: number; price: number; unit: "base" | "pack" }>();
+  const seen = new Map<string, { productId: string; qty: number; subtotal: number; unit: "base" | "pack" }>();
   for (const it of cleanRaw) {
     const key = `${it.productId}|${it.unit}`;
     const ex = seen.get(key);
-    if (ex) ex.qty += it.qty;
-    else seen.set(key, { ...it });
+    if (ex) {
+      ex.qty += it.qty;
+      ex.subtotal += it.subtotal;
+    } else seen.set(key, { ...it });
   }
-  const clean = [...seen.values()];
+  const clean = [...seen.values()].map((it) => ({
+    ...it,
+    price: Math.round(it.subtotal / Math.max(1, it.qty)), // per unit, untuk tampilan
+  }));
   const hasDup = cleanRaw.length > clean.length;
-  const grandTotal = clean.reduce((a, it) => a + it.price * it.qty, 0);
+  const grandTotal = clean.reduce((a, it) => a + it.subtotal, 0);
 
   function validate(e: FormEvent<HTMLFormElement>) {
-    const errs: { store?: string; items?: string } = {};
+    const errs: { store?: string; items?: string; price?: string } = {};
     if (isGrosir && !storeId) errs.store = "Pilih toko.";
     if (clean.length === 0) errs.items = "Tambah minimal 1 product dengan jumlah.";
+
+    // harga tidak boleh kosong / 0 — kalau lolos, omzet & profit jadi salah
+    const bad = new Set<number>();
+    items.forEach((it, i) => {
+      if (!it.productId) return;
+      if (Math.floor(Number(it.price) || 0) <= 0) bad.add(i);
+    });
+    if (bad.size) errs.price = "Harga belum diisi.";
+
+    setBadPrice(bad);
     if (Object.keys(errs).length) {
       e.preventDefault();
       setErrors(errs);
@@ -217,7 +294,8 @@ export function MultiItemSaleForm({
   }
 
   return (
-    <form action={action} onSubmit={validate} noValidate className="space-y-5 p-5">
+    <form key={formKey} action={action} onSubmit={validate} noValidate className="space-y-5 p-5">
+      <ResetAfterSave onDone={resetForm} />
       <input type="hidden" name="items" value={JSON.stringify(clean)} />
       {isGrosir && <input type="hidden" name="storeId" value={storeId} />}
 
@@ -253,7 +331,8 @@ export function MultiItemSaleForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-slate-600">
-            Product — harga {isGrosir ? "grosir" : "retail"} <span className="text-slate-400">per unit</span>
+            Product — harga {isGrosir ? "grosir" : "retail"}{" "}
+            <span className="text-slate-400">total per baris</span>
           </span>
           {errors.items && <span className="text-xs font-medium text-red-500">{errors.items}</span>}
         </div>
@@ -308,13 +387,18 @@ export function MultiItemSaleForm({
                     {unitOf(it.productId) || "unit"}
                   </span>
                 )}
-                <div className="w-32 shrink-0">
+                <div className="w-36 shrink-0">
                   <CurrencyInput
                     value={Number(it.price) || 0}
                     onValueChange={(n) => setItem(i, "price", String(n))}
-                    placeholder="/unit"
-                    className="h-10"
+                    placeholder="Total"
+                    className={`h-10 ${
+                      badPrice.has(i) ? "border-red-400 focus:border-red-500 focus:ring-red-100" : ""
+                    }`}
                   />
+                  {badPrice.has(i) && (
+                    <p className="mt-1 text-[11px] font-medium text-red-600">Harga wajib diisi</p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -327,13 +411,20 @@ export function MultiItemSaleForm({
                 </button>
               </div>
               {it.productId && (
-                <p className={`mt-1 pl-1 text-xs ${over ? "font-medium text-red-600" : "text-slate-400"}`}>
-                  {st == null
-                    ? "Stok belum di-opname"
-                    : `Stok: ${st} ${p?.unit ?? ""}` +
-                      (factor > 1 ? ` · jual ${it.qty} ${p?.packUnit} = ${baseQty} ${p?.unit}` : "") +
-                      (over ? " — melebihi stok!" : "")}
-                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 pl-1 text-xs">
+                  <span className={over ? "font-medium text-red-600" : "text-slate-400"}>
+                    {st == null
+                      ? "Stok belum di-opname"
+                      : `Stok: ${st} ${p?.unit ?? ""}` +
+                        (factor > 1 ? ` · jual ${it.qty} ${p?.packUnit} = ${baseQty} ${p?.unit}` : "") +
+                        (over ? " — melebihi stok!" : "")}
+                  </span>
+                  {Number(it.price) > 0 && Number(it.qty) > 1 && (
+                    <span className="text-slate-400">
+                      · {rupiah(Math.round(Number(it.price) / Math.max(1, Number(it.qty))))} / {unitLabel(it)}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           );

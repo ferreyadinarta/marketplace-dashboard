@@ -1,7 +1,10 @@
 import { prisma } from "./prisma";
 import { effectiveHppMap } from "./bundle";
 
-type ParsedItem = { productId: string; qty: number; price: number; unit?: string };
+// `subtotal` = total harga baris itu (yang diketik user). Dipakai sebagai angka
+// resmi kalau ada, supaya total tidak meleset karena pembagian per unit
+// (mis. Rp 100.000 untuk 3 box → per unit 33.333, tapi totalnya tetap 100.000).
+type ParsedItem = { productId: string; qty: number; price: number; unit?: string; subtotal?: number };
 
 // Baca payload item multi-product dari form (`items` = JSON array),
 // validasi + cocokkan ke product, kembalikan data OrderItem siap create.
@@ -17,12 +20,18 @@ export async function buildItemsData(formData: FormData) {
   }
 
   const items = parsed
-    .map((x) => ({
-      productId: String(x?.productId ?? ""),
-      qty: Math.max(1, Math.floor(Number(x?.qty) || 0)),
-      price: Math.max(0, Math.floor(Number(x?.price) || 0)),
-      unit: x?.unit === "pack" ? "pack" : "base",
-    }))
+    .map((x) => {
+      const qty = Math.max(1, Math.floor(Number(x?.qty) || 0));
+      const price = Math.max(0, Math.floor(Number(x?.price) || 0));
+      const rawSub = Math.max(0, Math.floor(Number(x?.subtotal) || 0));
+      return {
+        productId: String(x?.productId ?? ""),
+        qty,
+        price,
+        unit: x?.unit === "pack" ? "pack" : "base",
+        subtotal: rawSub > 0 ? rawSub : price * qty,
+      };
+    })
     .filter((x) => x.productId && x.qty >= 1);
   if (items.length === 0) return [];
 
@@ -46,8 +55,9 @@ export async function buildItemsData(formData: FormData) {
         qty: i.qty, // dalam satuan yang dijual (box atau sachet)
         unit: unitLabel, // label satuan jual
         baseQty, // untuk stok (satuan dasar)
-        price: i.price, // per satuan jual
-        subtotal: i.price * i.qty,
+        // price = per satuan jual (untuk tampilan), subtotal = angka resmi baris
+        price: Math.round(i.subtotal / i.qty),
+        subtotal: i.subtotal,
         hppSnapshot: hppMap.get(p.id) ?? p.hpp, // modal dibekukan (bundle = Σ isi)
       };
     });

@@ -26,8 +26,20 @@ export default function PembukuanFilter({
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value);
     else next.delete(key);
+    // ganti marketplace → toko yang terpilih bisa jadi bukan milik marketplace
+    // itu lagi; buang saja daripada menampilkan hasil kosong tanpa sebab jelas
+    if (key === "marketplace") {
+      const cur = params.get("storeId");
+      const stillValid = stores.some((s) => s.id === cur && (!value || s.marketplace === value));
+      if (!stillValid) next.delete("storeId");
+    }
     router.push(`/pembukuan?${next.toString()}`, { scroll: false });
   }
+
+  // daftar toko ikut filter marketplace: pilih "Grosir / Reseller" → cuma toko
+  // grosir yang muncul
+  const marketplace = params.get("marketplace") ?? "";
+  const storeOptions = marketplace ? stores.filter((s) => s.marketplace === marketplace) : stores;
 
   // Default halaman = semua data. Export ikut itu (tanpa from/to) kecuali
   // user pilih rentang. all=1 juga berarti semua data.
@@ -69,7 +81,11 @@ export default function PembukuanFilter({
           className="min-w-44"
           value={params.get("storeId") ?? ""}
           onValueChange={(v) => update("storeId", v)}
-          options={[{ value: "", label: "Semua" }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
+          options={[
+            { value: "", label: "Semua" },
+            ...storeOptions.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+          disabled={storeOptions.length === 0}
         />
       </label>
       <label className="block">

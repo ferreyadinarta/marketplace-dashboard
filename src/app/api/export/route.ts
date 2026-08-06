@@ -34,7 +34,10 @@ function sheetNameForYear(name: string, year: number, fallback = "Grup") {
 // Export pembukuan ke Excel (.xlsx). Sheet Ringkasan + satu sheet per grup.
 export async function GET(req: NextRequest) {
   const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
-  const period = resolvePeriod(sp);
+  // defaultAll=true supaya SAMA dengan halaman Pembukuan: tanpa from/to berarti
+  // "semua data". Sebelumnya export diam-diam jatuh ke bulan berjalan, jadi isi
+  // & nama filenya beda dengan yang dilihat user di layar.
+  const period = resolvePeriod(sp, true);
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
   const groups = await getPembukuanByGroup(filter);
   const detailRows = await getOrdersDetail(filter);

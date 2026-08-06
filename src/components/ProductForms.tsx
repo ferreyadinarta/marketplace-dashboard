@@ -1,26 +1,79 @@
 "use client";
 
 import { useState, useRef, useEffect, type FormEvent } from "react";
-import { Plus, FolderPlus, X } from "lucide-react";
-import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
+import { useFormStatus } from "react-dom";
+import { Plus, FolderPlus, X, Package, Boxes } from "lucide-react";
+import { Field, inputClass, inputErrorClass, Select, type SelectOption } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { type UnitInfo } from "@/lib/units";
+import {
+  BundleComponentList,
+  compsToPayload,
+  emptyCompRow,
+  type CompRow,
+} from "@/components/BundleComponentList";
 
 type Group = { id: string; name: string };
 type Action = (formData: FormData) => void | Promise<void>;
+type Mode = "plain" | "bundle";
+
+// Pantau status submit form induk; saat selesai → panggil reset.
+// Harus komponen sendiri karena useFormStatus wajib berada DI DALAM <form>.
+function ResetAfterSave({ onDone }: { onDone: () => void }) {
+  const { pending } = useFormStatus();
+  const prev = useRef(false);
+  const cb = useRef(onDone);
+
+  useEffect(() => {
+    cb.current = onDone;
+  }, [onDone]);
+
+  useEffect(() => {
+    if (!pending && prev.current) cb.current();
+    prev.current = pending;
+  }, [pending]);
+
+  return null;
+}
 
 // ---------- Tambah Product (validasi custom) ----------
 export function AddProductForm({
   groups,
   action,
+  productOptions = [],
+  unitOf,
 }: {
   groups: Group[];
   action: Action;
+  productOptions?: SelectOption[]; // calon isi bundle (product biasa saja)
+  unitOf?: Record<string, UnitInfo>;
 }) {
   const [errors, setErrors] = useState<{ name?: string; sku?: string }>({});
-  const [mainUnit, setMainUnit] = useState("pcs");
+  const [mainUnit, setMainUnit] = useState("box");
   const [smallUnit, setSmallUnit] = useState("");
   const [koliUnit, setKoliUnit] = useState("koli");
+  // Bundle = product yang isinya product lain (mis. box mix 3 rasa). Fieldnya
+  // beda: tidak punya HPP (dihitung dari isinya) & tidak punya satuan kecil/koli.
+  const [mode, setMode] = useState<Mode>("plain");
+  const [comps, setComps] = useState<CompRow[]>([emptyCompRow()]);
+  const isBundle = mode === "bundle";
+  // Ganti key = form di-mount ulang → semua isian bersih, termasuk komponen
+  // yang menyimpan state sendiri (CurrencyInput, Select) yang tidak ikut
+  // form.reset() bawaan browser.
+  const [formKey, setFormKey] = useState(0);
+
+  // Setelah tersimpan: kosongkan form di tempat. Server action-nya sengaja tidak
+  // redirect, jadi halaman tidak melompat ke atas — user bisa langsung
+  // mengetik product berikutnya.
+  const resetForm = () => {
+    setMainUnit("box");
+    setSmallUnit("");
+    setKoliUnit("koli");
+    setComps([emptyCompRow()]);
+    setErrors({});
+    setFormKey((k) => k + 1);
+  };
 
   function validate(e: FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
@@ -42,11 +95,47 @@ export function AddProductForm({
 
   return (
     <form
+      key={formKey}
       action={action}
       onSubmit={validate}
       noValidate
       className="grid gap-4 p-5 sm:grid-cols-2"
     >
+      <input type="hidden" name="isBundle" value={isBundle ? "true" : "false"} />
+      {isBundle && (
+        <input type="hidden" name="components" value={JSON.stringify(compsToPayload(comps, unitOf))} />
+      )}
+
+      {/* pilih jenis dulu: field yang tampil menyesuaikan */}
+      <div className="sm:col-span-2">
+        <div className="inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+          {([
+            { key: "plain", label: "Product biasa", icon: <Package size={14} /> },
+            { key: "bundle", label: "Bundle (isi campur)", icon: <Boxes size={14} /> },
+          ] as const).map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setMode(m.key)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                mode === m.key
+                  ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {m.icon}
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {isBundle && (
+          <p className="mt-2 text-xs text-slate-500">
+            Bundle tidak punya stok & HPP sendiri: stok yang berkurang adalah isinya, modalnya = jumlah HPP
+            isinya. Isi satuan jual saja (mis. box), lalu daftar isinya di bawah.
+          </p>
+        )}
+      </div>
+
       <Field label="Nama product" error={errors.name}>
         <input
           name="name"
@@ -67,13 +156,22 @@ export function AddProductForm({
           className={`${inputClass} ${errors.sku ? inputErrorClass : ""}`}
         />
       </Field>
+      {!isBundle && (
+        <Field
+          label="HPP / Modal (Rp)"
+          hint="Harga Pokok Penjualan: modal untuk 1 unit product."
+        >
+          <CurrencyInput name="hpp" placeholder="0" />
+        </Field>
+      )}
       <Field
-        label="HPP / Modal (Rp)"
-        hint="Harga Pokok Penjualan: modal untuk 1 unit product."
+        label={isBundle ? "Satuan jual" : "Satuan utama"}
+        hint={
+          isBundle
+            ? "Satuan saat bundle ini dijual (mis. box). Isi per box diatur di daftar isi."
+            : "Satuan yang biasa dipakai (mis. box, botol, pcs)."
+        }
       >
-        <CurrencyInput name="hpp" placeholder="0" />
-      </Field>
-      <Field label="Satuan utama" hint="Satuan yang biasa dipakai (mis. box, botol, pcs).">
         <input
           name="mainUnit"
           value={mainUnit}
@@ -82,36 +180,42 @@ export function AddProductForm({
           className={inputClass}
         />
       </Field>
-      <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
-        <input
-          name="smallUnit"
-          value={smallUnit}
-          onChange={(e) => setSmallUnit(e.target.value)}
-          placeholder="ex: sachet"
-          className={inputClass}
-        />
-      </Field>
-      <Field
-        label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
-        hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
-      >
-        <input name="isi" type="number" min="0" placeholder="ex: 12" className={inputClass} />
-      </Field>
-      <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
-        <input
-          name="koliUnit"
-          value={koliUnit}
-          onChange={(e) => setKoliUnit(e.target.value)}
-          placeholder="ex: koli"
-          className={inputClass}
-        />
-      </Field>
-      <Field
-        label={`Isi koli (1 ${koliUnit.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
-        hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
-      >
-        <input name="isiKoli" type="number" min="0" placeholder="ex: 6" className={inputClass} />
-      </Field>
+      {/* satuan kecil / isi / koli tidak berlaku untuk bundle: isinya diatur
+          lewat daftar isi, bukan lewat konversi satuan */}
+      {!isBundle && (
+        <>
+          <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
+            <input
+              name="smallUnit"
+              value={smallUnit}
+              onChange={(e) => setSmallUnit(e.target.value)}
+              placeholder="ex: sachet"
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
+            hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
+          >
+            <input name="isi" type="number" min="0" placeholder="ex: 12" className={inputClass} />
+          </Field>
+          <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+            <input
+              name="koliUnit"
+              value={koliUnit}
+              onChange={(e) => setKoliUnit(e.target.value)}
+              placeholder="ex: koli"
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label={`Isi koli (1 ${koliUnit.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
+            hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+          >
+            <input name="isiKoli" type="number" min="0" placeholder="ex: 6" className={inputClass} />
+          </Field>
+        </>
+      )}
       <Field label="Harga retail (Rp)" hint="Default harga jual WA/offline. Bisa diubah saat mencatat penjualan.">
         <CurrencyInput name="priceRetail" placeholder="0" />
       </Field>
@@ -128,14 +232,31 @@ export function AddProductForm({
           ]}
         />
       </Field>
+      {isBundle && (
+        <div className="sm:col-span-2">
+          <p className="mb-2 text-sm font-medium text-slate-700">Isi bundle</p>
+          <BundleComponentList
+            rows={comps}
+            onChange={setComps}
+            productOptions={productOptions}
+            unitOf={unitOf}
+          />
+          <p className="mt-2 text-xs text-slate-400">
+            Contoh box mix 3 rasa: tiap rasa 4 sachet. Jumlah ditulis dalam satuan product isinya.
+          </p>
+        </div>
+      )}
+
+      <ResetAfterSave onDone={resetForm} />
+
       <div className="sm:col-span-2">
         <SubmitButton
           variant="primary"
           icon={<Plus size={16} />}
           pendingText="Menyimpan…"
-          notify="Product ditambahkan"
+          notify={isBundle ? "Bundle ditambahkan" : "Product ditambahkan"}
         >
-          Simpan Product
+          {isBundle ? "Simpan Bundle" : "Simpan Product"}
         </SubmitButton>
       </div>
     </form>
