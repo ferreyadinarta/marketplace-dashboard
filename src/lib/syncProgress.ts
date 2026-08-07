@@ -114,6 +114,10 @@ export const ACTIVE_STALE_MS = 3 * 60 * 1000; // tak ada update 3 menit → dian
 // gagal dijadwalkan, user masih melihat statusnya (bukan panel yang hilang
 // begitu saja tanpa penjelasan).
 export const RECENT_DONE_MS = 3 * 60 * 1000;
+// Pekerjaan yang BELUM tuntas (partial) tetap ditampilkan jauh lebih lama:
+// penerusnya berjalan tiap ~5 menit, jadi kalau kartunya hilang setelah 3 menit
+// user melihat panel kosong padahal sync-nya masih akan lanjut.
+export const PENDING_MS = 24 * 60 * 60 * 1000;
 
 export async function listSyncJobs() {
   const now = Date.now();
@@ -122,6 +126,8 @@ export async function listSyncJobs() {
       OR: [
         { finishedAt: null, updatedAt: { gt: new Date(now - ACTIVE_STALE_MS) } },
         { finishedAt: { gt: new Date(now - RECENT_DONE_MS) } },
+        // masih ada sisa & menunggu putaran berikutnya
+        { partial: true, phase: "done", finishedAt: { gt: new Date(now - PENDING_MS) } },
       ],
     },
     orderBy: { startedAt: "desc" },

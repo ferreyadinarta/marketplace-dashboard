@@ -95,6 +95,8 @@ export function SyncProgressPanel() {
       {jobs.map((j) => {
         const running = !j.finishedAt;
         const failed = j.phase === "error";
+        // selesai tapi masih ada sisa → menunggu putaran berikutnya
+        const waiting = !running && !failed && j.partial;
         const pct = percent(j);
         const tone = failed
           ? { border: "border-red-200", bg: "bg-red-50", text: "text-red-800", bar: "bg-red-500" }
@@ -127,6 +129,11 @@ export function SyncProgressPanel() {
                 <p className={`mt-0.5 text-xs ${tone.text} opacity-80`}>
                   {j.error ?? j.message ?? "Menyiapkan…"}
                 </p>
+                {waiting && (
+                  <p className={`mt-0.5 text-xs ${tone.text} opacity-70`}>
+                    Menunggu putaran berikutnya — jalan otomatis tiap beberapa menit, halaman boleh ditutup.
+                  </p>
+                )}
 
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
                   <div
