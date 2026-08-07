@@ -31,6 +31,8 @@ export async function startSyncJob(input: {
   storeName: string;
   scope: "ALL" | "STORE";
   storeTotal?: number;
+  round?: number; // putaran ke berapa (untuk melanjutkan pekerjaan)
+  days?: number; // rentang hari yang diminta user
 }): Promise<string> {
   // sapu riwayat lama biar tabel tidak menumpuk (job cuma untuk tampilan)
   try {
@@ -48,6 +50,8 @@ export async function startSyncJob(input: {
       scope: input.scope,
       phase: "queued",
       storeTotal: input.storeTotal ?? 1,
+      round: input.round ?? 1,
+      days: input.days ?? null,
       message: "Menyiapkan…",
     },
     select: { id: true },

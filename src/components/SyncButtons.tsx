@@ -24,8 +24,6 @@ type RunResult = {
   created: number;
   updated: number;
   partial?: boolean;
-  // true = sisanya dilanjutkan SERVER (halaman boleh ditutup)
-  background?: boolean;
   error?: string;
 };
 
@@ -74,15 +72,10 @@ function useSyncRunner() {
             toast(`Sync selesai: ${acc.created} order baru, ${acc.updated} diperbarui`);
             break;
           }
-          // Server sudah menjadwalkan sisanya sendiri → tab boleh ditutup.
-          if (d.background) {
-            toast(
-              `${acc.created} order baru sejauh ini — sisanya lanjut di latar belakang, halaman boleh ditutup`
-            );
-            break;
-          }
           if (stop.current) {
-            toast(`Dijeda: ${acc.created} baru, ${acc.updated} diperbarui — sisanya bisa dilanjut nanti`);
+            toast(
+              `Dijeda: ${acc.created} baru, ${acc.updated} diperbarui — sisanya dilanjutkan otomatis di server`
+            );
             break;
           }
           if (r === MAX_ROUNDS) toast(`Berhenti setelah ${MAX_ROUNDS} putaran — klik Sync lagi kalau masih ada sisa`);

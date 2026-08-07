@@ -56,6 +56,10 @@ model SyncJob {
   created    Int     @default(0)
   updated    Int     @default(0)
   partial    Boolean @default(false) // waktu habis, masih ada sisa
+
+  // dipakai untuk MELANJUTKAN sendiri di panggilan berikutnya
+  round Int  @default(1) // putaran ke berapa
+  days  Int? // rentang hari yang diminta user
   message    String? // teks pendek untuk UI
   error      String?
 

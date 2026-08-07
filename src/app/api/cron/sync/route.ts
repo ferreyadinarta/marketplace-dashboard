@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncAllStores } from "@/lib/syncAll";
 import { notifyLowStock } from "@/lib/lowStock";
+import { findPendingRound, runSyncRound } from "@/lib/syncRunner";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // beri waktu lebih untuk beberapa toko sekaligus
@@ -18,7 +19,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const r = await syncAllStores(30);
+    // Kalau masih ada sisa sync yang belum kelar (tarik riwayat panjang), itu
+    // yang didahulukan — percuma menarik 30 hari terakhir berulang kali sementara
+    // pekerjaan lama menggantung.
+    const pending = await findPendingRound();
+    const r = pending
+      ? { ...(await runSyncRound(pending)), stores: 1, errors: [] as { store: string; message: string }[] }
+      : await syncAllStores(30);
     // setelah sync, cek stok menipis → kirim notifikasi (edge-triggered).
     // jangan gagalkan cron kalau notif error.
     let notif = { sent: 0, failed: 0, fresh: 0 };

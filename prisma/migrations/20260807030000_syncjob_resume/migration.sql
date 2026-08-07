@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "SyncJob" ADD COLUMN     "round" INTEGER NOT NULL DEFAULT 1,
+ADD COLUMN     "days" INTEGER;

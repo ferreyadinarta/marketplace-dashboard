@@ -5,12 +5,18 @@ import { syncShopeeStore } from "@/lib/shopee/sync";
 import { syncTiktokStore } from "@/lib/tiktok/sync";
 import { startSyncJob, progressWriter, finishSyncJob, type ProgressFn } from "@/lib/syncProgress";
 
-// Satu PUTARAN sync (≈45 detik kerja) + kemampuan menyambung sendiri.
+// Satu PUTARAN sync (≈45 detik kerja) + cara melanjutkannya.
 //
-// Toko besar butuh banyak putaran. Sebelumnya penyambungnya ada di browser, jadi
-// menutup tab = sync berhenti. Sekarang server yang memanggil dirinya sendiri
-// untuk putaran berikutnya (lewat /api/cron/sync-run yang dijaga CRON_SECRET),
-// sehingga user boleh menutup halaman dan sync tetap jalan sampai selesai.
+// Toko besar butuh banyak putaran. Menyambung dengan cara deployment memanggil
+// URL-nya sendiri TIDAK BISA di Vercel: request balik ke deployment yang sama
+// ditolak dengan HTTP 508 (Loop Detected).
+//
+// Jadi sisa pekerjaan DITITIPKAN ke database: putaran yang berhenti karena waktu
+// habis menyimpan posisi terakhirnya (round + days + hitungan) di SyncJob dengan
+// partial=true. Yang melanjutkan:
+//   • browser (kalau halaman masih dibuka) — paling cepat, dan
+//   • /api/cron/sync-resume — dipanggil penjadwal LUAR (cron-job.org/UptimeRobot,
+//     yang sama untuk keep-warm) atau cron harian Vercel → jalan walau tab ditutup.
 
 export const MAX_ROUNDS = 80; // ±1 jam kerja — pengaman dari loop tak berujung
 
@@ -79,7 +85,13 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
   if (!store) throw new Error("Toko tidak ditemukan");
 
   const { round, accCreated, accUpdated } = input;
-  const jobId = await startSyncJob({ storeId, storeName: store.name, scope: "STORE" });
+  const jobId = await startSyncJob({
+    storeId,
+    storeName: store.name,
+    scope: "STORE",
+    round,
+    days,
+  });
   const progress = progressWriter(jobId);
 
   try {
@@ -100,9 +112,8 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
     const created = accCreated + r.created;
     const updated = accUpdated + r.updated;
 
-    // pesan harus jujur: "lanjut sendiri" hanya kalau server memang bisa
-    // menyambung (butuh CRON_SECRET) dan belum kena batas putaran
-    const willContinue = r.partial && canRunInBackground() && round < MAX_ROUNDS;
+    // masih ada sisa → job ini jadi penanda pekerjaan yang bisa dilanjutkan
+    const willContinue = r.partial && round < MAX_ROUNDS;
     await finishSyncJob(jobId, {
       phase: "done",
       created,
@@ -111,8 +122,8 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
       message: !r.partial
         ? `Selesai: ${created} baru, ${updated} diperbarui`
         : willContinue
-          ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — lanjut otomatis ke putaran ${round + 1}`
-          : `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — klik Sync lagi untuk melanjutkan`,
+          ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — sisanya dilanjutkan otomatis`
+          : `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — sudah ${MAX_ROUNDS} putaran, klik Sync lagi kalau masih ada sisa`,
     });
 
     revalidatePath("/master/toko");
@@ -126,90 +137,29 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
   }
 }
 
-// Alamat untuk memanggil putaran berikutnya.
-// Pakai origin REQUEST dulu (domain yang benar-benar dibuka user), baru env.
-// VERCEL_URL menunjuk ke URL deployment, yang bisa kena Deployment Protection
-// dan menolak panggilan server-ke-server — alias domainnya lebih aman.
-function selfOrigin(reqUrl: string): string {
-  try {
-    return new URL(reqUrl).origin;
-  } catch {
-    return process.env.APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
-  }
-}
+// Cari pekerjaan sync yang masih menyisakan sisa dan belum dilanjutkan.
+// Yang dianggap tertunda: job terakhir sebuah toko selesai dengan partial=true.
+export async function findPendingRound(): Promise<RoundInput | null> {
+  const last = await prisma.syncJob.findFirst({
+    where: { scope: "STORE", partial: true, phase: "done", storeId: { not: null } },
+    orderBy: { finishedAt: "desc" },
+  });
+  if (!last || !last.storeId) return null;
+  if (last.round >= MAX_ROUNDS) return null;
 
-// Bisa lanjut sendiri hanya kalau ada CRON_SECRET (dipakai menandatangani
-// panggilan internal). Tanpa itu, klien yang harus melanjutkan seperti dulu.
-export function canRunInBackground(): boolean {
-  return !!process.env.CRON_SECRET;
-}
+  // sudah ada job yang LEBIH BARU untuk toko ini → berarti sudah dilanjutkan
+  const newer = await prisma.syncJob.findFirst({
+    where: { storeId: last.storeId, startedAt: { gt: last.finishedAt ?? last.startedAt } },
+    select: { id: true },
+  });
+  if (newer) return null;
 
-// Jadwalkan putaran berikutnya di SERVER. Dipanggil lewat `after()` supaya
-// dijalankan setelah response terkirim — user tidak menunggu.
-export async function chainNextRound(input: RoundInput, reqUrl: string, result: RoundResult) {
-  if (!result.partial) return;
-  if (input.round >= MAX_ROUNDS) return;
-  if (!canRunInBackground()) return;
-
-  const next: RoundInput = {
-    ...input,
-    round: input.round + 1,
-    accCreated: result.created,
-    accUpdated: result.updated,
+  return {
+    scope: "store",
+    storeId: last.storeId,
+    days: last.days ?? 90,
+    round: last.round + 1,
+    accCreated: last.created,
+    accUpdated: last.updated,
   };
-
-  const url = `${selfOrigin(reqUrl)}/api/cron/sync-run`;
-  try {
-    // JANGAN tunggu putaran berikutnya selesai: dia sendiri butuh ~45 detik dan
-    // ikut memanggil putaran sesudahnya. Kalau ditunggu, tiap invocation induk
-    // menganggur menunggu anaknya → jatah compute habis 2x lipat.
-    // Cukup pastikan request-nya SAMPAI (penolakan seperti 401/400 datang cepat),
-    // lalu putus koneksinya — prosesnya tetap jalan di sisi server.
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify(next),
-      signal: AbortSignal.timeout(4_000),
-    });
-    // Respons TIDAK boleh diabaikan: kalau ditolak (mis. Deployment Protection
-    // atau secret beda), rantainya mati diam-diam dan panel progres hilang
-    // tanpa penjelasan. Catat sebagai job error supaya kelihatan di UI.
-    if (!res.ok) {
-      await reportChainFailure(next, `HTTP ${res.status} saat memanggil ${url}`);
-    }
-  } catch (e) {
-    // timeout/abort = putaran berikutnya sudah diterima server dan sedang jalan,
-    // kita cuma berhenti menunggu jawabannya → itu memang yang diinginkan
-    const name = e instanceof Error ? e.name : "";
-    if (name === "TimeoutError" || name === "AbortError") return;
-    await reportChainFailure(next, e instanceof Error ? e.message : "unknown");
-  }
-}
-
-// Tulis kegagalan penyambungan sebagai SyncJob error → muncul di panel progres.
-async function reportChainFailure(next: RoundInput, reason: string) {
-  console.error("chainNextRound gagal:", reason);
-  try {
-    const store = next.storeId
-      ? await prisma.store.findUnique({ where: { id: next.storeId }, select: { name: true } })
-      : null;
-    const jobId = await startSyncJob({
-      storeId: next.storeId ?? null,
-      storeName: store?.name ?? "Semua toko",
-      scope: next.scope === "all" ? "ALL" : "STORE",
-    });
-    await finishSyncJob(jobId, {
-      phase: "error",
-      created: next.accCreated,
-      updated: next.accUpdated,
-      partial: true,
-      error: reason,
-      message: `Gagal lanjut otomatis ke putaran ${next.round} — klik Sync lagi untuk melanjutkan`,
-    });
-  } catch {
-    /* laporan gagal pun jangan sampai bikin proses induk error */
-  }
 }
