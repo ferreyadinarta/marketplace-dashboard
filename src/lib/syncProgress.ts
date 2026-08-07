@@ -117,14 +117,32 @@ export const RECENT_DONE_MS = 3 * 60 * 1000;
 
 export async function listSyncJobs() {
   const now = Date.now();
-  return prisma.syncJob.findMany({
+  const rows = await prisma.syncJob.findMany({
     where: {
       OR: [
         { finishedAt: null, updatedAt: { gt: new Date(now - ACTIVE_STALE_MS) } },
         { finishedAt: { gt: new Date(now - RECENT_DONE_MS) } },
       ],
     },
-    orderBy: { startedAt: "asc" },
-    take: 20,
+    orderBy: { startedAt: "desc" },
+    take: 40,
   });
+
+  // Sync panjang = banyak putaran = banyak baris job. Yang berguna dilihat cuma
+  // KEADAAN TERAKHIR tiap toko, jadi ambil satu per toko: yang masih jalan kalau
+  // ada, kalau tidak yang paling baru. Tanpa ini panel menumpuk kartu "putaran
+  // 1 selesai", "putaran 2 selesai", … dan memakan layar.
+  const latest = new Map<string, (typeof rows)[number]>();
+  for (const j of rows) {
+    const key = `${j.scope}|${j.storeId ?? "all"}`;
+    const cur = latest.get(key);
+    if (!cur) {
+      latest.set(key, j);
+      continue;
+    }
+    // yang masih berjalan selalu menang atas yang sudah selesai
+    if (!j.finishedAt && cur.finishedAt) latest.set(key, j);
+  }
+
+  return [...latest.values()].sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
 }
