@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import { id as localeId } from "date-fns/locale";
 import { format } from "date-fns";
@@ -26,32 +27,58 @@ export function DatePicker({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
-  const [openUp, setOpenUp] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [value, setValue] = useState(defaultValue ?? "");
   const [month, setMonth] = useState<Date>(
     defaultValue ? new Date(`${defaultValue}T00:00:00`) : new Date()
   );
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
 
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  function toggle() {
-    if (!open && ref.current) {
-      const r = ref.current.getBoundingClientRect();
-      setAlignRight(r.left + 320 > window.innerWidth - 8);
+  // Kalender di-portal ke body + position:fixed supaya tidak kepotong parent
+  // yang punya overflow-hidden (dialog Rekonsiliasi, wrapper tabel yang scroll).
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = popRef.current?.offsetWidth ?? 320;
+      const h = popRef.current?.offsetHeight ?? 380;
+      const M = 8;
       const spaceBelow = window.innerHeight - r.bottom;
-      setOpenUp(spaceBelow < 380 && r.top > spaceBelow);
+      const up = spaceBelow < h + M && r.top > spaceBelow;
+      const top = up
+        ? Math.max(M, r.top - h - M)
+        : Math.min(r.bottom + M, Math.max(M, window.innerHeight - h - M));
+      const left = Math.max(M, Math.min(r.left, window.innerWidth - w - M));
+      setPos({ top, left });
     }
-    setOpen((o) => !o);
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  function toggle() {
+    setOpen((o) => {
+      if (o) setPos(null);
+      return !o;
+    });
   }
 
   function pick(d?: Date) {
@@ -59,6 +86,7 @@ export function DatePicker({
     setValue(ymd(d));
     setMonth(d);
     setOpen(false);
+    setPos(null);
   }
 
   const rdpStyle = {
@@ -88,25 +116,32 @@ export function DatePicker({
         <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
-        <div
-          className={`absolute z-50 w-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl ${
-            alignRight ? "right-0" : "left-0"
-          } ${openUp ? "bottom-full mb-2" : "top-full mt-2"}`}
-        >
-          <DayPicker
-            mode="single"
-            locale={localeId}
-            selected={selected}
-            onSelect={pick}
-            month={month}
-            onMonthChange={setMonth}
-            numberOfMonths={1}
-            style={rdpStyle}
-            className="text-sm"
-          />
-        </div>
-      )}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popRef}
+            className="fixed z-[300] w-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
+            style={{
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              visibility: pos ? "visible" : "hidden",
+            }}
+          >
+            <DayPicker
+              mode="single"
+              locale={localeId}
+              selected={selected}
+              onSelect={pick}
+              month={month}
+              onMonthChange={setMonth}
+              numberOfMonths={1}
+              style={rdpStyle}
+              className="text-sm"
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
