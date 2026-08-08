@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, type FormEvent } from "react";
-import { useFormStatus } from "react-dom";
+import { useState, useRef, useEffect, useLayoutEffect, type FormEvent } from "react";
+import { useFormStatus, createPortal } from "react-dom";
 import { Plus, FolderPlus, X, Package, Boxes } from "lucide-react";
 import { Field, inputClass, inputErrorClass, Select, type SelectOption } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -264,27 +264,58 @@ export function AddProductForm({
 }
 
 // chip grup dengan tombol hapus + konfirmasi kecil
+const POPOVER_W = 224; // w-56
+
 function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action }) {
   const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
 
   function toggle() {
-    if (!open && ref.current) {
-      const r = ref.current.getBoundingClientRect();
-      // popover ~240px; kalau mepet kanan layar, rata-kanan biar tidak terpotong
-      setAlignRight(r.left + 240 > window.innerWidth - 8);
-    }
-    setOpen((o) => !o);
+    setOpen((o) => {
+      if (o) setPos(null);
+      return !o;
+    });
   }
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (ref.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  // Popover di-portal ke body + position:fixed: daftar chip punya
+  // overflow-y-auto, jadi popover absolute kepotong dan konfirmasinya tidak
+  // kelihatan sama sekali.
+  useLayoutEffect(() => {
+    if (!open) return;
+    function place() {
+      const r = ref.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = popRef.current?.offsetWidth ?? POPOVER_W;
+      const h = popRef.current?.offsetHeight ?? 120;
+      const M = 8;
+      const spaceBelow = window.innerHeight - r.bottom;
+      const up = spaceBelow < h + M && r.top > spaceBelow;
+      const top = up
+        ? Math.max(M, r.top - h - 4)
+        : Math.min(r.bottom + 4, Math.max(M, window.innerHeight - h - M));
+      const left = Math.max(M, Math.min(r.left, window.innerWidth - w - M));
+      setPos({ top, left });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   return (
     <div ref={ref} className="relative inline-flex max-w-full">
@@ -299,33 +330,40 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
           <X size={12} />
         </button>
       </span>
-      {open && (
-        <div
-          className={`absolute top-full z-30 mt-1 w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg ${
-            alignRight ? "right-0" : "left-0"
-          }`}
-        >
-          <p className="text-xs leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
-            Hapus grup <span className="font-semibold text-slate-800">{group.name}</span>? Product-nya
-            jadi <span className="font-medium">tanpa grup</span> (tidak ikut terhapus).
-          </p>
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
-            >
-              Batal
-            </button>
-            <form action={deleteAction}>
-              <input type="hidden" name="id" value={group.id} />
-              <SubmitButton variant="danger" className="px-2.5 py-1 text-xs" pendingText="…">
-                Hapus
-              </SubmitButton>
-            </form>
-          </div>
-        </div>
-      )}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popRef}
+            className="fixed z-[300] w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg"
+            style={{
+              top: pos?.top ?? 0,
+              left: pos?.left ?? 0,
+              visibility: pos ? "visible" : "hidden",
+            }}
+          >
+            <p className="text-xs leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
+              Hapus grup <span className="font-semibold text-slate-800">{group.name}</span>? Product-nya
+              jadi <span className="font-medium">tanpa grup</span> (tidak ikut terhapus).
+            </p>
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+              >
+                Batal
+              </button>
+              <form action={deleteAction} onSubmit={() => setOpen(false)}>
+                <input type="hidden" name="id" value={group.id} />
+                <SubmitButton variant="danger" className="px-2.5 py-1 text-xs" pendingText="…">
+                  Hapus
+                </SubmitButton>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

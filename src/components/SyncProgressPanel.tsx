@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ChevronDown, X } from "lucide-react";
 
 type Job = {
   id: string;
@@ -41,13 +41,51 @@ function elapsed(startedAt: string): string {
   return s < 60 ? `${s} detik` : `${Math.floor(s / 60)} menit ${s % 60} detik`;
 }
 
+function title(j: Job): string {
+  return j.scope === "ALL"
+    ? `Sync semua toko${j.storeTotal > 1 ? ` (${Math.max(1, j.storeIndex)}/${j.storeTotal})` : ""}`
+    : `Sync ${j.storeName}`;
+}
+
+// kunci per-toko, bukan per-job: tiap putaran bikin baris job baru, jadi kalau
+// dismiss disimpan per id kartunya nongol lagi 5 menit kemudian
+function jobKey(j: Job): string {
+  return `${j.scope}|${j.storeName}`;
+}
+
+const HIDDEN_KEY = "syncPanelHidden";
+const COLLAPSE_AT = 2; // lebih dari ini → daftar idle ditutup by default
+
 // Panel progres sync yang hidup: polling ke /api/sync/progress.
 // Muncul sendiri saat ada sync jalan (termasuk yang dijalankan cron / tab lain),
 // hilang sendiri beberapa detik setelah selesai.
 export function SyncProgressPanel() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [, setTick] = useState(0);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [showIdle, setShowIdle] = useState(false);
   const busy = useRef(false); // ada job jalan → polling dipercepat
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(HIDDEN_KEY);
+      if (raw) setHidden(JSON.parse(raw) as string[]);
+    } catch {
+      /* storage diblokir — biarkan tampil semua */
+    }
+  }, []);
+
+  function dismiss(key: string) {
+    setHidden((h) => {
+      const next = h.includes(key) ? h : [...h, key];
+      try {
+        sessionStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+      } catch {
+        /* abaikan */
+      }
+      return next;
+    });
+  }
 
   const load = useCallback(async () => {
     try {
@@ -88,69 +126,99 @@ export function SyncProgressPanel() {
     };
   }, [load]);
 
-  if (jobs.length === 0) return null;
+  // Yang jalan = kartu penuh (butuh bar progres). Yang sudah selesai — termasuk
+  // yang partial dan menunggu putaran berikutnya — cukup satu baris ringkas,
+  // kalau tidak layar habis dimakan kartu yang cuma bilang "menunggu".
+  const running = jobs.filter((j) => !j.finishedAt);
+  const idle = jobs.filter((j) => j.finishedAt && !hidden.includes(jobKey(j)));
+  if (running.length === 0 && idle.length === 0) return null;
+
+  const collapsed = idle.length > COLLAPSE_AT && !showIdle;
 
   return (
     <div className="space-y-3">
-      {jobs.map((j) => {
-        const running = !j.finishedAt;
-        const failed = j.phase === "error";
-        // selesai tapi masih ada sisa → menunggu putaran berikutnya
-        const waiting = !running && !failed && j.partial;
-        const pct = percent(j);
-        const tone = failed
-          ? { border: "border-red-200", bg: "bg-red-50", text: "text-red-800", bar: "bg-red-500" }
-          : running
-            ? { border: "border-indigo-200", bg: "bg-indigo-50/60", text: "text-indigo-900", bar: "bg-indigo-500" }
-            : j.partial
-              ? { border: "border-amber-200", bg: "bg-amber-50", text: "text-amber-900", bar: "bg-amber-500" }
-              : { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-900", bar: "bg-emerald-500" };
+      {running.map((j) => (
+        <div key={j.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <RefreshCw size={18} className="mt-0.5 shrink-0 animate-spin text-indigo-500" />
 
-        return (
-          <div key={j.id} className={`rounded-xl border ${tone.border} ${tone.bg} px-5 py-3.5`}>
-            <div className="flex items-start gap-2.5">
-              {failed ? (
-                <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
-              ) : running ? (
-                <RefreshCw size={18} className="mt-0.5 shrink-0 animate-spin text-indigo-500" />
-              ) : j.partial ? (
-                <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
-              ) : (
-                <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
-              )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-indigo-900">
+                {title(j)}
+                <span className="ml-1 font-normal opacity-70">· {elapsed(j.startedAt)}</span>
+              </p>
+              <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
+                {j.error ?? j.message ?? "Menyiapkan…"}
+              </p>
 
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${tone.text}`}>
-                  {j.scope === "ALL"
-                    ? `Sync semua toko${j.storeTotal > 1 ? ` (${Math.max(1, j.storeIndex)}/${j.storeTotal})` : ""}`
-                    : `Sync ${j.storeName}`}
-                  {running && <span className="ml-1 font-normal opacity-70">· {elapsed(j.startedAt)}</span>}
-                </p>
-                <p className={`mt-0.5 text-xs ${tone.text} opacity-80`}>
-                  {j.error ?? j.message ?? "Menyiapkan…"}
-                </p>
-                {waiting && (
-                  <p className={`mt-0.5 text-xs ${tone.text} opacity-70`}>
-                    Menunggu putaran berikutnya — jalan otomatis tiap beberapa menit, halaman boleh ditutup.
-                  </p>
-                )}
-
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
-                  <div
-                    className={`h-full rounded-full ${tone.bar} transition-[width] duration-500`}
-                    style={{ width: `${failed ? 100 : pct}%` }}
-                  />
-                </div>
-
-                <p className={`mt-1.5 text-xs ${tone.text} opacity-70`}>
-                  {j.ordersDone} order dipindai · {j.created} baru · {j.updated} diperbarui
-                  {j.windowTotal > 0 && running ? ` · periode ${j.windowIndex}/${j.windowTotal}` : ""}
-                </p>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
+                <div
+                  className="h-full rounded-full bg-indigo-500 transition-[width] duration-500"
+                  style={{ width: `${percent(j)}%` }}
+                />
               </div>
+
+              <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
+                {j.ordersDone} order dipindai · {j.created} baru · {j.updated} diperbarui
+                {j.windowTotal > 0 ? ` · periode ${j.windowIndex}/${j.windowTotal}` : ""}
+              </p>
             </div>
           </div>
-        );
-      })}
+        </div>
+      ))}
+
+      {idle.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          {idle.length > COLLAPSE_AT && (
+            <button
+              type="button"
+              onClick={() => setShowIdle((s) => !s)}
+              className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+            >
+              <span>{idle.length} sync menunggu / selesai</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${collapsed ? "" : "rotate-180"}`} />
+            </button>
+          )}
+
+          {!collapsed &&
+            idle.map((j) => {
+              const failed = j.phase === "error";
+              const Icon = failed ? XCircle : j.partial ? AlertTriangle : CheckCircle2;
+              const tint = failed ? "text-red-500" : j.partial ? "text-amber-500" : "text-emerald-500";
+
+              return (
+                <div
+                  key={j.id}
+                  className="flex items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 first:border-t-0"
+                >
+                  <Icon size={15} className={`shrink-0 ${tint}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-700">
+                      {title(j)}
+                      <span className="ml-1.5 font-normal text-slate-400">
+                        {j.created} baru · {j.updated} diperbarui
+                      </span>
+                    </p>
+                    <p className="truncate text-[11px] text-slate-400">
+                      {j.error ??
+                        (j.partial
+                          ? "Menunggu putaran berikutnya — jalan otomatis, halaman boleh ditutup."
+                          : (j.message ?? "Selesai"))}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dismiss(jobKey(j))}
+                    aria-label="Sembunyikan"
+                    className="shrink-0 rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
