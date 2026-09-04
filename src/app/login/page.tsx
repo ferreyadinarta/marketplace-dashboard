@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useActionState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
@@ -13,6 +13,14 @@ function LoginForm() {
   const next = params.get("next") ?? "/";
   const [state, formAction] = useActionState<LoginState, FormData>(login, {});
   const [show, setShow] = useState(false);
+
+  // Bangunkan compute Neon sambil user mengetik password. Neon tidur setelah 5
+  // menit idle dan bangunnya ~470ms; kalau baru kena di halaman pertama, halaman
+  // itu yang terasa lambat. Dipanggil sekali di sini → hangat sebelum "Masuk"
+  // ditekan, tanpa perlu keep-warm periodik yang menghabiskan kuota compute.
+  useEffect(() => {
+    void fetch("/api/health?db=1", { cache: "no-store" }).catch(() => {});
+  }, []);
 
   return (
     <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

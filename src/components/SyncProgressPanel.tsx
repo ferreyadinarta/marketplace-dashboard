@@ -23,7 +23,15 @@ type Job = {
 };
 
 const POLL_ACTIVE_MS = 2_000; // ada sync jalan → sering, biar terasa hidup
-const POLL_IDLE_MS = 10_000; // nganggur → jarang, hemat invocation
+const POLL_IDLE_MS = 10_000; // baru buka / habis ada kegiatan → masih responsif
+const POLL_SLEEP_MS = 60_000; // lama nganggur → jarang
+// Tiap polling = satu query ke Neon, dan compute-nya baru boleh tidur setelah
+// 5 menit TANPA query. Polling 10 detik terus-menerus = compute nyala selama
+// tab dibuka, dan plan Free cuma 100 CU-jam/bulan. Jadi setelah beberapa menit
+// tidak ada job, iramanya turun ke 60 detik — masih di bawah ambang tidur saat
+// tab aktif, tapi jauh lebih murah. Ritme cepat balik lagi begitu ada tanda
+// kehidupan: tab difokuskan lagi, atau tombol Sync ditekan (event sync:started).
+const IDLE_GRACE_MS = 2 * 60 * 1000;
 
 // Persentase kasar: gabungan posisi toko + posisi periode di dalam toko.
 // Tidak akurat 100% (jumlah order belum diketahui di awal), tapi cukup untuk
@@ -65,6 +73,7 @@ export function SyncProgressPanel() {
   const [hidden, setHidden] = useState<string[]>([]);
   const [showIdle, setShowIdle] = useState(false);
   const busy = useRef(false); // ada job jalan → polling dipercepat
+  const lastBusy = useRef(Date.now()); // kapan terakhir ada tanda kehidupan
 
   useEffect(() => {
     try {
@@ -94,6 +103,7 @@ export function SyncProgressPanel() {
       const d = (await r.json()) as { jobs?: Job[] };
       const next = d.jobs ?? [];
       busy.current = next.some((j) => !j.finishedAt);
+      if (busy.current) lastBusy.current = Date.now();
       setJobs(next);
     } catch {
       // offline / navigasi — biarkan, putaran berikutnya coba lagi
@@ -108,21 +118,38 @@ export function SyncProgressPanel() {
       if (stop) return;
       if (document.visibilityState === "visible") await load();
       if (stop) return;
-      timer = setTimeout(loop, busy.current ? POLL_ACTIVE_MS : POLL_IDLE_MS);
+      const idleFor = Date.now() - lastBusy.current;
+      const wait = busy.current
+        ? POLL_ACTIVE_MS
+        : idleFor < IDLE_GRACE_MS
+          ? POLL_IDLE_MS
+          : POLL_SLEEP_MS;
+      timer = setTimeout(loop, wait);
     };
     queueMicrotask(loop);
 
-    // detik berjalan biar "sudah X detik" tetap hidup
-    const tick = setInterval(() => setTick((t) => t + 1), 1_000);
+    // detik berjalan biar "sudah X detik" tetap hidup — cuma perlu saat ada job
+    // jalan, jadi tidak bikin render tiap detik saat panel diam
+    const tick = setInterval(() => busy.current && setTick((t) => t + 1), 1_000);
+    // tanda kehidupan → balik ke ritme cepat & langsung tarik data
+    const wake = () => {
+      lastBusy.current = Date.now();
+      clearTimeout(timer);
+      void loop();
+    };
     const onVisible = () => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") wake();
     };
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("sync:started", wake);
     return () => {
       stop = true;
       clearTimeout(timer);
       clearInterval(tick);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("sync:started", wake);
     };
   }, [load]);
 
