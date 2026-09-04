@@ -1,8 +1,5 @@
 import { Card, PageHeader } from "@/components/ui";
 
-// Skeleton Master Product (loading boundary Next.js). Judulnya harus ikut
-// halaman ini — sebelumnya jatuh ke skeleton grup (app) yang bertuliskan
-// "Dashboard", jadi saat memuat halamannya seolah salah halaman.
 function Bar({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }

@@ -24,13 +24,7 @@ type Job = {
 
 const POLL_ACTIVE_MS = 2_000; // ada sync jalan → sering, biar terasa hidup
 const POLL_IDLE_MS = 10_000; // baru buka / habis ada kegiatan → masih responsif
-const POLL_SLEEP_MS = 60_000; // lama nganggur → jarang
-// Tiap polling = satu query ke Neon, dan compute-nya baru boleh tidur setelah
-// 5 menit TANPA query. Polling 10 detik terus-menerus = compute nyala selama
-// tab dibuka, dan plan Free cuma 100 CU-jam/bulan. Jadi setelah beberapa menit
-// tidak ada job, iramanya turun ke 60 detik — masih di bawah ambang tidur saat
-// tab aktif, tapi jauh lebih murah. Ritme cepat balik lagi begitu ada tanda
-// kehidupan: tab difokuskan lagi, atau tombol Sync ditekan (event sync:started).
+const POLL_SLEEP_MS = 60_000; // lama nganggur → jarang, tiap poll = query ke Neon
 const IDLE_GRACE_MS = 2 * 60 * 1000;
 
 // Persentase kasar: gabungan posisi toko + posisi periode di dalam toko.
@@ -55,8 +49,7 @@ function title(j: Job): string {
     : `Sync ${j.storeName}`;
 }
 
-// kunci per-toko, bukan per-job: tiap putaran bikin baris job baru, jadi kalau
-// dismiss disimpan per id kartunya nongol lagi 5 menit kemudian
+// per toko, bukan per job: tiap putaran bikin baris job baru
 function jobKey(j: Job): string {
   return `${j.scope}|${j.storeName}`;
 }
@@ -128,10 +121,8 @@ export function SyncProgressPanel() {
     };
     queueMicrotask(loop);
 
-    // detik berjalan biar "sudah X detik" tetap hidup — cuma perlu saat ada job
-    // jalan, jadi tidak bikin render tiap detik saat panel diam
+    // "sudah X detik" cuma perlu jalan saat ada job
     const tick = setInterval(() => busy.current && setTick((t) => t + 1), 1_000);
-    // tanda kehidupan → balik ke ritme cepat & langsung tarik data
     const wake = () => {
       lastBusy.current = Date.now();
       clearTimeout(timer);
@@ -153,9 +144,7 @@ export function SyncProgressPanel() {
     };
   }, [load]);
 
-  // Yang jalan = kartu penuh (butuh bar progres). Yang sudah selesai — termasuk
-  // yang partial dan menunggu putaran berikutnya — cukup satu baris ringkas,
-  // kalau tidak layar habis dimakan kartu yang cuma bilang "menunggu".
+  // yang jalan = kartu penuh, sisanya satu baris ringkas biar tidak makan layar
   const running = jobs.filter((j) => !j.finishedAt);
   const idle = jobs.filter((j) => j.finishedAt && !hidden.includes(jobKey(j)));
   if (running.length === 0 && idle.length === 0) return null;

@@ -1,8 +1,5 @@
-// Skeleton cadangan untuk halaman di grup (app) yang belum punya loading.tsx
-// sendiri. SENGAJA tanpa judul: skeleton grup ini kena SEMUA rute anak, jadi
-// judul apa pun yang ditulis di sini bakal salah di sebagian halaman
-// (dulu semua halaman memuat dengan judul "Dashboard"). Halaman yang butuh
-// skeleton mirip isinya bikin loading.tsx sendiri di foldernya.
+// Skeleton cadangan untuk rute (app) yang belum punya loading.tsx sendiri.
+// Tanpa judul — skeleton ini kena semua rute anak, judul apa pun bakal salah di sebagian halaman.
 import { Card } from "@/components/ui";
 
 function Bar({ className = "" }: { className?: string }) {

@@ -8,11 +8,7 @@ export const maxDuration = 60;
 // Lanjutkan sync yang masih menyisakan pekerjaan — SATU putaran per panggilan.
 //
 // Dipanggil penjadwal LUAR (cron-job.org / UptimeRobot) tiap >=15 menit.
-//
-// JANGAN dipasang di bawah 5 menit: tiap panggilan menyentuh DB, dan compute
-// Neon baru tidur setelah 5 menit tanpa query. Ping 4 menit = compute nyala
-// 24/7 = ~182 CU-jam/bulan, sedangkan plan Free cuma 100 CU-jam. Sisa sync
-// jadi lebih lambat selesai, tapi kuota compute-nya tidak habis di tengah bulan. Kenapa dari luar? Karena
+// Jangan di bawah 5 menit: tiap panggilan query DB, compute Neon jadi tidak pernah tidur. Kenapa dari luar? Karena
 // Vercel menolak deployment yang memanggil URL-nya sendiri (HTTP 508 Loop
 // Detected), jadi server tidak bisa menyambung putarannya sendiri.
 //

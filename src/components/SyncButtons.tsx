@@ -49,8 +49,7 @@ function useSyncRunner() {
     async (body: RunBody) => {
       setRunning(true);
       stop.current = false;
-      // SyncProgressPanel menurunkan irama polling-nya kalau lama tidak ada job
-      // (hemat compute Neon) — kabari supaya langsung balik ke ritme cepat
+      // panel menurunkan irama polling saat idle — kabari biar langsung cepat lagi
       window.dispatchEvent(new Event("sync:started"));
       let acc = { created: 0, updated: 0 };
 

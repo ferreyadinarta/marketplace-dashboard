@@ -14,10 +14,7 @@ function LoginForm() {
   const [state, formAction] = useActionState<LoginState, FormData>(login, {});
   const [show, setShow] = useState(false);
 
-  // Bangunkan compute Neon sambil user mengetik password. Neon tidur setelah 5
-  // menit idle dan bangunnya ~470ms; kalau baru kena di halaman pertama, halaman
-  // itu yang terasa lambat. Dipanggil sekali di sini → hangat sebelum "Masuk"
-  // ditekan, tanpa perlu keep-warm periodik yang menghabiskan kuota compute.
+  // bangunkan compute Neon sambil user mengetik, biar halaman pertama tidak kena cold start
   useEffect(() => {
     void fetch("/api/health?db=1", { cache: "no-store" }).catch(() => {});
   }, []);

@@ -48,3 +48,8 @@ next-env.d.ts
 *.db-journal
 prisma/dev.db
 prisma/prod.db
+
+# artefak Playwright / screenshot manual (hasil cek UI, bukan bagian aplikasi)
+.playwright-mcp/
+*-390.png
+*-390-viewport.png

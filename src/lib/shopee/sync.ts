@@ -108,7 +108,7 @@ function feeFromIncome(inc: ShopeeIncome): number {
 // Escrow = 1 panggilan API PER ORDER. Kalau dijalankan berurutan, toko dengan
 // ribuan order tidak akan selesai sebelum function timeout → jalankan paralel
 // terbatas (jangan terlalu tinggi supaya tidak kena rate limit Shopee).
-const ESCROW_CONCURRENCY = 6;
+const ESCROW_CONCURRENCY = 10;
 
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let cursor = 0;
@@ -254,13 +254,16 @@ export async function syncShopeeStore(
         select: { marketplaceOrderId: true, marketplaceFee: true, netAmount: true, status: true },
       });
 
-      // semua sudah final & lengkap → lewati, tidak perlu panggil API sama sekali
-      const allDone =
-        known.length === chunk.length && known.every((k) => FINAL_STATUS.includes(k.status));
-      if (allDone) {
+      // dicek per order, bukan per chunk: 1 order belum final jangan menyeret 49 lainnya
+      const done = new Set(
+        known.filter((k) => FINAL_STATUS.includes(k.status)).map((k) => k.marketplaceOrderId)
+      );
+      const todo = chunk.filter((sn) => !done.has(sn));
+      if (todo.length === 0) {
         ordersDone += chunk.length;
         continue;
       }
+      ordersDone += chunk.length - todo.length;
 
       const cached = new Map<string, CachedFee>(
         known
@@ -268,13 +271,13 @@ export async function syncShopeeStore(
           .map((k) => [k.marketplaceOrderId, { marketplaceFee: k.marketplaceFee, netAmount: k.netAmount }])
       );
 
-      const details = await getOrderDetails(accessToken, shopId, chunk);
+      const details = await getOrderDetails(accessToken, shopId, todo);
       const normalized = await normalizeWithFees(accessToken, shopId, details, cached);
       const r = await ingestOrders(store.id, normalized);
       total.created += r.created;
       total.updated += r.updated;
       total.unmapped += r.unmapped;
-      ordersDone += chunk.length;
+      ordersDone += todo.length;
 
       await progress?.({
         ordersDone,
