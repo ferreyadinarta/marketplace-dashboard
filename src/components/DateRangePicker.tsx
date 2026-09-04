@@ -171,11 +171,13 @@ export default function DateRangePicker({
       <button
         type="button"
         onClick={toggleOpen}
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-auto sm:justify-start"
       >
-        <CalendarRange size={16} className="text-slate-400" />
-        <span className="font-medium">{buttonLabel}</span>
-        <ChevronDown size={15} className="text-slate-400" />
+        <span className="flex min-w-0 items-center gap-2">
+          <CalendarRange size={16} className="shrink-0 text-slate-400" />
+          <span className="truncate font-medium">{buttonLabel}</span>
+        </span>
+        <ChevronDown size={15} className="shrink-0 text-slate-400" />
       </button>
 
       {open && (

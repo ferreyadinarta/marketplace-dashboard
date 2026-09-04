@@ -55,14 +55,14 @@ export default function PembukuanFilter({
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <label className="block">
+      <label className="block w-full sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Rentang tanggal</span>
         <DateRangePicker initialFrom={initialFrom} initialTo={initialTo} defaultAll />
       </label>
-      <label className="block">
+      <label className="block w-full sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Marketplace</span>
         <Select
-          className="min-w-40"
+          className="w-full sm:w-auto sm:min-w-40"
           value={params.get("marketplace") ?? ""}
           onValueChange={(v) => update("marketplace", v)}
           options={[
@@ -75,10 +75,10 @@ export default function PembukuanFilter({
           ]}
         />
       </label>
-      <label className="block">
+      <label className="block w-full sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Toko</span>
         <Select
-          className="min-w-44"
+          className="w-full sm:w-auto sm:min-w-44"
           value={params.get("storeId") ?? ""}
           onValueChange={(v) => update("storeId", v)}
           options={[
@@ -88,10 +88,10 @@ export default function PembukuanFilter({
           disabled={storeOptions.length === 0}
         />
       </label>
-      <label className="block">
+      <label className="block w-full sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Grup / Brand</span>
         <Select
-          className="min-w-44"
+          className="w-full sm:w-auto sm:min-w-44"
           value={params.get("groupId") ?? ""}
           onValueChange={(v) => update("groupId", v)}
           options={[
@@ -105,7 +105,7 @@ export default function PembukuanFilter({
       {hasFilter && (
         <button
           onClick={() => router.push("/pembukuan", { scroll: false })}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
         >
           <RotateCcw size={15} /> Reset
         </button>
@@ -113,7 +113,7 @@ export default function PembukuanFilter({
 
       <a
         href={`/api/export?${qs}`}
-        className="ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 sm:ml-auto sm:w-auto"
       >
         <Download size={16} /> Export Excel
       </a>
