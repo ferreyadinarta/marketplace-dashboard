@@ -152,6 +152,7 @@ model Order {
   marketplaceFee     Int      @default(0) // total potongan fee marketplace
   shippingSubsidy    Int      @default(0)
   netAmount          Int      @default(0) // yang seharusnya cair ke seller
+  escrowAt           DateTime? // escrow sudah pernah ditarik (fee final), walau feenya 0
   payoutId           String?
   payout             Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
   createdAt          DateTime @default(now())

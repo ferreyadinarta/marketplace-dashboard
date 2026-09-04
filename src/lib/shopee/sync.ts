@@ -154,6 +154,7 @@ async function normalizeWithFees(
   await mapLimit(pending, ESCROW_CONCURRENCY, async ({ sn, idx }) => {
     const inc = await getEscrowDetail(accessToken, shopId, sn);
     if (!inc) return;
+    orders[idx].escrowAt = new Date();
     orders[idx].marketplaceFee = feeFromIncome(inc);
     if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
       orders[idx].netAmount = Math.round(inc.escrow_amount);
@@ -251,9 +252,10 @@ export async function syncShopeeStore(
       }
       const chunk = sns.slice(i, i + BATCH);
 
-      // order yang sudah tersimpan + fee-nya sudah ada
+      // escrowAt, bukan fee > 0: order final yang feenya memang 0 (batal, atau
+      // escrow balikin 0) jangan ikut ditarik ulang tiap putaran
       const known = await prisma.order.findMany({
-        where: { storeId: store.id, marketplaceOrderId: { in: chunk }, marketplaceFee: { gt: 0 } },
+        where: { storeId: store.id, marketplaceOrderId: { in: chunk }, escrowAt: { not: null } },
         select: { marketplaceOrderId: true, marketplaceFee: true, netAmount: true, status: true },
       });
 

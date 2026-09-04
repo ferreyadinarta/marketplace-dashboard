@@ -14,6 +14,7 @@ type Job = {
   windowTotal: number;
   ordersDone: number;
   ordersTotal: number;
+  round: number;
   created: number;
   updated: number;
   partial: boolean;
@@ -74,6 +75,9 @@ export function SyncProgressPanel() {
   const busy = useRef(false); // ada job jalan → polling dipercepat
   const lastBusy = useRef(Date.now()); // kapan terakhir ada tanda kehidupan
   const rate = useRef(new Map<string, { t: number; done: number; perSec: number }>());
+  // tiap putaran = baris job baru dengan hitungan mulai 0; simpan capaian
+  // tertinggi per toko biar barnya tidak mundur di awal putaran berikutnya
+  const best = useRef(new Map<string, { done: number; total: number; ids: Set<string> }>());
 
   useEffect(() => {
     try {
@@ -105,6 +109,18 @@ export function SyncProgressPanel() {
       busy.current = next.some((j) => !j.finishedAt);
       if (busy.current) lastBusy.current = Date.now();
       const now = Date.now();
+      for (const j of next) {
+        const k = jobKey(j);
+        const b = best.current.get(k);
+        // putaran 1 yang baru = sync baru → mulai dari nol lagi
+        if (!b || (j.round <= 1 && !b.ids.has(j.id))) {
+          best.current.set(k, { done: j.ordersDone, total: j.ordersTotal, ids: new Set([j.id]) });
+        } else {
+          b.ids.add(j.id);
+          b.done = Math.max(b.done, j.ordersDone);
+          b.total = Math.max(b.total, j.ordersTotal);
+        }
+      }
       for (const j of next) {
         const prev = rate.current.get(j.id);
         if (prev && j.ordersDone > prev.done && now > prev.t) {
@@ -175,9 +191,13 @@ export function SyncProgressPanel() {
   return (
     <div className="space-y-3">
       {running.map((j) => {
-        const sisa = Math.max(0, j.ordersTotal - j.ordersDone);
+        const b = best.current.get(jobKey(j));
+        const done = Math.max(j.ordersDone, b?.done ?? 0);
+        const totalOrders = Math.max(j.ordersTotal, b?.total ?? 0);
+        const sisa = Math.max(0, totalOrders - done);
         const perSec = rate.current.get(j.id)?.perSec ?? 0;
         const eta = sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
+        const pct = totalOrders > 0 ? Math.min(97, Math.round((done / totalOrders) * 100)) : percent(j);
         return (
         <div key={j.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-3.5">
           <div className="flex items-start gap-2.5">
@@ -186,6 +206,7 @@ export function SyncProgressPanel() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-indigo-900">
                 {title(j)}
+                {j.round > 1 ? <span className="ml-1 font-normal opacity-70">· putaran {j.round}</span> : null}
                 <span className="ml-1 font-normal opacity-70">
                   · {elapsed(j.startedAt)}
                   {eta ? ` · sisa ±${eta}` : ""}
@@ -198,14 +219,14 @@ export function SyncProgressPanel() {
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
                 <div
                   className="h-full rounded-full bg-indigo-500 transition-[width] duration-500"
-                  style={{ width: `${percent(j)}%` }}
+                  style={{ width: `${pct}%` }}
                 />
               </div>
 
               <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
-                {j.ordersTotal > 0
-                  ? `${j.ordersDone} dari ${j.ordersTotal} order · sisa ${sisa}`
-                  : `${j.ordersDone} order dipindai`}
+                {totalOrders > 0
+                  ? `${done} dari ${totalOrders} order · sisa ${sisa}`
+                  : `${done} order dipindai`}
                 {j.created > 0 || j.updated > 0 ? ` · ${j.created} baru · ${j.updated} diperbarui` : ""}
               </p>
             </div>

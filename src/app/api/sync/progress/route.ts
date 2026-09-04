@@ -19,6 +19,7 @@ export async function GET() {
           storeTotal: j.storeTotal,
           windowIndex: j.windowIndex,
           windowTotal: j.windowTotal,
+          round: j.round,
           ordersDone: j.ordersDone,
           ordersTotal: j.ordersTotal,
           created: j.created,

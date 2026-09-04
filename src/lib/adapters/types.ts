@@ -24,6 +24,7 @@ export type NormalizedOrder = {
   marketplaceFee: number; // total potongan marketplace
   shippingSubsidy: number;
   netAmount: number; // yang seharusnya cair ke seller
+  escrowAt?: Date; // diisi kalau fee escrow benar-benar sudah ditarik
   items: NormalizedOrderItem[];
 };
 

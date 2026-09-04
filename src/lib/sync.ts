@@ -101,6 +101,7 @@ export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder
             marketplaceFee: o.marketplaceFee,
             shippingSubsidy: o.shippingSubsidy,
             netAmount: o.netAmount,
+            ...(o.escrowAt ? { escrowAt: o.escrowAt } : {}),
           },
         })
       );
@@ -118,6 +119,7 @@ export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder
             marketplaceFee: o.marketplaceFee,
             shippingSubsidy: o.shippingSubsidy,
             netAmount: o.netAmount,
+            escrowAt: o.escrowAt ?? null,
             items: { create: items },
           },
         })
