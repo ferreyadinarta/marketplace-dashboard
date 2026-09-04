@@ -218,6 +218,7 @@ export async function syncShopeeStore(
   const total: SyncResult = { created: 0, updated: 0, unmapped: 0, partial: false };
   const progress = opts.onProgress;
   let ordersDone = 0; // order yang sudah dipindai (untuk tampilan progres)
+  let ordersTotal = 0; // order yang sudah ketahuan ada; tumbuh tiap periode dilist
 
   await progress?.({
     phase: "orders",
@@ -240,6 +241,8 @@ export async function syncShopeeStore(
     });
     if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
     const sns = await getOrderSnList(accessToken, shopId, ws, we);
+    ordersTotal += sns.length;
+    await progress?.({ ordersTotal });
 
     for (let i = 0; i < sns.length; i += BATCH) {
       if (outOfTime()) {
@@ -281,9 +284,10 @@ export async function syncShopeeStore(
 
       await progress?.({
         ordersDone,
+        ordersTotal,
         created: total.created,
         updated: total.updated,
-        message: `Periode ${wi + 1}/${windows.length} · ${ordersDone} order dipindai`,
+        message: `Periode ${wi + 1}/${windows.length}`,
       });
     }
     if (total.partial) break;

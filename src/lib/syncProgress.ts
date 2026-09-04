@@ -12,6 +12,7 @@ export type ProgressPatch = {
   windowIndex?: number;
   windowTotal?: number;
   ordersDone?: number;
+  ordersTotal?: number;
   created?: number;
   updated?: number;
   partial?: boolean;

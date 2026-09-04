@@ -13,6 +13,7 @@ type Job = {
   windowIndex: number;
   windowTotal: number;
   ordersDone: number;
+  ordersTotal: number;
   created: number;
   updated: number;
   partial: boolean;
@@ -27,15 +28,20 @@ const POLL_IDLE_MS = 10_000; // baru buka / habis ada kegiatan → masih respons
 const POLL_SLEEP_MS = 60_000; // lama nganggur → jarang, tiap poll = query ke Neon
 const IDLE_GRACE_MS = 2 * 60 * 1000;
 
-// Persentase kasar: gabungan posisi toko + posisi periode di dalam toko.
-// Tidak akurat 100% (jumlah order belum diketahui di awal), tapi cukup untuk
-// memberi tahu user bahwa ada kemajuan — dibanding spinner yang diam.
+// Pakai jumlah order kalau sudah ketahuan; kalau belum, jatuh ke posisi periode.
 function percent(j: Job): number {
   if (j.finishedAt) return 100;
+  if (j.ordersTotal > 0) return Math.min(97, Math.round((j.ordersDone / j.ordersTotal) * 100));
   const perStore = j.storeTotal > 0 ? 1 / j.storeTotal : 1;
   const doneStores = Math.max(0, j.storeIndex - 1) * perStore;
   const inStore = j.windowTotal > 0 ? (j.windowIndex / j.windowTotal) * perStore : 0;
   return Math.min(97, Math.round((doneStores + inStore) * 100));
+}
+
+function shortDur(sec: number): string {
+  if (sec < 60) return `${Math.max(5, Math.round(sec / 5) * 5)} detik`;
+  const m = Math.round(sec / 60);
+  return m < 60 ? `${m} menit` : `${Math.floor(m / 60)} jam ${m % 60} menit`;
 }
 
 function elapsed(startedAt: string): string {
@@ -67,6 +73,7 @@ export function SyncProgressPanel() {
   const [showIdle, setShowIdle] = useState(false);
   const busy = useRef(false); // ada job jalan → polling dipercepat
   const lastBusy = useRef(Date.now()); // kapan terakhir ada tanda kehidupan
+  const rate = useRef(new Map<string, { t: number; done: number; perSec: number }>());
 
   useEffect(() => {
     try {
@@ -97,6 +104,20 @@ export function SyncProgressPanel() {
       const next = d.jobs ?? [];
       busy.current = next.some((j) => !j.finishedAt);
       if (busy.current) lastBusy.current = Date.now();
+      const now = Date.now();
+      for (const j of next) {
+        const prev = rate.current.get(j.id);
+        if (prev && j.ordersDone > prev.done && now > prev.t) {
+          const inst = ((j.ordersDone - prev.done) * 1000) / (now - prev.t);
+          rate.current.set(j.id, {
+            t: now,
+            done: j.ordersDone,
+            perSec: prev.perSec ? prev.perSec * 0.7 + inst * 0.3 : inst,
+          });
+        } else if (!prev) {
+          rate.current.set(j.id, { t: now, done: j.ordersDone, perSec: 0 });
+        }
+      }
       setJobs(next);
     } catch {
       // offline / navigasi — biarkan, putaran berikutnya coba lagi
@@ -153,7 +174,11 @@ export function SyncProgressPanel() {
 
   return (
     <div className="space-y-3">
-      {running.map((j) => (
+      {running.map((j) => {
+        const sisa = Math.max(0, j.ordersTotal - j.ordersDone);
+        const perSec = rate.current.get(j.id)?.perSec ?? 0;
+        const eta = sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
+        return (
         <div key={j.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-3.5">
           <div className="flex items-start gap-2.5">
             <RefreshCw size={18} className="mt-0.5 shrink-0 animate-spin text-indigo-500" />
@@ -161,7 +186,10 @@ export function SyncProgressPanel() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-indigo-900">
                 {title(j)}
-                <span className="ml-1 font-normal opacity-70">· {elapsed(j.startedAt)}</span>
+                <span className="ml-1 font-normal opacity-70">
+                  · {elapsed(j.startedAt)}
+                  {eta ? ` · sisa ±${eta}` : ""}
+                </span>
               </p>
               <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
                 {j.error ?? j.message ?? "Menyiapkan…"}
@@ -175,13 +203,16 @@ export function SyncProgressPanel() {
               </div>
 
               <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
-                {j.ordersDone} order dipindai · {j.created} baru · {j.updated} diperbarui
-                {j.windowTotal > 0 ? ` · periode ${j.windowIndex}/${j.windowTotal}` : ""}
+                {j.ordersTotal > 0
+                  ? `${j.ordersDone} dari ${j.ordersTotal} order · sisa ${sisa}`
+                  : `${j.ordersDone} order dipindai`}
+                {j.created > 0 || j.updated > 0 ? ` · ${j.created} baru · ${j.updated} diperbarui` : ""}
               </p>
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {idle.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">

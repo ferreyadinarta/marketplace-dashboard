@@ -20,6 +20,7 @@ export async function GET() {
           windowIndex: j.windowIndex,
           windowTotal: j.windowTotal,
           ordersDone: j.ordersDone,
+          ordersTotal: j.ordersTotal,
           created: j.created,
           updated: j.updated,
           partial: j.partial,

@@ -347,7 +347,8 @@ export function MultiItemSaleForm({
           return (
             <div key={i} className="rounded-xl border border-slate-200 p-2">
               <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-                <div className="min-w-0 flex-1">
+                {/* dropdown ambil baris sendiri di layar sempit; kalau ikut sebaris dia tergencet jadi ~8px */}
+                <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
                   <Select
                     value={it.productId}
                     onValueChange={(v) => chooseProduct(i, v)}
@@ -387,7 +388,7 @@ export function MultiItemSaleForm({
                     {unitOf(it.productId) || "unit"}
                   </span>
                 )}
-                <div className="w-36 shrink-0">
+                <div className="w-28 shrink-0 sm:w-36">
                   <CurrencyInput
                     value={Number(it.price) || 0}
                     onValueChange={(n) => setItem(i, "price", String(n))}

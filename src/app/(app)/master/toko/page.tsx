@@ -156,8 +156,8 @@ export default async function MasterTokoPage({
               : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
               <Card key={s.id} className="p-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
                     {s.logoUrl ? (
                       // foto profil toko (dari marketplace saat authorize)
                       // eslint-disable-next-line @next/next/no-img-element

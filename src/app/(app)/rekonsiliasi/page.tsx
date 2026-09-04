@@ -145,24 +145,27 @@ export default async function RekonsiliasiPage() {
               const cocok = r.selisih === 0 && !belumAdaPayout;
               return (
                 <div key={r.store.id} className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  {/* badge di baris sendiri: kalau disandingkan, teksnya pecah per kata di layar sempit */}
+                  <div className="flex flex-col gap-2">
+                    <div className="min-w-0">
                       <p className="font-semibold text-slate-900">{r.store.name}</p>
                       <p className="mt-0.5 text-xs text-slate-400">{MARKETPLACE_LABEL[r.store.marketplace]}</p>
                     </div>
-                    {belumAdaPayout ? (
-                      <Badge color="slate">
-                        <Clock size={13} /> Payout belum masuk
-                      </Badge>
-                    ) : cocok ? (
-                      <Badge color="green">
-                        <CheckCircle2 size={13} /> Cocok
-                      </Badge>
-                    ) : (
-                      <Badge color="amber">
-                        <AlertTriangle size={13} /> Perlu dicek
-                      </Badge>
-                    )}
+                    <span className="self-start whitespace-nowrap">
+                      {belumAdaPayout ? (
+                        <Badge color="slate">
+                          <Clock size={13} /> Payout belum masuk
+                        </Badge>
+                      ) : cocok ? (
+                        <Badge color="green">
+                          <CheckCircle2 size={13} /> Cocok
+                        </Badge>
+                      ) : (
+                        <Badge color="amber">
+                          <AlertTriangle size={13} /> Perlu dicek
+                        </Badge>
+                      )}
+                    </span>
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm">

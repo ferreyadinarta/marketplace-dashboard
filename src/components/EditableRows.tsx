@@ -346,8 +346,9 @@ export function MappingRow({
         </button>
       )}
 
-      <div className="flex w-full items-center gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="flex w-full flex-wrap items-center gap-2">
+        {/* di layar sempit dropdown ambil satu baris penuh; kalau tidak, kolom isi + tombol menggencetnya sampai 0px */}
+        <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
           <Select
             name="productId"
             value={value}

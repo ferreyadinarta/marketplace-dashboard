@@ -448,7 +448,7 @@ export function OpnameCell({
   const selisih = baseCounted !== null && known ? baseCounted - current : null;
 
   return (
-    <form action={action} className="flex items-center gap-2">
+    <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="productId" value={productId} />
       <input type="hidden" name="unit" value={u} />
       <input
@@ -458,7 +458,7 @@ export function OpnameCell({
         value={val}
         onChange={(e) => setVal(e.target.value)}
         placeholder={known ? "fisik…" : "stok awal…"}
-        className="h-9 w-20 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        className="h-9 w-16 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-20"
       />
       {hasPack ? (
         <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
@@ -480,7 +480,7 @@ export function OpnameCell({
       ) : (
         <span className="shrink-0 text-[11px] text-slate-400">{unit}</span>
       )}
-      <span className="w-20 shrink-0 text-xs">
+      <span className="w-14 shrink-0 text-xs sm:w-20">
         {!known ? (
           <span className="text-slate-400">stok awal</span>
         ) : selisih === null ? (

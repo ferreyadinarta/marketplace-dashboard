@@ -52,7 +52,8 @@ model SyncJob {
   windowIndex Int @default(0) // periode 15 harian ke-berapa
   windowTotal Int @default(0)
 
-  ordersDone Int     @default(0) // order yang sudah diproses di job ini
+  ordersDone  Int    @default(0) // order yang sudah diproses di job ini
+  ordersTotal Int    @default(0) // order yang sudah ketahuan ada (periode yang sudah dilist)
   created    Int     @default(0)
   updated    Int     @default(0)
   partial    Boolean @default(false) // waktu habis, masih ada sisa
