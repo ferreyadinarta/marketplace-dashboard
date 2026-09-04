@@ -94,6 +94,22 @@ export async function getDailyTrend(f: DashboardFilter) {
     cur.profit += o.totalAmount - o.marketplaceFee - hpp;
     map.set(key, cur);
   }
+  // Isi hari kosong dengan 0 sepanjang rentang filter. Tanpa ini grafik mulai di
+  // hari pertama yang ADA ordernya, jadi periode tanpa data terlihat seolah tidak
+  // pernah difilter — padahal artinya belum tersync / memang tidak ada penjualan.
+  if (f.from && f.to) {
+    const out: { tanggal: string; omzet: number; profit: number }[] = [];
+    const cursor = new Date(`${dateKey(f.from)}T00:00:00+07:00`);
+    const last = dateKey(f.to);
+    for (let i = 0; i < 1500; i++) {
+      const key = dateKey(cursor);
+      out.push({ tanggal: key, ...(map.get(key) ?? { omzet: 0, profit: 0 }) });
+      if (key >= last) break;
+      cursor.setTime(cursor.getTime() + 24 * 3600 * 1000);
+    }
+    return out;
+  }
+
   return Array.from(map.entries()).map(([tanggal, v]) => ({ tanggal, ...v }));
 }
 
