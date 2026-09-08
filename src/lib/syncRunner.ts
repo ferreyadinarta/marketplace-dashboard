@@ -140,23 +140,30 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
 // Cari pekerjaan sync yang masih menyisakan sisa dan belum dilanjutkan.
 // Yang dianggap tertunda: job terakhir sebuah toko selesai dengan partial=true.
 export async function findPendingRound(): Promise<RoundInput | null> {
+  // scope ALL ikut dilanjutkan; dulu cuma STORE, jadi "Sync semua toko" yang
+  // kepotong waktu tidak pernah disambung dan menggantung selamanya
   const last = await prisma.syncJob.findFirst({
-    where: { scope: "STORE", partial: true, phase: "done", storeId: { not: null } },
+    where: { partial: true, phase: "done" },
     orderBy: { finishedAt: "desc" },
   });
-  if (!last || !last.storeId) return null;
+  if (!last) return null;
   if (last.round >= MAX_ROUNDS) return null;
+  const isAll = last.scope === "ALL";
+  if (!isAll && !last.storeId) return null;
 
-  // sudah ada job yang LEBIH BARU untuk toko ini → berarti sudah dilanjutkan
+  // sudah ada job yang LEBIH BARU untuk pekerjaan yang sama → sudah dilanjutkan
   const newer = await prisma.syncJob.findFirst({
-    where: { storeId: last.storeId, startedAt: { gt: last.finishedAt ?? last.startedAt } },
+    where: {
+      ...(isAll ? { scope: "ALL" } : { storeId: last.storeId }),
+      startedAt: { gt: last.finishedAt ?? last.startedAt },
+    },
     select: { id: true },
   });
   if (newer) return null;
 
   return {
-    scope: "store",
-    storeId: last.storeId,
+    scope: isAll ? "all" : "store",
+    storeId: isAll ? undefined : last.storeId!,
     days: last.days ?? 90,
     round: last.round + 1,
     accCreated: last.created,
