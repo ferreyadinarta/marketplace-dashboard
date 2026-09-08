@@ -214,8 +214,18 @@ export function SyncProgressPanel() {
 
   // yang jalan = kartu penuh, sisanya satu baris ringkas biar tidak makan layar
   const running = jobs.filter(inProgress);
-  const idle = jobs.filter((j) => !inProgress(j) && !hidden.includes(jobKey(j)));
-  if (running.length === 0 && idle.length === 0) return null;
+  const rest = jobs.filter((j) => !inProgress(j) && !hidden.includes(jobKey(j)));
+  // baru saja tuntas → tampilkan penuh, jangan diselipkan ke daftar ringkas
+  const JUST_DONE_MS = 3 * 60 * 1000;
+  const justDone = rest.filter(
+    (j) =>
+      j.phase !== "error" &&
+      !j.partial &&
+      j.finishedAt &&
+      Date.now() - new Date(j.finishedAt).getTime() < JUST_DONE_MS
+  );
+  const idle = rest.filter((j) => !justDone.includes(j));
+  if (running.length === 0 && idle.length === 0 && justDone.length === 0) return null;
 
   const collapsed = idle.length > COLLAPSE_AT && !showIdle;
 
@@ -275,6 +285,32 @@ export function SyncProgressPanel() {
         </div>
         );
       })}
+
+      {justDone.map((j) => (
+        <div key={j.id} className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3.5">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-emerald-900">
+                {j.scope === "ALL" ? "Semua toko selesai diambil" : `${j.storeName} selesai diambil`}
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-900 opacity-80">
+                {j.created > 0 || j.updated > 0
+                  ? `${angka(j.created)} pesanan baru masuk · ${angka(j.updated)} datanya diperbarui`
+                  : "Tidak ada pesanan baru."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => dismiss(jobKey(j))}
+              aria-label="Tutup"
+              className="shrink-0 rounded-md p-1 text-emerald-400 transition hover:bg-emerald-100 hover:text-emerald-700"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
 
       {idle.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
