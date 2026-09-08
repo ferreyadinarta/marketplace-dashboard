@@ -28,41 +28,56 @@ export type PushPayload = {
 
 type SubRow = { endpoint: string; p256dh: string; auth: string };
 
-async function deliver(sub: SubRow, payload: PushPayload): Promise<"ok" | "dead" | "fail"> {
+type Hasil = { status: "ok" | "dead" | "fail"; reason?: string };
+
+async function deliver(sub: SubRow, payload: PushPayload): Promise<Hasil> {
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
       JSON.stringify(payload)
     );
-    return "ok";
+    return { status: "ok" };
   } catch (e) {
-    const code = (e as { statusCode?: number })?.statusCode;
+    const err = e as { statusCode?: number; body?: string; message?: string };
+    const code = err?.statusCode;
+    // alasan aslinya dibawa keluar — tanpa ini semua kegagalan terlihat sama
+    const reason = `${code ?? "?"} ${(err?.body || err?.message || "").toString().slice(0, 120)}`.trim();
     // 404/410 = langganan mati (device unsub / browser buang) → hapus
-    return code === 404 || code === 410 ? "dead" : "fail";
+    return { status: code === 404 || code === 410 ? "dead" : "fail", reason };
   }
 }
 
 // Kirim ke SEMUA device yang berlangganan. Buang langganan yang sudah mati.
-export async function sendToAll(payload: PushPayload): Promise<{ sent: number; failed: number }> {
-  if (!pushConfigured()) return { sent: 0, failed: 0 };
+export type SendResult = { sent: number; failed: number; subs: number; reason?: string };
+
+export async function sendToAll(payload: PushPayload): Promise<SendResult> {
+  if (!pushConfigured()) {
+    return { sent: 0, failed: 0, subs: 0, reason: "VAPID belum di-set di server" };
+  }
   ensureConfigured();
 
   const subs = await prisma.pushSubscription.findMany();
+  if (subs.length === 0) {
+    return { sent: 0, failed: 0, subs: 0, reason: "belum ada device yang berlangganan" };
+  }
+
   const dead: string[] = [];
   let sent = 0;
   let failed = 0;
+  let reason: string | undefined;
 
   await Promise.all(
     subs.map(async (s) => {
       const r = await deliver(s, payload);
-      if (r === "ok") sent++;
+      if (r.status === "ok") sent++;
       else {
         failed++;
-        if (r === "dead") dead.push(s.endpoint);
+        reason ??= r.reason;
+        if (r.status === "dead") dead.push(s.endpoint);
       }
     })
   );
 
   if (dead.length) await prisma.pushSubscription.deleteMany({ where: { endpoint: { in: dead } } });
-  return { sent, failed };
+  return { sent, failed, subs: subs.length, reason };
 }

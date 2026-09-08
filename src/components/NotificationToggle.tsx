@@ -126,11 +126,15 @@ export function NotificationToggle() {
     setMsg(null);
     try {
       const r = await sendTestNotification();
-      setMsg(
-        r.sent > 0
-          ? { tone: "ok", text: "Notifikasi tes dikirim — cek layar HP." }
-          : { tone: "err", text: "Tidak terkirim. Belum ada device aktif / kunci VAPID belum di-set di server." }
-      );
+      if (r.sent > 0) {
+        setMsg({ tone: "ok", text: `Terkirim ke ${r.sent} device — cek layar HP.` });
+      } else {
+        // tampilkan alasan aslinya; tanpa ini semua kegagalan terlihat sama
+        setMsg({
+          tone: "err",
+          text: `Tidak terkirim (${r.subs} device terdaftar)${r.reason ? ` — ${r.reason}` : ""}.`,
+        });
+      }
     } catch (e) {
       setMsg({ tone: "err", text: `Gagal kirim tes: ${(e as Error)?.message || "tidak diketahui"}.` });
     } finally {

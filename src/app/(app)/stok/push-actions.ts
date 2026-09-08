@@ -36,7 +36,12 @@ export async function unsubscribeUser(endpoint: string): Promise<{ ok: boolean }
 }
 
 // Kirim notifikasi tes (buat memastikan izin & service worker jalan).
-export async function sendTestNotification(): Promise<{ sent: number; failed: number }> {
+export async function sendTestNotification(): Promise<{
+  sent: number;
+  failed: number;
+  subs: number;
+  reason?: string;
+}> {
   return sendToAll({
     title: "✅ Notifikasi aktif",
     body: "Kamu akan dapat pesan di sini kalau ada stok menipis.",
