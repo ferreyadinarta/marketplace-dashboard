@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   getSummary,
+  getInFlight,
   getDailyTrend,
   getByMarketplace,
   getBestSellers,
@@ -66,8 +67,9 @@ export default async function DashboardPage({
   const canCompare = !period.isAll && !!filter.from && !!filter.to;
   const prev = canCompare ? previousPeriod(filter.from!, filter.to!) : null;
 
-  const [summary, prevSummary, trend, byMp, best, setup, levels] = await Promise.all([
+  const [summary, inFlight, prevSummary, trend, byMp, best, setup, levels] = await Promise.all([
     getSummary(filter),
+    getInFlight(filter),
     prev ? getSummary({ ...filter, from: prev.from, to: prev.to }) : Promise.resolve(null),
     getDailyTrend(filter),
     getByMarketplace(filter),
@@ -185,6 +187,25 @@ export default async function DashboardPage({
           help="Omzet dikurangi fee marketplace dan HPP. Inilah untung sebenarnya."
         />
       </div>
+
+      {/* Pesanan yang belum Selesai — bukan bagian pembukuan, tapi tanpa ini
+          hari-hari terakhir terlihat Rp 0 padahal penjualannya ada. */}
+      {inFlight.jumlahOrder > 0 && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50/60 p-5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-900">
+              {inFlight.jumlahOrder} pesanan masih diproses · {rupiah(inFlight.omzet)}
+            </p>
+            <p className="mt-0.5 text-xs text-amber-800/80">
+              Belum dihitung di angka di atas — Shopee baru menandai Selesai beberapa hari setelah
+              barang sampai. Fee-nya juga belum final
+              {inFlight.feeRate > 0
+                ? `, perkiraan potongan ≈ ${rupiah(inFlight.perkiraanFee)} (${(inFlight.feeRate * 100).toFixed(1)}% dari riwayat).`
+                : "."}
+            </p>
+          </div>
+        </Card>
+      )}
 
       {/* chart */}
       <Card>

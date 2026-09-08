@@ -26,6 +26,11 @@ export type StockLevel = {
 // hitungan fisik + barang masuk − penjualan COMPLETED yang terjadi SETELAH opname.
 // Penjualan diturunkan dari OrderItem (sumber kebenaran), tidak disimpan ganda,
 // jadi opname baru cukup me-reset anchor tanpa risiko double-count masa lalu.
+// Barang SHIPPED sudah keluar gudang walau Shopee baru menandai COMPLETED
+// beberapa hari kemudian — kalau nunggu COMPLETED, stok sistem lebih banyak
+// daripada fisiknya dan opname selalu minus.
+const SOLD_STATUS = { in: ["COMPLETED", "SHIPPED"] };
+
 export async function getStockLevels(): Promise<StockLevel[]> {
   const [products, latestOpnames, restocks, saleItems, components] = await Promise.all([
     prisma.product.findMany({ orderBy: { name: "asc" } }),
@@ -36,7 +41,7 @@ export async function getStockLevels(): Promise<StockLevel[]> {
     }),
     prisma.stockRestock.findMany({ select: { productId: true, qty: true, restockAt: true } }),
     prisma.orderItem.findMany({
-      where: { productId: { not: null }, order: { status: "COMPLETED" } },
+      where: { productId: { not: null }, order: { status: SOLD_STATUS } },
       select: { productId: true, qty: true, baseQty: true, order: { select: { orderDate: true } } },
     }),
     prisma.productComponent.findMany({ select: { bundleId: true, componentId: true, qty: true } }),
@@ -132,7 +137,7 @@ export async function computeCurrentStock(productId: string): Promise<number> {
     prisma.stockOpname.findFirst({ where: { productId }, orderBy: { opnameAt: "desc" } }),
     prisma.stockRestock.findMany({ where: { productId }, select: { qty: true, restockAt: true } }),
     prisma.orderItem.findMany({
-      where: { productId, order: { status: "COMPLETED" } },
+      where: { productId, order: { status: SOLD_STATUS } },
       select: { qty: true, baseQty: true, order: { select: { orderDate: true } } },
     }),
     // bundle yang MEMAKAI product ini sebagai component
@@ -149,7 +154,7 @@ export async function computeCurrentStock(productId: string): Promise<number> {
   if (compOf.length) {
     const qtyByBundle = new Map(compOf.map((c) => [c.bundleId, c.qty]));
     const bundleItems = await prisma.orderItem.findMany({
-      where: { productId: { in: compOf.map((c) => c.bundleId) }, order: { status: "COMPLETED" } },
+      where: { productId: { in: compOf.map((c) => c.bundleId) }, order: { status: SOLD_STATUS } },
       select: { productId: true, qty: true, baseQty: true, order: { select: { orderDate: true } } },
     });
     for (const s of bundleItems) {

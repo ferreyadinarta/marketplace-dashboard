@@ -76,6 +76,39 @@ export async function getSummary(f: DashboardFilter) {
   return { omzet, fee, hpp, profit, jumlahOrder: orders.length };
 }
 
+// Pesanan yang SUDAH masuk tapi belum Selesai (PENDING/SHIPPED). Sengaja
+// dipisah dari pembukuan: feenya belum final dan masih bisa batal, jadi angka
+// ini cuma untuk "hari ini ada penjualan apa", bukan untuk profit resmi.
+export async function getInFlight(f: DashboardFilter) {
+  const where: Record<string, unknown> = { status: { in: ["PENDING", "SHIPPED"] } };
+  if (f.from || f.to) {
+    where.orderDate = { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) };
+  }
+  if (f.storeId) where.storeId = f.storeId;
+  if (f.marketplace) where.store = { marketplace: f.marketplace };
+
+  const [agg, settled] = await Promise.all([
+    prisma.order.aggregate({ where, _count: true, _sum: { totalAmount: true } }),
+    // rata-rata potongan fee dari order yang FEE-nya sudah final → dipakai
+    // sebagai perkiraan untuk pesanan yang belum settle
+    prisma.order.aggregate({
+      where: { status: "COMPLETED", marketplaceFee: { gt: 0 } },
+      _sum: { totalAmount: true, marketplaceFee: true },
+    }),
+  ]);
+
+  const omzet = agg._sum.totalAmount ?? 0;
+  const dasar = settled._sum.totalAmount ?? 0;
+  const feeRate = dasar > 0 ? (settled._sum.marketplaceFee ?? 0) / dasar : 0;
+
+  return {
+    jumlahOrder: agg._count,
+    omzet,
+    feeRate,
+    perkiraanFee: Math.round(omzet * feeRate),
+  };
+}
+
 // tren harian omzet & profit
 export async function getDailyTrend(f: DashboardFilter) {
   const orders = await prisma.order.findMany({
