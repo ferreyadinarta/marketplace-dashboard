@@ -184,7 +184,7 @@ export async function syncShopeeStore(
   storeId: string,
   from: Date,
   to: Date,
-  opts: { deadlineMs?: number; onProgress?: ProgressFn } = {}
+  opts: { deadlineMs?: number; onProgress?: ProgressFn; resume?: boolean } = {}
 ): Promise<SyncResult> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
@@ -209,6 +209,17 @@ export async function syncShopeeStore(
   // Periode LAMA yang sudah pernah tersync penuh tidak perlu dipindai lagi:
   // order di situ statusnya sudah final. Yang masih mungkin berubah (order baru,
   // status berubah, retur) hanya RECHECK_DAYS terakhir → itu selalu dipindai.
+  // Lanjutan putaran sebelumnya: periode yang lebih baru dari cursor sudah
+  // beres, jangan dilist ulang. Tanpa ini tiap putaran mengulang dari periode 1,
+  // kehabisan waktu di tengah, dan tidak pernah maju (loop selamanya).
+  const cursorSec =
+    opts.resume && store.syncCursor ? Math.floor(store.syncCursor.getTime() / 1000) : null;
+  // sync baru (bukan lanjutan) → buang cursor lama, jangan sampai putaran
+  // berikutnya melewati periode terbaru yang belum sempat dikerjakan
+  if (!opts.resume && store.syncCursor) {
+    await prisma.store.update({ where: { id: store.id }, data: { syncCursor: null } });
+  }
+
   const RECHECK_DAYS = 30;
   const recheckCutoff = Math.floor(Date.now() / 1000) - RECHECK_DAYS * 24 * 3600;
   const syncedFromSec = store.syncedFrom ? Math.floor(store.syncedFrom.getTime() / 1000) : null;
@@ -241,6 +252,7 @@ export async function syncShopeeStore(
       message: `Penjualan ${tanggal(new Date(ws * 1000))} – ${tanggal(new Date(we * 1000))}`,
     });
     if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
+    if (cursorSec != null && ws >= cursorSec) continue; // sudah dikerjakan putaran sebelumnya
     const sns = await getOrderSnList(accessToken, shopId, ws, we);
     ordersTotal += sns.length;
     await progress?.({ ordersTotal });
@@ -293,6 +305,7 @@ export async function syncShopeeStore(
       });
     }
     if (total.partial) break;
+    await prisma.store.update({ where: { id: store.id }, data: { syncCursor: new Date(ws * 1000) } });
   }
 
   // Catat sampai kapan riwayat sudah tersync PENUH. Hanya kalau tidak partial —
@@ -302,7 +315,8 @@ export async function syncShopeeStore(
 
   await prisma.store.update({
     where: { id: store.id },
-    data: { lastSyncAt: new Date(), syncedFrom },
+    // rentang tuntas → cursor dikosongkan biar sync berikutnya mulai dari terbaru
+    data: { lastSyncAt: new Date(), syncedFrom, syncCursor: total.partial ? undefined : null },
   });
   return total;
 }

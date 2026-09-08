@@ -106,7 +106,7 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
 
     const r =
       store.marketplace === "SHOPEE"
-        ? await syncShopeeStore(storeId, from, to, { onProgress })
+        ? await syncShopeeStore(storeId, from, to, { onProgress, resume: round > 1 })
         : { ...(await syncTiktokStore(storeId, from, to, { onProgress })), partial: false };
 
     const created = accCreated + r.created;
