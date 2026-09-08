@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ChevronDown, X } from "lucide-react";
+import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ChevronDown, X, Clock } from "lucide-react";
 
 type Job = {
   id: string;
@@ -32,8 +32,7 @@ const IDLE_GRACE_MS = 2 * 60 * 1000;
 // ordersTotal cuma menghitung periode yang SUDAH dilist (mis. 2 dari 25), jadi
 // dia bukan total pekerjaan. Ukur dari posisi periode, dan pakai rasio order
 // untuk mengisi progres DI DALAM periode yang sedang jalan.
-function percent(j: Job): number {
-  if (j.finishedAt) return 100;
+function periodPercent(j: Job): number {
   if (j.windowTotal > 0) {
     const inWindow = j.ordersTotal > 0 ? Math.min(1, j.ordersDone / j.ordersTotal) : 0;
     const frac = (Math.max(0, j.windowIndex - 1) + inWindow) / j.windowTotal;
@@ -41,6 +40,18 @@ function percent(j: Job): number {
   }
   if (j.ordersTotal > 0) return Math.min(97, Math.round((j.ordersDone / j.ordersTotal) * 100));
   return 0;
+}
+
+// selesai TOTAL = 100; selesai tapi masih ada sisa = masih di tengah jalan
+function percent(j: Job): number {
+  if (j.finishedAt && !j.partial && j.phase !== "error") return 100;
+  return periodPercent(j);
+}
+
+// job yang masih berjalan ATAU sedang menunggu lanjutan otomatis — dua-duanya
+// bagian dari SATU pekerjaan yang sama, jadi kartunya tidak boleh hilang
+function inProgress(j: Job): boolean {
+  return !j.finishedAt || (j.partial && j.phase === "done");
 }
 
 // semua periode sudah dilist → ordersTotal memang total pekerjaannya
@@ -59,10 +70,14 @@ function elapsed(startedAt: string): string {
   return s < 60 ? `${s} detik` : `${Math.floor(s / 60)} menit ${s % 60} detik`;
 }
 
+function angka(n: number): string {
+  return new Intl.NumberFormat("id-ID").format(n);
+}
+
 function title(j: Job): string {
   return j.scope === "ALL"
-    ? `Sync semua toko${j.storeTotal > 1 ? ` (${Math.max(1, j.storeIndex)}/${j.storeTotal})` : ""}`
-    : `Sync ${j.storeName}`;
+    ? `Mengambil penjualan semua toko${j.storeTotal > 1 ? ` (toko ${Math.max(1, j.storeIndex)} dari ${j.storeTotal})` : ""}`
+    : `Mengambil penjualan ${j.storeName}`;
 }
 
 // per toko, bukan per job: tiap putaran bikin baris job baru
@@ -86,7 +101,7 @@ export function SyncProgressPanel() {
   const rate = useRef(new Map<string, { t: number; done: number; perSec: number }>());
   // tiap putaran = baris job baru dengan hitungan mulai 0; simpan capaian
   // tertinggi per toko biar barnya tidak mundur di awal putaran berikutnya
-  const best = useRef(new Map<string, { done: number; total: number; ids: Set<string> }>());
+  const best = useRef(new Map<string, { done: number; total: number; pct: number; ids: Set<string> }>());
 
   useEffect(() => {
     try {
@@ -123,11 +138,18 @@ export function SyncProgressPanel() {
         const b = best.current.get(k);
         // putaran 1 yang baru = sync baru → mulai dari nol lagi
         if (!b || (j.round <= 1 && !b.ids.has(j.id))) {
-          best.current.set(k, { done: j.ordersDone, total: j.ordersTotal, ids: new Set([j.id]) });
+          best.current.set(k, {
+            done: j.ordersDone,
+            total: j.ordersTotal,
+            pct: periodPercent(j),
+            ids: new Set([j.id]),
+          });
         } else {
           b.ids.add(j.id);
           b.done = Math.max(b.done, j.ordersDone);
           b.total = Math.max(b.total, j.ordersTotal);
+          // tiap putaran mulai lagi dari periode 1, jadi barnya cuma boleh maju
+          b.pct = Math.max(b.pct, periodPercent(j));
         }
       }
       for (const j of next) {
@@ -191,8 +213,8 @@ export function SyncProgressPanel() {
   }, [load]);
 
   // yang jalan = kartu penuh, sisanya satu baris ringkas biar tidak makan layar
-  const running = jobs.filter((j) => !j.finishedAt);
-  const idle = jobs.filter((j) => j.finishedAt && !hidden.includes(jobKey(j)));
+  const running = jobs.filter(inProgress);
+  const idle = jobs.filter((j) => !inProgress(j) && !hidden.includes(jobKey(j)));
   if (running.length === 0 && idle.length === 0) return null;
 
   const collapsed = idle.length > COLLAPSE_AT && !showIdle;
@@ -208,23 +230,30 @@ export function SyncProgressPanel() {
         const perSec = rate.current.get(j.id)?.perSec ?? 0;
         // ETA cuma jujur kalau totalnya sudah pasti
         const eta = finalTotal && sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
-        const pct = percent(j);
+        const waiting = !!j.finishedAt; // selesai satu bagian, menunggu lanjutan
+        const pct = Math.max(percent(j), b?.pct ?? 0);
         return (
         <div key={j.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-3.5">
           <div className="flex items-start gap-2.5">
-            <RefreshCw size={18} className="mt-0.5 shrink-0 animate-spin text-indigo-500" />
+            {waiting ? (
+              <Clock size={18} className="mt-0.5 shrink-0 text-indigo-400" />
+            ) : (
+              <RefreshCw size={18} className="mt-0.5 shrink-0 animate-spin text-indigo-500" />
+            )}
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-indigo-900">
                 {title(j)}
-                {j.round > 1 ? <span className="ml-1 font-normal opacity-70">· putaran {j.round}</span> : null}
                 <span className="ml-1 font-normal opacity-70">
-                  · {elapsed(j.startedAt)}
-                  {eta ? ` · sisa ±${eta}` : ""}
+                  {waiting ? "· jeda sebentar" : `· berjalan ${elapsed(j.startedAt)}`}
+                  {!waiting && eta ? ` · kira-kira ${eta} lagi` : ""}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
-                {j.error ?? j.message ?? "Menyiapkan…"}
+                {waiting
+                  ? "Lanjut otomatis sebentar lagi — halaman boleh ditutup."
+                  : (j.error ?? j.message ?? "Menyiapkan…")}
+                {j.windowTotal > 1 && !j.error ? ` (bagian ${j.windowIndex} dari ${j.windowTotal})` : ""}
               </p>
 
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
@@ -236,9 +265,10 @@ export function SyncProgressPanel() {
 
               <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
                 {finalTotal && totalOrders > 0
-                  ? `${done} dari ${totalOrders} order · sisa ${sisa}`
-                  : `${done} order dipindai`}
-                {j.created > 0 || j.updated > 0 ? ` · ${j.created} baru · ${j.updated} diperbarui` : ""}
+                  ? `${angka(done)} dari ${angka(totalOrders)} pesanan diperiksa · sisa ${angka(sisa)}`
+                  : `${angka(done)} pesanan diperiksa`}
+                {j.created > 0 ? ` · ${angka(j.created)} pesanan baru masuk` : ""}
+                {j.updated > 0 ? ` · ${angka(j.updated)} datanya diperbarui` : ""}
               </p>
             </div>
           </div>
@@ -254,7 +284,7 @@ export function SyncProgressPanel() {
               onClick={() => setShowIdle((s) => !s)}
               className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-medium text-slate-600 transition hover:bg-slate-50"
             >
-              <span>{idle.length} sync menunggu / selesai</span>
+              <span>{idle.length} pengambilan data lain</span>
               <ChevronDown size={14} className={`text-slate-400 transition-transform ${collapsed ? "" : "rotate-180"}`} />
             </button>
           )}
@@ -275,13 +305,13 @@ export function SyncProgressPanel() {
                     <p className="truncate text-xs font-medium text-slate-700">
                       {title(j)}
                       <span className="ml-1.5 font-normal text-slate-400">
-                        {j.created} baru · {j.updated} diperbarui
+                        {angka(j.created)} baru · {angka(j.updated)} diperbarui
                       </span>
                     </p>
                     <p className="truncate text-[11px] text-slate-400">
                       {j.error ??
                         (j.partial
-                          ? "Menunggu putaran berikutnya — jalan otomatis, halaman boleh ditutup."
+                          ? "Masih ada sisa — lanjut otomatis beberapa menit lagi. Halaman boleh ditutup."
                           : (j.message ?? "Selesai"))}
                     </p>
                   </div>

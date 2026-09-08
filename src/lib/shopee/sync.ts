@@ -2,7 +2,7 @@ import type { Store } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestOrders } from "@/lib/sync";
 import type { ProgressFn } from "@/lib/syncProgress";
-import { dateKey } from "@/lib/format";
+import { dateKey, tanggal } from "@/lib/format";
 import type { NormalizedOrder } from "@/lib/adapters/types";
 import type { ImportedProduct } from "@/lib/adapters/types";
 import {
@@ -238,7 +238,7 @@ export async function syncShopeeStore(
       ordersDone,
       created: total.created,
       updated: total.updated,
-      message: `Periode ${wi + 1}/${windows.length}`,
+      message: `Penjualan ${tanggal(new Date(ws * 1000))} – ${tanggal(new Date(we * 1000))}`,
     });
     if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
     const sns = await getOrderSnList(accessToken, shopId, ws, we);
@@ -289,7 +289,7 @@ export async function syncShopeeStore(
         ordersTotal,
         created: total.created,
         updated: total.updated,
-        message: `Periode ${wi + 1}/${windows.length}`,
+        message: `Penjualan ${tanggal(new Date(ws * 1000))} – ${tanggal(new Date(we * 1000))}`,
       });
     }
     if (total.partial) break;
