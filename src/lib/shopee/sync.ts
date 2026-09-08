@@ -10,6 +10,7 @@ import {
   getOrderSnList,
   getOrderDetails,
   getEscrowDetail,
+  getEscrowDetailBatch,
   fetchShopeeCatalog,
   getEscrowList,
   shopeeSku,
@@ -109,6 +110,8 @@ function feeFromIncome(inc: ShopeeIncome): number {
 // ribuan order tidak akan selesai sebelum function timeout → jalankan paralel
 // terbatas (jangan terlalu tinggi supaya tidak kena rate limit Shopee).
 const ESCROW_CONCURRENCY = 10;
+const ESCROW_BATCH = 50; // batas order_sn per panggilan batch
+const ESCROW_BATCH_CONCURRENCY = 4;
 
 async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let cursor = 0;
@@ -151,14 +154,36 @@ async function normalizeWithFees(
     if ((o.order_status || "").toUpperCase() !== "UNPAID") pending.push({ sn: o.order_sn, idx });
   });
 
-  await mapLimit(pending, ESCROW_CONCURRENCY, async ({ sn, idx }) => {
-    const inc = await getEscrowDetail(accessToken, shopId, sn);
-    if (!inc) return;
+  const apply = (idx: number, inc: ShopeeIncome) => {
     orders[idx].escrowAt = new Date();
     orders[idx].marketplaceFee = feeFromIncome(inc);
     if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
       orders[idx].netAmount = Math.round(inc.escrow_amount);
     }
+  };
+
+  // Coba versi batch dulu (50 order/panggilan). Kalau endpointnya tidak bisa
+  // dipakai app ini, `batch` null → sisanya ditarik satuan seperti sebelumnya.
+  const leftovers: typeof pending = [];
+  const slices: (typeof pending)[] = [];
+  for (let i = 0; i < pending.length; i += ESCROW_BATCH) slices.push(pending.slice(i, i + ESCROW_BATCH));
+
+  await mapLimit(slices, ESCROW_BATCH_CONCURRENCY, async (slice) => {
+    const got = await getEscrowDetailBatch(accessToken, shopId, slice.map((x) => x.sn));
+    if (!got) {
+      leftovers.push(...slice);
+      return;
+    }
+    for (const item of slice) {
+      const inc = got.get(item.sn);
+      if (inc) apply(item.idx, inc);
+      else leftovers.push(item);
+    }
+  });
+
+  await mapLimit(leftovers, ESCROW_CONCURRENCY, async ({ sn, idx }) => {
+    const inc = await getEscrowDetail(accessToken, shopId, sn);
+    if (inc) apply(idx, inc);
   });
 
   return orders;

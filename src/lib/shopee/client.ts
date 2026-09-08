@@ -352,6 +352,37 @@ export type ShopeeIncome = {
 
 // Ambil rincian escrow satu order. Balikin null kalau belum ada (mis. order
 // belum dibayar) atau API error — biar sync tetap jalan tanpa fee.
+// Escrow versi BATCH (maks 50 order per panggilan). Jauh lebih hemat daripada
+// get_escrow_detail yang 1 panggilan per order. Balikin null kalau endpointnya
+// tidak tersedia untuk app ini → pemanggil jatuh ke versi satuan.
+type EscrowBatchRow = { order_sn?: string; escrow_detail?: { order_income?: ShopeeIncome } };
+
+export async function getEscrowDetailBatch(
+  accessToken: string,
+  shopId: string,
+  orderSns: string[]
+): Promise<Map<string, ShopeeIncome> | null> {
+  if (orderSns.length === 0) return new Map();
+  try {
+    const r = await shopGet<EscrowBatchRow[] | { escrow_detail_list?: EscrowBatchRow[] }>(
+      "/api/v2/payment/get_escrow_detail_batch",
+      accessToken,
+      shopId,
+      { order_sn_list: orderSns.join(",") }
+    );
+    const rows = Array.isArray(r) ? r : (r?.escrow_detail_list ?? []);
+    if (!Array.isArray(rows)) return null;
+    const out = new Map<string, ShopeeIncome>();
+    for (const row of rows) {
+      const inc = row.escrow_detail?.order_income;
+      if (row.order_sn && inc) out.set(row.order_sn, inc);
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 export async function getEscrowDetail(
   accessToken: string,
   shopId: string,
