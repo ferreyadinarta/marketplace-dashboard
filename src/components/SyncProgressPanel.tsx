@@ -29,14 +29,23 @@ const POLL_IDLE_MS = 10_000; // baru buka / habis ada kegiatan → masih respons
 const POLL_SLEEP_MS = 60_000; // lama nganggur → jarang, tiap poll = query ke Neon
 const IDLE_GRACE_MS = 2 * 60 * 1000;
 
-// Pakai jumlah order kalau sudah ketahuan; kalau belum, jatuh ke posisi periode.
+// ordersTotal cuma menghitung periode yang SUDAH dilist (mis. 2 dari 25), jadi
+// dia bukan total pekerjaan. Ukur dari posisi periode, dan pakai rasio order
+// untuk mengisi progres DI DALAM periode yang sedang jalan.
 function percent(j: Job): number {
   if (j.finishedAt) return 100;
+  if (j.windowTotal > 0) {
+    const inWindow = j.ordersTotal > 0 ? Math.min(1, j.ordersDone / j.ordersTotal) : 0;
+    const frac = (Math.max(0, j.windowIndex - 1) + inWindow) / j.windowTotal;
+    return Math.min(97, Math.round(frac * 100));
+  }
   if (j.ordersTotal > 0) return Math.min(97, Math.round((j.ordersDone / j.ordersTotal) * 100));
-  const perStore = j.storeTotal > 0 ? 1 / j.storeTotal : 1;
-  const doneStores = Math.max(0, j.storeIndex - 1) * perStore;
-  const inStore = j.windowTotal > 0 ? (j.windowIndex / j.windowTotal) * perStore : 0;
-  return Math.min(97, Math.round((doneStores + inStore) * 100));
+  return 0;
+}
+
+// semua periode sudah dilist → ordersTotal memang total pekerjaannya
+function totalIsFinal(j: Job): boolean {
+  return j.windowTotal > 0 && j.windowIndex >= j.windowTotal;
 }
 
 function shortDur(sec: number): string {
@@ -194,10 +203,12 @@ export function SyncProgressPanel() {
         const b = best.current.get(jobKey(j));
         const done = Math.max(j.ordersDone, b?.done ?? 0);
         const totalOrders = Math.max(j.ordersTotal, b?.total ?? 0);
+        const finalTotal = totalIsFinal(j);
         const sisa = Math.max(0, totalOrders - done);
         const perSec = rate.current.get(j.id)?.perSec ?? 0;
-        const eta = sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
-        const pct = totalOrders > 0 ? Math.min(97, Math.round((done / totalOrders) * 100)) : percent(j);
+        // ETA cuma jujur kalau totalnya sudah pasti
+        const eta = finalTotal && sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
+        const pct = percent(j);
         return (
         <div key={j.id} className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-3.5">
           <div className="flex items-start gap-2.5">
@@ -224,7 +235,7 @@ export function SyncProgressPanel() {
               </div>
 
               <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
-                {totalOrders > 0
+                {finalTotal && totalOrders > 0
                   ? `${done} dari ${totalOrders} order · sisa ${sisa}`
                   : `${done} order dipindai`}
                 {j.created > 0 || j.updated > 0 ? ` · ${j.created} baru · ${j.updated} diperbarui` : ""}

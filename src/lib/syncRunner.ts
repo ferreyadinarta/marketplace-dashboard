@@ -101,7 +101,7 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
         ...p,
         ...(p.created != null ? { created: accCreated + p.created } : {}),
         ...(p.updated != null ? { updated: accUpdated + p.updated } : {}),
-        message: p.message ? (round > 1 ? `Putaran ${round} — ${p.message}` : p.message) : undefined,
+        message: p.message, // nomor putaran sudah tampil di judul kartu
       });
 
     const r =
