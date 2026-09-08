@@ -293,12 +293,27 @@ export async function syncShopeeStore(
       // escrow balikin 0) jangan ikut ditarik ulang tiap putaran
       const known = await prisma.order.findMany({
         where: { storeId: store.id, marketplaceOrderId: { in: chunk }, escrowAt: { not: null } },
-        select: { marketplaceOrderId: true, marketplaceFee: true, netAmount: true, status: true },
+        select: {
+          marketplaceOrderId: true,
+          marketplaceFee: true,
+          netAmount: true,
+          status: true,
+          orderDate: true,
+        },
       });
 
-      // dicek per order, bukan per chunk: 1 order belum final jangan menyeret 49 lainnya
+      // Dicek per order, bukan per chunk: 1 order belum final jangan menyeret 49
+      // lainnya. Order final yang MASIH BARU tetap ditarik ulang — retur/refund
+      // bisa terjadi setelah Selesai, dan kalau dilewati stok & omzetnya tidak
+      // pernah dikoreksi.
       const done = new Set(
-        known.filter((k) => FINAL_STATUS.includes(k.status)).map((k) => k.marketplaceOrderId)
+        known
+          .filter(
+            (k) =>
+              FINAL_STATUS.includes(k.status) &&
+              Math.floor(k.orderDate.getTime() / 1000) < recheckCutoff
+          )
+          .map((k) => k.marketplaceOrderId)
       );
       const todo = chunk.filter((sn) => !done.has(sn));
       if (todo.length === 0) {

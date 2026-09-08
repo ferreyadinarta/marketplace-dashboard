@@ -25,6 +25,13 @@ function itemBaseQty(it: { baseQty?: number | null; qty: number }): number {
   return it.baseQty && it.baseQty > 0 ? it.baseQty : it.qty;
 }
 
+// Porsi item terhadap ordernya, untuk membagi fee/subsidi. Kalau nilai ordernya
+// 0 (mis. habis kena voucher) dibagi rata — jangan sampai feenya menguap.
+function shareOf(subtotal: number, nilai: number, jumlahItem: number): number {
+  if (nilai > 0) return subtotal / nilai;
+  return jumlahItem > 0 ? 1 / jumlahItem : 0;
+}
+
 export type DashboardFilter = {
   from?: Date;
   to?: Date;
@@ -72,8 +79,8 @@ export async function getSummary(f: DashboardFilter) {
       hpp += itemModal(it);
     }
   }
-  const profit = omzet - fee - hpp;
-  return { omzet, fee, hpp, profit, jumlahOrder: orders.length };
+  const hppBulat = Math.round(hpp);
+  return { omzet, fee, hpp: hppBulat, profit: omzet - fee - hppBulat, jumlahOrder: orders.length };
 }
 
 // Pesanan yang SUDAH masuk tapi belum Selesai (PENDING/SHIPPED). Sengaja
@@ -87,25 +94,43 @@ export async function getInFlight(f: DashboardFilter) {
   if (f.storeId) where.storeId = f.storeId;
   if (f.marketplace) where.store = { marketplace: f.marketplace };
 
-  const [agg, settled] = await Promise.all([
+  // Acuan perkiraan: toko/marketplace yang SAMA dengan filter, 90 hari terakhir.
+  // Kalau diambil global & sepanjang masa, angkanya bukan cerminan toko itu.
+  const acuan: Record<string, unknown> = { status: "COMPLETED", marketplaceFee: { gt: 0 } };
+  if (f.storeId) acuan.storeId = f.storeId;
+  if (f.marketplace) acuan.store = { marketplace: f.marketplace };
+  acuan.orderDate = { gte: new Date(Date.now() - 90 * 24 * 3600 * 1000) };
+
+  const batal: Record<string, unknown> = { status: { in: ["CANCELLED", "RETURNED"] } };
+  const selesai: Record<string, unknown> = { status: "COMPLETED" };
+  for (const w of [batal, selesai]) {
+    if (f.storeId) w.storeId = f.storeId;
+    if (f.marketplace) w.store = { marketplace: f.marketplace };
+    w.orderDate = { gte: new Date(Date.now() - 90 * 24 * 3600 * 1000) };
+  }
+
+  const [agg, settled, nBatal, nSelesai] = await Promise.all([
     prisma.order.aggregate({ where, _count: true, _sum: { totalAmount: true } }),
-    // rata-rata potongan fee dari order yang FEE-nya sudah final → dipakai
-    // sebagai perkiraan untuk pesanan yang belum settle
-    prisma.order.aggregate({
-      where: { status: "COMPLETED", marketplaceFee: { gt: 0 } },
-      _sum: { totalAmount: true, marketplaceFee: true },
-    }),
+    prisma.order.aggregate({ where: acuan, _count: true, _sum: { totalAmount: true, marketplaceFee: true } }),
+    prisma.order.count({ where: batal }),
+    prisma.order.count({ where: selesai }),
   ]);
 
   const omzet = agg._sum.totalAmount ?? 0;
   const dasar = settled._sum.totalAmount ?? 0;
   const feeRate = dasar > 0 ? (settled._sum.marketplaceFee ?? 0) / dasar : 0;
+  const totalRiwayat = nBatal + nSelesai;
+  const batalRate = totalRiwayat > 0 ? nBatal / totalRiwayat : 0;
 
   return {
     jumlahOrder: agg._count,
     omzet,
     feeRate,
     perkiraanFee: Math.round(omzet * feeRate),
+    sampel: settled._count, // berapa order jadi dasar perkiraan
+    batalRate,
+    // perkiraan yang benar-benar masuk: dikurangi yang biasanya batal & fee
+    perkiraanBersih: Math.round(omzet * (1 - batalRate) * (1 - feeRate)),
   };
 }
 
@@ -163,7 +188,23 @@ export async function getByMarketplace(f: DashboardFilter) {
     cur.order += 1;
     map.set(key, cur);
   }
-  return Array.from(map.entries()).map(([marketplace, v]) => ({ marketplace, ...v }));
+  // Pembulatan per baris bisa bikin jumlah baris ≠ total dashboard (selisih
+  // 1-2 rupiah). Sisa pembulatan ditempelkan ke baris terbesar supaya
+  // penjumlahannya persis sama.
+  const rows = Array.from(map.entries()).map(([marketplace, v]) => ({
+    marketplace,
+    ...v,
+    profit: Math.round(v.profit),
+  }));
+  const totalProfit = Math.round(
+    Array.from(map.values()).reduce((a, v) => a + v.profit, 0)
+  );
+  const sisa = totalProfit - rows.reduce((a, r) => a + r.profit, 0);
+  if (sisa !== 0 && rows.length) {
+    const idx = rows.reduce((bi, r, i) => (Math.abs(r.profit) > Math.abs(rows[bi].profit) ? i : bi), 0);
+    rows[idx].profit += sisa;
+  }
+  return rows;
 }
 
 // id semu untuk bucket product tanpa grup
@@ -191,16 +232,24 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
   // akumulasi per productId
   type Agg = { terjual: number; omzet: number; fee: number; hpp: number };
   const perProduct = new Map<string, Agg>();
+  // Item yang SKU-nya belum dipetakan tidak punya product → tidak bisa masuk
+  // baris grup, tapi omzet & feenya tetap dihitung supaya total pembukuan sama
+  // dengan dashboard.
+  const unmapped = { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
   for (const o of orders) {
-    const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
+    // fee dibagi menurut NILAI item, bukan rata per item: 1 order isi barang
+    // Rp 500rb + Rp 20rb tidak menanggung potongan yang sama
+    const nilai = o.items.reduce((a, it) => a + it.subtotal, 0);
     for (const it of o.items) {
-      if (!it.productId) continue;
-      const r = perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
-      r.terjual += itemBaseQty(it); // dalam satuan dasar (konsisten walau jual campur box/sachet)
-      r.omzet += it.subtotal;
-      r.fee += feePerItem;
-      r.hpp += itemModal(it);
-      perProduct.set(it.productId, r);
+      const feeItem = o.marketplaceFee * shareOf(it.subtotal, nilai, o.items.length);
+      const target = it.productId
+        ? perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 }
+        : unmapped;
+      target.terjual += itemBaseQty(it); // satuan dasar (konsisten walau campur box/sachet)
+      target.omzet += it.subtotal;
+      target.fee += feeItem;
+      target.hpp += itemModal(it);
+      if (it.productId) perProduct.set(it.productId, target);
     }
   }
 
@@ -242,6 +291,54 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
     if (ungrouped.length) result.push(buildGroup(NO_GROUP, "Tanpa Grup", ungrouped));
   }
 
+  // Sisa pembulatan per baris ditempel ke baris terbesar supaya jumlah semua
+  // grup persis sama dengan total di Dashboard (jangan beda 1-2 rupiah).
+  const rapikan = () => {
+    const exactFee = [...perProduct.values()].reduce((a, v) => a + v.fee, 0) + unmapped.fee;
+    const exactProfit =
+      [...perProduct.values()].reduce((a, v) => a + (v.omzet - v.fee - v.hpp), 0) +
+      (unmapped.omzet - unmapped.fee - unmapped.hpp);
+    const rows = result.flatMap((g) => g.rows);
+    if (!rows.length) return;
+    const sisaFee = Math.round(exactFee) - rows.reduce((a, x) => a + x.fee, 0);
+    const sisaProfit = Math.round(exactProfit) - rows.reduce((a, x) => a + x.profit, 0);
+    const biggest = (key: "fee" | "profit") =>
+      rows.reduce((bi, x, i) => (Math.abs(x[key]) > Math.abs(rows[bi][key]) ? i : bi), 0);
+    if (sisaFee) rows[biggest("fee")].fee += sisaFee;
+    if (sisaProfit) rows[biggest("profit")].profit += sisaProfit;
+    for (const g of result) {
+      g.subtotal.fee = g.rows.reduce((a, x) => a + x.fee, 0);
+      g.subtotal.profit = g.rows.reduce((a, x) => a + x.profit, 0);
+    }
+  };
+
+  if (!f.groupId && unmapped.omzet > 0) {
+    const profit = unmapped.omzet - unmapped.fee - unmapped.hpp;
+    result.push({
+      groupId: "__unmapped__",
+      groupName: "SKU belum dipetakan",
+      rows: [
+        {
+          productId: "__unmapped__",
+          name: "SKU belum dipetakan",
+          sku: "—",
+          hpp: 0,
+          terjual: unmapped.terjual,
+          omzet: unmapped.omzet,
+          fee: Math.round(unmapped.fee),
+          profit: Math.round(profit),
+        },
+      ],
+      subtotal: {
+        terjual: unmapped.terjual,
+        omzet: unmapped.omzet,
+        fee: Math.round(unmapped.fee),
+        profit: Math.round(profit),
+      },
+    });
+  }
+
+  rapikan();
   return result;
 }
 
@@ -279,9 +376,12 @@ export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> 
 
   const rows: LedgerRow[] = [];
   for (const o of orders) {
-    const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
-    const shipPerItem = o.items.length ? o.shippingSubsidy / o.items.length : 0;
+    // sama seperti Pembukuan: dibagi menurut nilai item, bukan rata per item
+    const nilai = o.items.reduce((a, x) => a + x.subtotal, 0);
     for (const it of o.items) {
+      const bagian = shareOf(it.subtotal, nilai, o.items.length);
+      const feePerItem = o.marketplaceFee * bagian;
+      const shipPerItem = o.shippingSubsidy * bagian;
       const gId = it.product?.groupId ?? null;
       // hormati filter grup
       if (f.groupId === NO_GROUP) {
@@ -323,15 +423,17 @@ export async function getBestSellers(f: DashboardFilter, limit = 5) {
   type Row = { productId: string; name: string; sku: string; qty: number; omzet: number; profit: number };
   const map = new Map<string, Row>();
   for (const o of orders) {
-    const feePerItem = o.items.length ? o.marketplaceFee / o.items.length : 0;
+    const nilai = o.items.reduce((a, it) => a + it.subtotal, 0);
     for (const it of o.items) {
       if (!it.productId || !it.product) continue;
+      // fee & satuan mengikuti aturan yang sama dengan Pembukuan biar angkanya cocok
+      const feeItem = o.marketplaceFee * shareOf(it.subtotal, nilai, o.items.length);
       const r =
         map.get(it.productId) ??
         { productId: it.productId, name: it.product.name, sku: it.product.sku, qty: 0, omzet: 0, profit: 0 };
-      r.qty += it.qty;
+      r.qty += itemBaseQty(it);
       r.omzet += it.subtotal;
-      r.profit += it.subtotal - feePerItem - itemModal(it);
+      r.profit += it.subtotal - feeItem - itemModal(it);
       map.set(it.productId, r);
     }
   }

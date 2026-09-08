@@ -178,13 +178,21 @@ export default async function DashboardPage({
           help="Harga Pokok Penjualan = total modal semua product yang terjual."
         />
         <StatCard
-          label="Profit Bersih"
+          label={summary.hpp === 0 && summary.omzet > 0 ? "Profit (belum ada HPP)" : "Profit Bersih"}
           value={summary.profit}
           icon={<Wallet size={18} />}
-          accent="green"
+          accent={summary.hpp === 0 && summary.omzet > 0 ? "amber" : "green"}
           deltaPct={dProfit}
-          hint={`Margin ${margin.toFixed(1)}% · ${summary.jumlahOrder.toLocaleString("id-ID")} order`}
-          help="Omzet dikurangi fee marketplace dan HPP. Inilah untung sebenarnya."
+          hint={
+            summary.hpp === 0 && summary.omzet > 0
+              ? `Baru omzet − fee · ${summary.jumlahOrder.toLocaleString("id-ID")} order`
+              : `Margin ${margin.toFixed(1)}% · ${summary.jumlahOrder.toLocaleString("id-ID")} order`
+          }
+          help={
+            summary.hpp === 0 && summary.omzet > 0
+              ? "HPP semua product masih 0, jadi angka ini baru omzet dikurangi fee marketplace — BUKAN untung sebenarnya. Isi HPP di Master Product supaya profit & margin benar."
+              : "Omzet dikurangi fee marketplace dan HPP. Inilah untung sebenarnya."
+          }
         />
       </div>
 
@@ -197,12 +205,18 @@ export default async function DashboardPage({
               {inFlight.jumlahOrder} pesanan masih diproses · {rupiah(inFlight.omzet)}
             </p>
             <p className="mt-0.5 text-xs text-amber-800/80">
-              Belum dihitung di angka di atas — Shopee baru menandai Selesai beberapa hari setelah
-              barang sampai. Fee-nya juga belum final
-              {inFlight.feeRate > 0
-                ? `, perkiraan potongan ≈ ${rupiah(inFlight.perkiraanFee)} (${(inFlight.feeRate * 100).toFixed(1)}% dari riwayat).`
-                : "."}
+              Angka di atas belum menghitung ini — Shopee baru menandai Selesai beberapa hari setelah
+              barang sampai. Nilai pesanannya pasti, yang belum pasti berapa yang jadi.
             </p>
+            {inFlight.sampel > 0 && (
+              <p className="mt-1 text-xs text-amber-800/80">
+                Kalau polanya sama seperti 90 hari terakhir ({inFlight.sampel} pesanan selesai):
+                ±{(inFlight.batalRate * 100).toFixed(0)}% batal, potongan ±
+                {(inFlight.feeRate * 100).toFixed(1)}% → kira-kira{" "}
+                <strong className="font-semibold">{rupiah(inFlight.perkiraanBersih)}</strong> yang
+                benar-benar masuk. Perkiraan, bukan angka pembukuan.
+              </p>
+            )}
           </div>
         </Card>
       )}

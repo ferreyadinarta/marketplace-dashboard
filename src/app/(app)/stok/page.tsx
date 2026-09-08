@@ -197,7 +197,9 @@ export default async function StokPage({
                   <th className="whitespace-nowrap px-5 py-3 font-medium">SKU</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Stok</th>
                   <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Terjual</th>
+                  {/* beda dengan "Terjual" di Pembukuan: di sini barang yang SUDAH KELUAR
+                      gudang (terkirim + selesai), di sana yang penjualannya sudah final */}
+                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Barang keluar</th>
                   <th className="whitespace-nowrap px-5 py-3 font-medium">Min</th>
                   <th className="whitespace-nowrap px-5 py-3 font-medium">Opname (hitung fisik)</th>
                 </tr>
@@ -316,7 +318,7 @@ export default async function StokPage({
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="block text-[11px] text-slate-400">Terjual</span>
+                      <span className="block text-[11px] text-slate-400">Barang keluar</span>
                       <span className="tabular-nums text-slate-600">{l.soldTotal}</span>
                       <span className="ml-1 text-xs text-slate-400">{l.unit}</span>
                     </div>

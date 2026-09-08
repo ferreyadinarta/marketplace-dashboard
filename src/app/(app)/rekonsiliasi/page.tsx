@@ -27,8 +27,17 @@ export default async function RekonsiliasiPage() {
 
   const rows = await Promise.all(
     stores.map(async (s) => {
+      // Toko API: hanya order yang escrow-nya sudah final, kalau tidak order
+      // yang belum settle dihitung pakai nilai kotor → seolah dananya kurang.
+      // Toko manual (grosir/WA) tidak punya escrow sama sekali, jadi semua
+      // order selesai dihitung.
+      const manualStore = isManual(s.marketplace, !!s.accessToken);
       const netAgg = await prisma.order.aggregate({
-        where: { storeId: s.id, status: "COMPLETED" },
+        where: {
+          storeId: s.id,
+          status: "COMPLETED",
+          ...(manualStore ? {} : { escrowAt: { not: null } }),
+        },
         _sum: { netAmount: true },
       });
       const payoutAgg = await prisma.payout.aggregate({
