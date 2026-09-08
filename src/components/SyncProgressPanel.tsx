@@ -245,13 +245,13 @@ export function SyncProgressPanel() {
               <p className="text-sm font-medium text-indigo-900">
                 {title(j)}
                 <span className="ml-1 font-normal opacity-70">
-                  {waiting ? "· jeda sebentar" : `· berjalan ${elapsed(j.startedAt)}`}
+                  {waiting ? `· menunggu ${elapsed(j.finishedAt ?? j.startedAt)}` : `· berjalan ${elapsed(j.startedAt)}`}
                   {!waiting && eta ? ` · kira-kira ${eta} lagi` : ""}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
                 {waiting
-                  ? "Lanjut otomatis sebentar lagi — halaman boleh ditutup."
+                  ? "Lanjut sendiri tiap ~15 menit. Halaman boleh ditutup — atau klik Sync lagi kalau mau langsung lanjut."
                   : (j.error ?? j.message ?? "Menyiapkan…")}
                 {j.windowTotal > 1 && !j.error ? ` (bagian ${j.windowIndex} dari ${j.windowTotal})` : ""}
               </p>
@@ -311,7 +311,7 @@ export function SyncProgressPanel() {
                     <p className="truncate text-[11px] text-slate-400">
                       {j.error ??
                         (j.partial
-                          ? "Masih ada sisa — lanjut otomatis beberapa menit lagi. Halaman boleh ditutup."
+                          ? "Masih ada sisa — lanjut sendiri tiap ~15 menit, atau klik Sync lagi."
                           : (j.message ?? "Selesai"))}
                     </p>
                   </div>
