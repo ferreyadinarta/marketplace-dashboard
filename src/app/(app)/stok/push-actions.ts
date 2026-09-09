@@ -43,8 +43,8 @@ export async function sendTestNotification(): Promise<{
   reason?: string;
 }> {
   return sendToAll({
-    title: "✅ Notifikasi aktif",
-    body: "Kamu akan dapat pesan di sini kalau ada stok menipis.",
+    title: "Notifikasi aktif",
+    body: "Nanti ada pesan di sini kalau stok menipis.",
     url: "/stok",
     tag: "test",
   });

@@ -49,14 +49,14 @@ export async function notifyLowStock(): Promise<{ sent: number; failed: number; 
 
   // urutkan HABIS dulu, lalu menipis
   fresh.sort((a, b) => (a.status === "OUT" ? -1 : 1) - (b.status === "OUT" ? -1 : 1));
-  const lines = fresh.slice(0, 8).map((l) =>
-    l.status === "OUT"
-      ? `• ${l.name} — HABIS`
-      : `• ${l.name} — sisa ${fmtQty(l, l.current)} (min ${fmtQty(l, l.minStock)})`
+  // Layar HP cuma menampilkan 1-2 baris sebelum dilipat → cukup 3 nama,
+  // sisanya diringkas. Nama dulu, angka belakangan, tanpa bullet.
+  const lines = fresh.slice(0, 3).map((l) =>
+    l.status === "OUT" ? `${l.name}: habis` : `${l.name}: sisa ${fmtQty(l, l.current)}`
   );
-  const more = fresh.length > 8 ? `\n+${fresh.length - 8} product lagi` : "";
-  const body = lines.join("\n") + more;
-  const title = fresh.length === 1 ? "⚠️ Stok menipis" : `⚠️ ${fresh.length} product stok menipis`;
+  const more = fresh.length > 3 ? ` +${fresh.length - 3} lagi` : "";
+  const body = lines.join(" · ") + more;
+  const title = fresh.length === 1 ? "Stok menipis" : `${fresh.length} product stok menipis`;
 
   const r = await sendToAll({ title, body, url: "/stok", tag: "stok-menipis" });
   return { ...r, fresh: fresh.length };
@@ -65,13 +65,11 @@ export async function notifyLowStock(): Promise<{ sent: number; failed: number; 
 // bikin baris pesan dari daftar level menipis (HABIS dulu)
 function buildBody(list: StockLevel[]): string {
   const sorted = [...list].sort((a, b) => (a.status === "OUT" ? -1 : 1) - (b.status === "OUT" ? -1 : 1));
-  const lines = sorted.slice(0, 8).map((l) =>
-    l.status === "OUT"
-      ? `• ${l.name} — HABIS`
-      : `• ${l.name} — sisa ${fmtQty(l, l.current)} (min ${fmtQty(l, l.minStock)})`
+  const lines = sorted.slice(0, 3).map((l) =>
+    l.status === "OUT" ? `${l.name}: habis` : `${l.name}: sisa ${fmtQty(l, l.current)}`
   );
-  const more = sorted.length > 8 ? `\n+${sorted.length - 8} product lagi` : "";
-  return lines.join("\n") + more;
+  const more = sorted.length > 3 ? ` +${sorted.length - 3} lagi` : "";
+  return lines.join(" · ") + more;
 }
 
 // Cek MANUAL (tombol) — kirim daftar stok menipis SAAT INI, abaikan flag.
@@ -83,15 +81,15 @@ export async function checkLowStockNow(): Promise<{ sent: number; failed: number
 
   if (low.length === 0) {
     const r = await sendToAll({
-      title: "✅ Stok aman",
-      body: "Tidak ada product yang menipis saat ini.",
+      title: "Stok aman",
+      body: "Tidak ada product yang menipis.",
       url: "/stok",
       tag: "cek-stok",
     });
     return { ...r, low: 0 };
   }
 
-  const title = low.length === 1 ? "⚠️ Stok menipis" : `⚠️ ${low.length} product stok menipis`;
+  const title = low.length === 1 ? "Stok menipis" : `${low.length} product stok menipis`;
   const r = await sendToAll({ title, body: buildBody(low), url: "/stok", tag: "stok-menipis" });
   return { ...r, low: low.length };
 }

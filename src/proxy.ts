@@ -15,6 +15,13 @@ const PUBLIC_PATHS = [
   "/api/health", // keep-warm / uptime ping (tanpa login)
   "/sw.js", // service worker push (di-fetch browser, kadang tanpa cookie)
   "/manifest.webmanifest", // PWA manifest (di-fetch browser untuk install)
+  // Ikon notifikasi & PWA: di-fetch browser/OS, sering TANPA cookie sesi.
+  // Kalau kena redirect ke /login, ikonnya gagal dimuat → notifikasi tampil
+  // sebagai kotak putih dan ikon home screen kosong.
+  "/icon-192.png",
+  "/icon-512.png",
+  "/badge-96.png",
+  "/apple-touch-icon.png",
 ];
 
 // Lindungi seluruh route kecuali /login & aset statis.
@@ -35,5 +42,5 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.svg).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp|gif|ico|woff2?)).*)"],
 };

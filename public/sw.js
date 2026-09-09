@@ -8,10 +8,13 @@ self.addEventListener("push", function (event) {
   } catch {
     data = { title: "Pembukuan", body: event.data.text() };
   }
+  // Android tidak bisa render SVG di notifikasi → ikonnya jadi kotak putih.
+  // icon  = PNG berwarna (ikon aplikasi)
+  // badge = PNG putih transparan; Android cuma pakai bentuknya (alpha)
   const options = {
     body: data.body || "",
-    icon: data.icon || "/icon.svg",
-    badge: "/icon.svg",
+    icon: data.icon || "/icon-192.png",
+    badge: "/badge-96.png",
     vibrate: [100, 50, 100],
     tag: data.tag || "stok-menipis",
     renotify: true,
