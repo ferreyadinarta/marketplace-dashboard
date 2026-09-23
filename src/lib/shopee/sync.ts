@@ -210,7 +210,7 @@ export async function syncShopeeStore(
   storeId: string,
   from: Date,
   to: Date,
-  opts: { deadlineMs?: number; onProgress?: ProgressFn; resume?: boolean } = {}
+  opts: { deadlineMs?: number; onProgress?: ProgressFn; resume?: boolean; preserveCursor?: boolean } = {}
 ): Promise<SyncResult> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
@@ -242,7 +242,9 @@ export async function syncShopeeStore(
     opts.resume && store.syncCursor ? Math.floor(store.syncCursor.getTime() / 1000) : null;
   // sync baru (bukan lanjutan) → buang cursor lama, jangan sampai putaran
   // berikutnya melewati periode terbaru yang belum sempat dikerjakan
-  if (!opts.resume && store.syncCursor) {
+  // preserveCursor: penyegaran harian jalan berdampingan dengan sync riwayat yang
+  // belum selesai → bookmark riwayatnya jangan dihapus/ditimpa
+  if (!opts.resume && !opts.preserveCursor && store.syncCursor) {
     await prisma.store.update({ where: { id: store.id }, data: { syncCursor: null } });
   }
 
@@ -346,7 +348,9 @@ export async function syncShopeeStore(
       });
     }
     if (total.partial) break;
-    await prisma.store.update({ where: { id: store.id }, data: { syncCursor: new Date(ws * 1000) } });
+    if (!opts.preserveCursor) {
+      await prisma.store.update({ where: { id: store.id }, data: { syncCursor: new Date(ws * 1000) } });
+    }
   }
 
   // Catat sampai kapan riwayat sudah tersync PENUH. Hanya kalau tidak partial —
@@ -357,7 +361,11 @@ export async function syncShopeeStore(
   await prisma.store.update({
     where: { id: store.id },
     // rentang tuntas → cursor dikosongkan biar sync berikutnya mulai dari terbaru
-    data: { lastSyncAt: new Date(), syncedFrom, syncCursor: total.partial ? undefined : null },
+    data: {
+      lastSyncAt: new Date(),
+      syncedFrom,
+      syncCursor: opts.preserveCursor || total.partial ? undefined : null,
+    },
   });
   return total;
 }

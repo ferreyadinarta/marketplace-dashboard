@@ -19,13 +19,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Kalau masih ada sisa sync yang belum kelar (tarik riwayat panjang), itu
-    // yang didahulukan — percuma menarik 30 hari terakhir berulang kali sementara
-    // pekerjaan lama menggantung.
+    // 1) SELALU segarkan status 30 hari terakhir dulu. Dulu kalau ada sync
+    //    riwayat yang menggantung, cron cuma melanjutkan itu dan melewatkan
+    //    penyegaran → status pesanan (Selesai/Batal) bisa macet berhari-hari.
+    // 2) Sisa waktunya baru dipakai melanjutkan sync riwayat yang tertunda.
+    //    Batas Vercel 60 detik → total kerja dijaga ≤ ~50 detik.
+    const started = Date.now();
     const pending = await findPendingRound();
-    const r = pending
-      ? { ...(await runSyncRound(pending)), stores: 1, errors: [] as { store: string; message: string }[] }
-      : await syncAllStores(30);
+    const daily = await syncAllStores(30, pending ? 25_000 : 45_000, { daily: true });
+
+    const left = 50_000 - (Date.now() - started);
+    const history =
+      pending && left >= 10_000 ? await runSyncRound(pending, left - 3_000) : null;
+
+    const r = {
+      stores: daily.stores,
+      created: daily.created + (history?.created ?? 0),
+      updated: daily.updated + (history?.updated ?? 0),
+      partial: daily.partial,
+      errors: daily.errors,
+      history: pending ? (history ? { partial: history.partial } : { skipped: "no time left" }) : undefined,
+    };
     // setelah sync, cek stok menipis → kirim notifikasi (edge-triggered).
     // jangan gagalkan cron kalau notif error.
     let notif = { sent: 0, failed: 0, fresh: 0 };

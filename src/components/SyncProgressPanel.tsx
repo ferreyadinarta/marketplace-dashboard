@@ -81,7 +81,7 @@ function angka(n: number): string {
 }
 
 function title(j: Job, t: T): string {
-  return j.scope === "ALL"
+  return j.scope !== "STORE"
     ? t("Mengambil penjualan semua toko", "Fetching sales for all stores") +
         (j.storeTotal > 1
           ? ` (${t("toko", "store")} ${Math.max(1, j.storeIndex)} ${t("dari", "of")} ${j.storeTotal})`
@@ -334,7 +334,7 @@ export function SyncProgressPanel() {
             <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-emerald-900">
-                {j.scope === "ALL"
+                {j.scope !== "STORE"
                   ? t("Semua toko selesai diambil", "All stores finished fetching")
                   : t(`${j.storeName} selesai diambil`, `${j.storeName} finished fetching`)}
               </p>

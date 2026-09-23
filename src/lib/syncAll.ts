@@ -21,7 +21,11 @@ export type SyncAllResult = {
 //
 // Progresnya dicatat ke tabel SyncJob tiap batch → UI (dan riwayat cron) bisa
 // lihat toko ke berapa, periode ke berapa, sudah berapa order.
-export async function syncAllStores(days = 30, budgetMs = 45_000): Promise<SyncAllResult> {
+export async function syncAllStores(
+  days = 30,
+  budgetMs = 45_000,
+  opts: { daily?: boolean } = {}
+): Promise<SyncAllResult> {
   const started = Date.now();
   const to = new Date();
   const from = new Date(to);
@@ -39,7 +43,7 @@ export async function syncAllStores(days = 30, budgetMs = 45_000): Promise<SyncA
 
   const jobId = await startSyncJob({
     storeName: `${stores.length} toko`,
-    scope: "ALL",
+    scope: opts.daily ? "DAILY" : "ALL",
     storeTotal: stores.length,
   });
   const progress = progressWriter(jobId);
@@ -74,7 +78,7 @@ export async function syncAllStores(days = 30, budgetMs = 45_000): Promise<SyncA
 
     try {
       if (s.marketplace === "SHOPEE") {
-        const r = await syncShopeeStore(s.id, from, to, { deadlineMs: share, onProgress });
+        const r = await syncShopeeStore(s.id, from, to, { deadlineMs: share, onProgress, preserveCursor: opts.daily });
         res.created += r.created;
         res.updated += r.updated;
         if (r.partial) res.partial = true;

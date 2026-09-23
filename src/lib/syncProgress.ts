@@ -30,7 +30,9 @@ const MIN_INTERVAL_MS = 1_200; // jangan spam DB tiap iterasi kecil
 export async function startSyncJob(input: {
   storeId?: string | null;
   storeName: string;
-  scope: "ALL" | "STORE";
+  // DAILY = penyegaran status 30 hari dari cron: tampil seperti ALL, tapi tidak
+  // pernah dianggap pekerjaan tertunda (lihat findPendingRound)
+  scope: "ALL" | "STORE" | "DAILY";
   storeTotal?: number;
   round?: number; // putaran ke berapa (untuk melanjutkan pekerjaan)
   days?: number; // rentang hari yang diminta user

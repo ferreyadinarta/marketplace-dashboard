@@ -53,7 +53,8 @@ export function parseRoundInput(body: Record<string, unknown>): RoundInput {
   };
 }
 
-export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
+// budgetMs: sisa waktu yang boleh dipakai (default 45 detik, cukup untuk 1 panggilan)
+export async function runSyncRound(input: RoundInput, budgetMs = 45_000): Promise<RoundResult> {
   const days = input.days ?? 90;
   const to = new Date();
   const from = new Date(to);
@@ -61,7 +62,7 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
 
   // ---- semua toko sekaligus (job progresnya dibuat di syncAllStores) ----
   if (input.scope === "all") {
-    const r = await syncAllStores(days);
+    const r = await syncAllStores(days, budgetMs);
     revalidatePath("/master/toko");
     revalidatePath("/pembukuan");
     revalidatePath("/");
@@ -106,7 +107,7 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
 
     const r =
       store.marketplace === "SHOPEE"
-        ? await syncShopeeStore(storeId, from, to, { onProgress, resume: round > 1 })
+        ? await syncShopeeStore(storeId, from, to, { onProgress, resume: round > 1, deadlineMs: budgetMs })
         : { ...(await syncTiktokStore(storeId, from, to, { onProgress })), partial: false };
 
     const created = accCreated + r.created;
@@ -143,7 +144,7 @@ export async function findPendingRound(): Promise<RoundInput | null> {
   // scope ALL ikut dilanjutkan; dulu cuma STORE, jadi "Sync semua toko" yang
   // kepotong waktu tidak pernah disambung dan menggantung selamanya
   const last = await prisma.syncJob.findFirst({
-    where: { partial: true, phase: "done" },
+    where: { partial: true, phase: "done", scope: { not: "DAILY" } },
     orderBy: { finishedAt: "desc" },
   });
   if (!last) return null;
