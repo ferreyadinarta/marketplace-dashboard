@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Tags, ChevronDown, Search, Loader2, Wand2 } from "lucide-react";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Collapse } from "@/components/Collapse";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -100,11 +101,19 @@ function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => voi
 //  • edit manual per baris → bar "belum disimpan" muncul sendiri di bawah;
 //  • "Terapkan ke semua" → konfirmasi dulu, lalu langsung tersimpan.
 // Yang dikirim ke server HANYA baris yang berubah.
-export function BulkPriceForm({ products, action }: { products: PriceRow[]; action: Action }) {
-  const [open, setOpen] = useState(false);
+export function BulkPriceForm({
+  products,
+  action,
+  defaultOpen = false,
+}: {
+  products: PriceRow[];
+  action: Action;
+  defaultOpen?: boolean; // dibuka dari link "Isi HPP" → langsung tampilkan yang HPP-nya kosong
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [tab, setTab] = useState<Tab>("harga");
   const [q, setQ] = useState("");
-  const [onlyEmpty, setOnlyEmpty] = useState(false);
+  const [onlyEmpty, setOnlyEmpty] = useState(defaultOpen);
   const [confirmTpl, setConfirmTpl] = useState(false);
 
   // State cuma menyimpan PERUBAHAN user (override per product), bukan salinan
@@ -225,10 +234,10 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
             )}
           </span>
         </span>
-        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <form ref={formRef} action={action} className="border-t border-slate-100 p-5">
           <input type="hidden" name="prices" value={JSON.stringify(payload)} />
 
@@ -336,14 +345,14 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
 
           {/* header kolom (desktop) */}
           {tab === "harga" ? (
-            <div className="hidden gap-2 px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(3,7rem)]">
+            <div className="hidden gap-2 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(3,7rem)]">
               <span>Product</span>
               <span>HPP (modal) / satuan utama</span>
               <span>Retail</span>
               <span>Grosir</span>
             </div>
           ) : (
-            <div className="hidden gap-2 px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem]">
+            <div className="hidden gap-2 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem]">
               <span>Product</span>
               <span>Satuan utama</span>
               <span>Kecil</span>
@@ -362,8 +371,8 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
               return tab === "harga" ? (
                 <div
                   key={p.id}
-                  className={`grid grid-cols-1 gap-2 rounded-xl border p-2 sm:grid-cols-[1fr_repeat(3,7rem)] sm:items-center sm:p-1 ${
-                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-0"
+                  className={`grid grid-cols-1 gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_repeat(3,7rem)] sm:items-center sm:px-3 sm:py-2 ${
+                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-transparent"
                   }`}
                 >
                   <div className="min-w-0">
@@ -382,8 +391,8 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
               ) : (
                 <div
                   key={p.id}
-                  className={`grid grid-cols-2 gap-2 rounded-xl border p-2 sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem] sm:items-center sm:p-1 ${
-                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-0"
+                  className={`grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem] sm:items-center sm:px-3 sm:py-2 ${
+                    dirty ? "border-amber-200 bg-amber-50/40" : "border-slate-100 sm:border-transparent"
                   }`}
                 >
                   <div className="col-span-2 min-w-0 sm:col-span-1">
@@ -413,7 +422,7 @@ export function BulkPriceForm({ products, action }: { products: PriceRow[]; acti
             }}
           />
         </form>
-      )}
+      </Collapse>
 
       {/* konfirmasi sebelum satuan ditimpa massal — langsung tersimpan setelah OK */}
       <ConfirmDialog

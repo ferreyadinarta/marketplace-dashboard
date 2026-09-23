@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Trash2, ChevronDown, Search, AlertTriangle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Collapse } from "@/components/Collapse";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -64,10 +65,10 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
             Bersihkan product sampah (mis. hasil import lama yang namanya panjang & HPP-nya masih 0).
           </span>
         </span>
-        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <div className="border-t border-slate-100 p-5">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:max-w-xs">
@@ -170,7 +171,7 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
             extraFields={<input type="hidden" name="ids" value={JSON.stringify(ids)} />}
           />
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }

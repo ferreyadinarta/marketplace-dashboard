@@ -53,28 +53,28 @@ export function BulkMappingBar({
   return (
     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
       <p className="text-sm font-medium text-indigo-900">
-        Petakan massal — {unmappedInFilter} SKU belum dipetakan di {scopeText}
+        Petakan sekaligus: {unmappedInFilter} SKU {isFiltered ? "di hasil filter" : "yang belum dipetakan"}
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="button"
           disabled={suggestable === 0}
           onClick={() => setConfirm("suggest")}
-          className="inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
           title={suggestable === 0 ? "Tidak ada saran yang cukup yakin" : undefined}
         >
           <Wand2 size={15} />
           Terima semua saran ({suggestable})
         </button>
 
-        <span className="text-xs text-slate-400">atau</span>
+        <span className="text-center text-xs text-slate-400 sm:text-left">atau</span>
 
         <Select
           value={productId}
           onValueChange={setProductId}
           placeholder="— Pilih product tujuan —"
-          className="w-56"
+          className="w-full sm:w-56"
           options={options}
           searchable
         />
@@ -82,7 +82,7 @@ export function BulkMappingBar({
         <Select
           value={baseQty}
           onValueChange={setBaseQty}
-          className="w-44"
+          className="w-full sm:w-44"
           options={ISI_OPTIONS}
         />
 
@@ -90,7 +90,7 @@ export function BulkMappingBar({
           type="button"
           disabled={!productId}
           onClick={() => setConfirm("product")}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-40"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-40"
         >
           <Link2 size={15} />
           Petakan {unmappedInFilter} ke product ini
