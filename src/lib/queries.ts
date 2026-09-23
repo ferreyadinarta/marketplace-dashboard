@@ -41,14 +41,17 @@ export type DashboardFilter = {
   groupId?: string; // filter grup pembukuan (khusus halaman Pembukuan)
 };
 
-// bangun where clause order dari filter.
-// HANYA hitung order yang SELESAI (COMPLETED) = penjualan benar-benar terjadi &
-// dana cair. Otomatis mengecualikan yang batal/retur (CANCELLED/RETURNED) —
-// termasuk paket yang sudah dikirim tapi akhirnya dibatalkan/dikembalikan —
-// dan yang belum final (PENDING/SHIPPED), supaya pembukuan tidak over-hitung.
-function orderWhere(f: DashboardFilter) {
+// Dua cara hitung penjualan:
+//  - "selesai" (Pembukuan & Excel): hanya COMPLETED → buku final, tidak berubah lagi.
+//  - "dibayar" (Dashboard): semua yang sudah dibayar & tidak batal (PENDING,
+//    SHIPPED, COMPLETED) → penjualan hari ini langsung kelihatan. Kalau nanti
+//    batal/retur, statusnya berubah saat sync dan otomatis keluar sendiri.
+// UNPAID, CANCELLED, RETURNED tidak pernah dihitung.
+export const PAID_STATUSES = ["PENDING", "SHIPPED", "COMPLETED"];
+
+function orderWhere(f: DashboardFilter, basis: "completed" | "paid" = "completed") {
   const where: Record<string, unknown> = {
-    status: "COMPLETED",
+    status: basis === "paid" ? { in: PAID_STATUSES } : "COMPLETED",
   };
   if (f.from || f.to) {
     where.orderDate = {
@@ -63,25 +66,65 @@ function orderWhere(f: DashboardFilter) {
   return where;
 }
 
-// ringkasan profit keseluruhan
-export async function getSummary(f: DashboardFilter) {
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f),
-    include: { items: { include: { product: true } } },
+// Fee order yang belum Selesai sering belum final (atau belum ada). Kalau
+// Shopee belum kasih angkanya, perkirakan dari rata-rata fee toko itu 90 hari
+// terakhir. Order Selesai selalu pakai fee aslinya.
+async function feeEstimator() {
+  const rows = await prisma.order.groupBy({
+    by: ["storeId"],
+    where: {
+      status: "COMPLETED",
+      marketplaceFee: { gt: 0 },
+      orderDate: { gte: new Date(Date.now() - 90 * 24 * 3600 * 1000) },
+    },
+    _sum: { totalAmount: true, marketplaceFee: true },
   });
+  const rate = new Map(
+    rows.map((r) => [r.storeId, (r._sum.totalAmount ?? 0) > 0 ? (r._sum.marketplaceFee ?? 0) / r._sum.totalAmount! : 0])
+  );
+  return (o: { storeId: string; status: string; totalAmount: number; marketplaceFee: number }) =>
+    o.status === "COMPLETED" || o.marketplaceFee > 0
+      ? o.marketplaceFee
+      : Math.round(o.totalAmount * (rate.get(o.storeId) ?? 0));
+}
+
+// ringkasan dashboard (basis "dibayar")
+export async function getSummary(f: DashboardFilter) {
+  const [orders, feeOf] = await Promise.all([
+    prisma.order.findMany({
+      where: orderWhere(f, "paid"),
+      include: { items: { include: { product: true } } },
+    }),
+    feeEstimator(),
+  ]);
 
   let omzet = 0;
   let fee = 0;
   let hpp = 0;
+  let prosesOrder = 0;
+  let prosesOmzet = 0;
   for (const o of orders) {
     omzet += o.totalAmount;
-    fee += o.marketplaceFee;
+    fee += feeOf(o);
     for (const it of o.items) {
       hpp += itemModal(it);
     }
+    if (o.status !== "COMPLETED") {
+      prosesOrder += 1;
+      prosesOmzet += o.totalAmount;
+    }
   }
   const hppBulat = Math.round(hpp);
-  return { omzet, fee, hpp: hppBulat, profit: omzet - fee - hppBulat, jumlahOrder: orders.length };
+  return {
+    omzet,
+    fee,
+    hpp: hppBulat,
+    profit: omzet - fee - hppBulat,
+    jumlahOrder: orders.length,
+    // bagian yang belum Selesai (masih bisa batal) — untuk catatan kecil di UI
+    prosesOrder,
+    prosesOmzet,
+  };
 }
 
 // Pesanan yang SUDAH masuk tapi belum Selesai (PENDING/SHIPPED). Sengaja
@@ -137,11 +180,14 @@ export async function getInFlight(f: DashboardFilter) {
 
 // tren harian omzet & profit
 export async function getDailyTrend(f: DashboardFilter) {
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f),
-    include: { items: { include: { product: true } } },
-    orderBy: { orderDate: "asc" },
-  });
+  const [orders, feeOf] = await Promise.all([
+    prisma.order.findMany({
+      where: orderWhere(f, "paid"),
+      include: { items: { include: { product: true } } },
+      orderBy: { orderDate: "asc" },
+    }),
+    feeEstimator(),
+  ]);
 
   const map = new Map<string, { omzet: number; profit: number }>();
   for (const o of orders) {
@@ -150,7 +196,7 @@ export async function getDailyTrend(f: DashboardFilter) {
     let hpp = 0;
     for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
-    cur.profit += o.totalAmount - o.marketplaceFee - hpp;
+    cur.profit += o.totalAmount - feeOf(o) - hpp;
     map.set(key, cur);
   }
   // Isi hari kosong dengan 0 sepanjang rentang filter. Tanpa ini grafik mulai di
@@ -174,10 +220,13 @@ export async function getDailyTrend(f: DashboardFilter) {
 
 // performa per marketplace
 export async function getByMarketplace(f: DashboardFilter) {
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f),
-    include: { items: { include: { product: true } }, store: true },
-  });
+  const [orders, feeOf] = await Promise.all([
+    prisma.order.findMany({
+      where: orderWhere(f, "paid"),
+      include: { items: { include: { product: true } }, store: true },
+    }),
+    feeEstimator(),
+  ]);
   const map = new Map<string, { omzet: number; profit: number; order: number }>();
   for (const o of orders) {
     const key = o.store.marketplace;
@@ -185,7 +234,7 @@ export async function getByMarketplace(f: DashboardFilter) {
     let hpp = 0;
     for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
-    cur.profit += o.totalAmount - o.marketplaceFee - hpp;
+    cur.profit += o.totalAmount - feeOf(o) - hpp;
     cur.order += 1;
     map.set(key, cur);
   }
@@ -418,10 +467,13 @@ export async function getGroups() {
 
 // product terlaris (top N) berdasarkan profit dalam periode filter
 export async function getBestSellers(f: DashboardFilter, limit = 5) {
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f),
-    include: { items: { include: { product: true } } },
-  });
+  const [orders, feeOf] = await Promise.all([
+    prisma.order.findMany({
+      where: orderWhere(f, "paid"),
+      include: { items: { include: { product: true } } },
+    }),
+    feeEstimator(),
+  ]);
 
   type Row = { productId: string; name: string; sku: string; qty: number; omzet: number; profit: number };
   const map = new Map<string, Row>();
@@ -430,7 +482,7 @@ export async function getBestSellers(f: DashboardFilter, limit = 5) {
     for (const it of o.items) {
       if (!it.productId || !it.product) continue;
       // fee & satuan mengikuti aturan yang sama dengan Pembukuan biar angkanya cocok
-      const feeItem = o.marketplaceFee * shareOf(it.subtotal, nilai, o.items.length);
+      const feeItem = feeOf(o) * shareOf(it.subtotal, nilai, o.items.length);
       const r =
         map.get(it.productId) ??
         { productId: it.productId, name: it.product.name, sku: it.product.sku, qty: 0, omzet: 0, profit: 0 };

@@ -54,8 +54,8 @@ export default async function PembukuanPage({
       <PageHeader
         title={t("Pembukuan", "Bookkeeping")}
         description={t(
-          "Penjualan tiap product dikelompokkan per grup. Atur rentang tanggal & marketplace, lalu export ke Excel.",
-          "Sales for each product are grouped per bookkeeping group. Set the date range & marketplace, then export to Excel."
+          "Penjualan tiap product per grup, hanya dari pesanan yang sudah selesai, jadi angkanya final. Dashboard juga menghitung pesanan yang masih dikirim.",
+          "Sales for each product per group, from completed orders only, so the numbers are final. The dashboard also counts orders still being shipped."
         )}
       />
 

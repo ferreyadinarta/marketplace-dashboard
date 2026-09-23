@@ -13,10 +13,10 @@ import {
   PackagePlus,
   Package,
   CalendarClock,
+  Clock,
 } from "lucide-react";
 import {
   getSummary,
-  getInFlight,
   getDailyTrend,
   getByMarketplace,
   getBestSellers,
@@ -35,7 +35,7 @@ import TrendChart from "@/components/TrendChart";
 import SetupChecklist from "@/components/SetupChecklist";
 import DateRangePicker from "@/components/DateRangePicker";
 import DashboardRefresh from "@/components/DashboardRefresh";
-import { Card, CardHeader, PageHeader, HelpHint } from "@/components/ui";
+import { Card, CardHeader, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -72,9 +72,8 @@ export default async function DashboardPage({
   const canCompare = !period.isAll && !!filter.from && !!filter.to;
   const prev = canCompare ? previousPeriod(filter.from!, filter.to!) : null;
 
-  const [summary, inFlight, prevSummary, trend, byMp, best, setup, levels, lastSync] = await Promise.all([
+  const [summary, prevSummary, trend, byMp, best, setup, levels, lastSync] = await Promise.all([
     getSummary(filter),
-    getInFlight(filter),
     prev ? getSummary({ ...filter, from: prev.from, to: prev.to }) : Promise.resolve(null),
     getDailyTrend(filter),
     getByMarketplace(filter),
@@ -178,14 +177,14 @@ export default async function DashboardPage({
           deltaPct={dOmzet}
           hint={
             !hasOrders
-              ? t("Belum ada order selesai", "No completed orders yet")
+              ? t("Belum ada pesanan", "No orders yet")
               : canCompare
                 ? t("vs periode sebelumnya", "vs previous period")
                 : undefined
           }
           help={t(
-            "Total penjualan (yang dibayar pembeli) dari semua order, sebelum dipotong biaya apa pun.",
-            "Total sales (paid by buyers) from all orders, before any costs are deducted."
+            "Total yang dibayar pembeli dari semua pesanan yang sudah dibayar, termasuk yang masih dikirim. Sebelum dipotong biaya apa pun. Pesanan yang batal atau diretur otomatis keluar.",
+            "Total paid by buyers across all paid orders, including ones still being shipped, before any costs. Cancelled or returned orders drop out automatically."
           )}
         />
         <StatCard
@@ -193,7 +192,10 @@ export default async function DashboardPage({
           value={summary.fee}
           icon={<Receipt size={18} />}
           accent="red"
-          help={t("Total potongan/komisi yang diambil marketplace.", "Total fees/commission taken by the marketplace.")}
+          help={t(
+            "Total potongan/komisi marketplace. Untuk pesanan yang belum selesai, dipakai perkiraan dari rata-rata fee toko itu 90 hari terakhir.",
+            "Total marketplace fees/commission. For orders not completed yet, it's estimated from that store's average fee over the last 90 days."
+          )}
         />
         <StatCard
           label={t("Total HPP", "Total COGS")}
@@ -239,6 +241,17 @@ export default async function DashboardPage({
           }
         />
       </div>
+      {summary.prosesOrder > 0 && (
+        <p className="-mt-3 flex items-start gap-1.5 px-1 text-xs text-slate-500">
+          <Clock size={14} className="mt-px shrink-0 text-slate-400" />
+          <span>
+            {t(
+              `Termasuk ${summary.prosesOrder} pesanan yang masih diproses (${rupiah(summary.prosesOmzet)}). Kalau nanti batal atau diretur, otomatis dikeluarkan.`,
+              `Includes ${summary.prosesOrder} ${summary.prosesOrder === 1 ? "order" : "orders"} still in progress (${rupiah(summary.prosesOmzet)}). If they're cancelled or returned, they're removed automatically.`
+            )}
+          </span>
+        </p>
+      )}
 
       {/* hal yang perlu ditindak — satu kartu, bukan banner bertumpuk */}
       {todos.length > 0 && (
@@ -278,40 +291,6 @@ export default async function DashboardPage({
           <QuickAction href="/master/product" icon={<Package size={18} />} label={t("Tambah Product", "Add Product")} />
         </div>
       </Card>
-
-      {/* Pesanan yang belum Selesai — bukan bagian pembukuan, tapi tanpa ini
-          hari-hari terakhir terlihat Rp 0 padahal penjualannya ada. */}
-      {inFlight.jumlahOrder > 0 && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50/60 p-5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-amber-900">
-              {t(
-                `${inFlight.jumlahOrder} pesanan belum selesai`,
-                `${inFlight.jumlahOrder} ${inFlight.jumlahOrder === 1 ? "order" : "orders"} not yet completed`
-              )}{" "}
-              · {rupiah(inFlight.omzet)}
-            </p>
-            <p className="mt-0.5 text-xs text-amber-800/80">
-              {t(
-                "Belum masuk angka di atas. Marketplace baru menandai Selesai beberapa hari setelah barang sampai.",
-                "Not included in the numbers above. Marketplaces only mark orders Completed a few days after the item arrives."
-              )}
-            </p>
-            {inFlight.sampel > 0 && (
-              <p className="mt-1 flex items-center text-xs text-amber-800/80">
-                {t("Perkiraan uang yang nanti masuk:", "Estimated amount to be received:")}&nbsp;
-                <strong className="font-semibold">±{rupiah(inFlight.perkiraanBersih)}</strong>
-                <HelpHint
-                  text={t(
-                    `Dihitung dari pola 90 hari terakhir (${inFlight.sampel} pesanan selesai): ±${(inFlight.batalRate * 100).toFixed(0)}% batal, potongan ±${(inFlight.feeRate * 100).toFixed(1)}%. Perkiraan, bukan angka pembukuan.`,
-                    `Calculated from the last 90 days' pattern (${inFlight.sampel} completed orders): ±${(inFlight.batalRate * 100).toFixed(0)}% cancelled, ±${(inFlight.feeRate * 100).toFixed(1)}% fees. An estimate, not a bookkeeping figure.`
-                  )}
-                />
-              </p>
-            )}
-          </div>
-        </Card>
-      )}
 
       {/* chart */}
       <Card>

@@ -44,6 +44,7 @@ async function ensureFreshToken(store: Store): Promise<string> {
 // map status Shopee → status internal
 function mapStatus(s: string): NormalizedOrder["status"] {
   const up = (s || "").toUpperCase();
+  if (up === "UNPAID") return "UNPAID";
   if (up === "COMPLETED") return "COMPLETED";
   if (up === "CANCELLED" || up === "IN_CANCEL") return "CANCELLED";
   if (up === "TO_RETURN") return "RETURNED";

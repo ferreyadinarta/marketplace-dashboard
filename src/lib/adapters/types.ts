@@ -18,7 +18,8 @@ export type NormalizedOrderItem = {
 export type NormalizedOrder = {
   marketplaceOrderId: string;
   orderDate: Date;
-  status: "PENDING" | "SHIPPED" | "COMPLETED" | "CANCELLED" | "RETURNED";
+  // UNPAID = sudah checkout tapi belum dibayar → tidak pernah dihitung sebagai penjualan
+  status: "UNPAID" | "PENDING" | "SHIPPED" | "COMPLETED" | "CANCELLED" | "RETURNED";
   buyerName?: string; // username/nama pembeli
   totalAmount: number; // total dibayar pembeli
   marketplaceFee: number; // total potongan marketplace

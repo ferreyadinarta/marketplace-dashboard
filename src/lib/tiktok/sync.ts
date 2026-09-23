@@ -18,6 +18,7 @@ function toNum(v?: string): number {
 // map status TikTok → status internal
 function mapStatus(s: string): NormalizedOrder["status"] {
   const up = (s || "").toUpperCase();
+  if (up === "UNPAID") return "UNPAID";
   if (up === "COMPLETED") return "COMPLETED";
   if (up === "CANCELLED" || up === "CANCEL") return "CANCELLED";
   if (up === "DELIVERED" || up === "IN_TRANSIT" || up === "AWAITING_COLLECTION") return "SHIPPED";
