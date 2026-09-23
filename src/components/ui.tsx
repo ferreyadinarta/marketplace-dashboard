@@ -43,12 +43,13 @@ export function CardHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
-      <div>
+    // HP: judul di atas, kontrol selebar kartu di bawahnya (kalau sebaris, dua-duanya tergencet)
+    <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="min-w-0">
         <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
       </div>
-      {action}
+      {action && <div className="w-full sm:w-auto sm:shrink-0">{action}</div>}
     </div>
   );
 }
@@ -92,7 +93,7 @@ export function Badge({
   color?: keyof typeof badgeColors;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeColors[color]}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeColors[color]}`}>
       {children}
     </span>
   );

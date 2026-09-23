@@ -10,7 +10,7 @@ export default function StokLoading() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stok Opname"
+        title="Stok"
         description="Pantau stok tiap product. Stok otomatis berkurang dari order yang Selesai (COMPLETED), bertambah dari barang masuk, dan bisa disamakan dengan hitungan fisik lewat opname."
       />
 

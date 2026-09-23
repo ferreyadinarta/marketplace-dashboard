@@ -8,7 +8,7 @@ export default function MasterProductLoading() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Product"
+        title="Product"
         description="Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit."
       />
 

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { CheckCircle2, Circle, ArrowRight } from "lucide-react";
+import { Check } from "lucide-react";
 
-type Step = { key: string; done: boolean; title: string; desc: string; href: string };
+type Step = { key: string; done: boolean; title: string; desc: string; href: string; cta: string };
 
+// Stepper terpandu: cuma langkah yang sedang aktif yang punya tombol, jadi user
+// selalu tahu satu hal berikutnya yang harus dikerjakan.
 export default function SetupChecklist({
   steps,
   doneCount,
@@ -12,59 +14,68 @@ export default function SetupChecklist({
   doneCount: number;
   total: number;
 }) {
-  const pct = Math.round((doneCount / total) * 100);
+  const current = steps.findIndex((s) => !s.done);
+
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
+    <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm">
+      <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">Langkah Awal</h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            Selesaikan langkah ini supaya pembukuan berjalan otomatis.
-          </p>
+          <h2 className="text-sm font-semibold text-slate-900">Siapkan pembukuan</h2>
+          <p className="mt-0.5 text-xs text-slate-500">Ikuti urutannya — angka profit baru benar setelah semua selesai.</p>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold text-indigo-600">
-            {doneCount}/{total}
-          </p>
-          <p className="text-xs text-slate-400">selesai</p>
-        </div>
+        <p className="shrink-0 text-sm font-semibold text-indigo-600">
+          {doneCount} dari {total}
+        </p>
       </div>
 
-      <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-indigo-100">
-        <div className="h-full rounded-full bg-indigo-600 transition-all" style={{ width: `${pct}%` }} />
-      </div>
+      <ol className="px-5 py-3">
+        {steps.map((s, i) => {
+          const isCurrent = i === current;
+          return (
+            <li key={s.key} className="relative flex gap-3 py-2">
+              {/* garis penghubung antar langkah */}
+              {i < steps.length - 1 && (
+                <span
+                  className={`absolute left-[11px] top-9 bottom-[-8px] w-px ${s.done ? "bg-emerald-200" : "bg-slate-200"}`}
+                  aria-hidden
+                />
+              )}
+              <span
+                className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  s.done
+                    ? "bg-emerald-500 text-white"
+                    : isCurrent
+                      ? "bg-indigo-600 text-white"
+                      : "border border-slate-300 bg-white text-slate-400"
+                }`}
+              >
+                {s.done ? <Check size={14} strokeWidth={3} /> : i + 1}
+              </span>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        {steps.map((s, i) => (
-          <Link
-            key={s.key}
-            href={s.href}
-            className={`group flex items-start gap-3 rounded-xl border p-4 ${
-              s.done
-                ? "border-emerald-100 bg-emerald-50/50"
-                : "border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm"
-            }`}
-          >
-            {s.done ? (
-              <CheckCircle2 className="mt-0.5 shrink-0 text-emerald-500" size={20} />
-            ) : (
-              <Circle className="mt-0.5 shrink-0 text-slate-300" size={20} />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className={`text-sm font-medium ${s.done ? "text-slate-500 line-through" : "text-slate-900"}`}>
-                {i + 1}. {s.title}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-500">{s.desc}</p>
-            </div>
-            {!s.done && (
-              <ArrowRight
-                size={16}
-                className="mt-0.5 shrink-0 text-slate-300 group-hover:text-indigo-500"
-              />
-            )}
-          </Link>
-        ))}
-      </div>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <p
+                  className={`text-sm ${
+                    s.done ? "text-slate-400" : isCurrent ? "font-semibold text-slate-900" : "text-slate-500"
+                  }`}
+                >
+                  {s.title}
+                </p>
+                {isCurrent && (
+                  <div className="animate-reveal">
+                    <p className="mt-0.5 text-xs text-slate-500">{s.desc}</p>
+                    <Link
+                      href={s.href}
+                      className="mt-2.5 inline-flex items-center rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+                    >
+                      {s.cta}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

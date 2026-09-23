@@ -182,7 +182,7 @@ export default function DateRangePicker({
 
       {open && (
         <div
-          className={`absolute top-full z-50 mt-2 flex w-auto max-w-[95vw] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:flex-row ${
+          className={`animate-pop absolute top-full z-50 mt-2 flex w-auto max-w-[95vw] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:flex-row ${
             alignRight ? "right-0" : "left-0"
           }`}
         >

@@ -142,7 +142,7 @@ export function Select({
               minWidth: pos.width,
               maxWidth: "min(90vw, 22rem)",
             }}
-            className="z-[100] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+            className="animate-pop z-[100] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
           >
             {searchable && (
               <div className="border-b border-slate-100 p-1.5">

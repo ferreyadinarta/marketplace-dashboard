@@ -7,6 +7,7 @@ import { Field, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
 import { DatePicker } from "@/components/DatePicker";
 import { CurrencyInput } from "@/components/CurrencyInput";
+import { Collapse } from "@/components/Collapse";
 
 type Option = { value: string; label: string };
 type Action = (formData: FormData) => void | Promise<void>;
@@ -110,7 +111,7 @@ export function RestockForm({
   if (products.length === 0) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
-        Tambah product dulu di Master Product, baru bisa catat barang masuk.
+        Tambah product dulu di halaman Product, baru bisa catat barang masuk.
       </p>
     );
   }
@@ -314,13 +315,13 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
           </div>
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Opname Massal</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Hitung fisik banyak product sekaligus, simpan sekali.</p>
+            <p className="mt-0.5 text-xs text-slate-500">Hitung stok fisik banyak product sekaligus. Sebaiknya tiap product dihitung minimal sebulan sekali.</p>
           </div>
         </div>
-        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
+      <Collapse open={open}>
         <form action={action} className="border-t border-slate-100 p-5">
           <input type="hidden" name="items" value={JSON.stringify(filled)} />
 
@@ -415,7 +416,7 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
             </SubmitButton>
           </div>
         </form>
-      )}
+      </Collapse>
     </div>
   );
 }
@@ -448,7 +449,7 @@ export function OpnameCell({
   const selisih = baseCounted !== null && known ? baseCounted - current : null;
 
   return (
-    <form action={action} className="flex flex-wrap items-center gap-2">
+    <form action={action} className="flex flex-wrap items-center gap-2 min-[1400px]:flex-nowrap">
       <input type="hidden" name="productId" value={productId} />
       <input type="hidden" name="unit" value={u} />
       <input
@@ -457,8 +458,8 @@ export function OpnameCell({
         min="0"
         value={val}
         onChange={(e) => setVal(e.target.value)}
-        placeholder={known ? "fisik…" : "stok awal…"}
-        className="h-9 w-16 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-20"
+        placeholder="0"
+        className="h-9 w-16 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
       />
       {hasPack ? (
         <div className="flex shrink-0 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
@@ -480,7 +481,7 @@ export function OpnameCell({
       ) : (
         <span className="shrink-0 text-[11px] text-slate-400">{unit}</span>
       )}
-      <span className="w-14 shrink-0 text-xs sm:w-20">
+      <span className="w-14 shrink-0 text-xs">
         {!known ? (
           <span className="text-slate-400">stok awal</span>
         ) : selisih === null ? (
@@ -500,7 +501,7 @@ export function OpnameCell({
         pendingText="…"
         notify="Opname tersimpan"
       >
-        {known ? "Opname" : "Set"}
+        {known ? "Opname" : "Simpan"}
       </SubmitButton>
     </form>
   );
@@ -530,13 +531,14 @@ export function MinStockCell({
         onChange={(e) => setVal(e.target.value)}
         className="h-9 w-16 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
       />
+      {/* tombol hanya muncul saat angka diubah */}
       <SubmitButton
-        variant={dirty ? "primary" : "outline"}
+        variant="primary"
         disabled={!dirty}
-        className="h-9 px-2 py-0 text-xs"
+        className={`h-9 px-2 py-0 text-xs ${dirty ? "" : "invisible"}`}
         pendingText="…"
       >
-        {dirty ? "Simpan" : "OK"}
+        Simpan
       </SubmitButton>
     </form>
   );
@@ -583,7 +585,7 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           value={text}
@@ -605,7 +607,7 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
       <button
         type="button"
         onClick={toggleLow}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
+        className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none ${
           low
             ? "border-amber-300 bg-amber-50 text-amber-700"
             : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
@@ -617,7 +619,7 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
       <button
         type="button"
         onClick={toggleSort}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
+        className={`inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium sm:flex-none ${
           sort === "stock"
             ? "border-indigo-300 bg-indigo-50 text-indigo-700"
             : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"

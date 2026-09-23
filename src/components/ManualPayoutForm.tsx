@@ -64,12 +64,12 @@ export function ManualPayoutForm({
           <div
             onClick={() => setOpen(false)}
             aria-hidden
-            className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
+            className="animate-fade absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]"
           />
           <div
             role="dialog"
             aria-modal="true"
-            className="relative w-full overflow-hidden rounded-t-2xl bg-white shadow-[0_-8px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-200 sm:max-w-md sm:rounded-2xl"
+            className="animate-sheet relative w-full overflow-hidden rounded-t-2xl bg-white shadow-[0_-8px_40px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-200 sm:max-w-md sm:rounded-2xl"
           >
             <div className="h-1 w-full bg-indigo-500" />
             <form

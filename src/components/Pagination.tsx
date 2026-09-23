@@ -68,48 +68,50 @@ export function Pagination({
   if (total === 0) return null;
   const border = place === "top" ? "border-b" : "border-t";
 
-  const btn = "inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 font-medium";
+  const btn = "inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 font-medium sm:px-3";
   const btnOn = `${btn} border-slate-300 text-slate-700 hover:bg-slate-50`;
   const btnOff = `${btn} border-slate-200 text-slate-300`;
 
   const controls = (
     <div className="flex items-center gap-1">
       {page > 1 ? (
-        <Link scroll={false} href={hrefFor(page - 1)} className={btnOn}>
-          <ChevronLeft size={15} /> Sebelumnya
+        <Link scroll={false} href={hrefFor(page - 1)} className={btnOn} aria-label="Halaman sebelumnya">
+          <ChevronLeft size={15} /> <span className="hidden sm:inline">Sebelumnya</span>
         </Link>
       ) : (
         <span className={btnOff}>
-          <ChevronLeft size={15} /> Sebelumnya
+          <ChevronLeft size={15} /> <span className="hidden sm:inline">Sebelumnya</span>
         </span>
       )}
-      <span className="px-3 text-slate-500">
+      <span className="whitespace-nowrap px-2 text-slate-500 sm:px-3">
         Halaman {page} / {totalPages}
       </span>
       {page < totalPages ? (
-        <Link scroll={false} href={hrefFor(page + 1)} className={btnOn}>
-          Berikutnya <ChevronRight size={15} />
+        <Link scroll={false} href={hrefFor(page + 1)} className={btnOn} aria-label="Halaman berikutnya">
+          <span className="hidden sm:inline">Berikutnya</span> <ChevronRight size={15} />
         </Link>
       ) : (
         <span className={btnOff}>
-          Berikutnya <ChevronRight size={15} />
+          <span className="hidden sm:inline">Berikutnya</span> <ChevronRight size={15} />
         </span>
       )}
     </div>
   );
 
   if (compact) {
+    if (totalPages <= 1) return null;
     return (
       <div className={`flex justify-end ${border} border-slate-100 px-5 py-2 text-sm`}>{controls}</div>
     );
   }
 
   return (
-    <div className={`flex flex-col items-center justify-between gap-3 ${border} border-slate-100 px-5 py-3 text-sm sm:flex-row`}>
+    <div className={`flex items-center justify-between gap-3 ${border} border-slate-100 px-5 py-3 text-sm`}>
       <span className="text-slate-500">
-        Menampilkan {from}–{to} dari {total} {unit}
+        {from}–{to} dari {total} {unit}
       </span>
-      {controls}
+      {/* satu halaman saja → tombol navigasi cuma jadi hiasan mati */}
+      {totalPages > 1 && controls}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { DeleteProductButton } from "@/components/ProductControls";
 import { BundleEditor } from "@/components/BundleEditor";
 import { rupiah } from "@/lib/format";
 import { tiersOf, splitBase, type UnitInfo } from "@/lib/units";
+import { Collapse } from "@/components/Collapse";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -81,23 +82,6 @@ export function ProductRow({
             )}
           </div>
           <p className="font-mono text-xs text-slate-500">{sku}</p>
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
-            {!isBundle && <span>HPP <b className="text-slate-700">{rupiah(hpp)}</b></span>}
-            <span>Retail <b className="text-slate-700">{rupiah(priceRetail)}</b></span>
-            <span>Grosir <b className="text-slate-700">{rupiah(priceGrosir)}</b></span>
-            <span>Satuan <b className="text-slate-700">{mainUnit}</b></span>
-            {!isBundle && packSize > 0 && (
-              <span>
-                1 {packUnit} = <b className="text-slate-700">{packSize} {unit}</b>
-              </span>
-            )}
-            {!isBundle && koliSize > 0 && (
-              <span>
-                1 {koliUnit} = <b className="text-slate-700">{koliSize} {packUnit}</b>
-              </span>
-            )}
-            {groupName && <span>Grup <b className="text-slate-700">{groupName}</b></span>}
-          </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -123,8 +107,29 @@ export function ProductRow({
           <DeleteProductButton id={id} name={name} action={deleteAction} />
         </div>
       </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+        {!isBundle && (
+          <span className={hpp === 0 ? "text-amber-600" : ""}>
+            HPP <b className={hpp === 0 ? "text-amber-700" : "text-slate-700"}>{hpp === 0 ? "belum diisi" : rupiah(hpp)}</b>
+          </span>
+        )}
+        <span>Retail <b className="text-slate-700">{rupiah(priceRetail)}</b></span>
+        <span>Grosir <b className="text-slate-700">{rupiah(priceGrosir)}</b></span>
+        <span>Satuan <b className="text-slate-700">{mainUnit}</b></span>
+        {!isBundle && packSize > 0 && (
+          <span>
+            1 {packUnit} = <b className="text-slate-700">{packSize} {unit}</b>
+          </span>
+        )}
+        {!isBundle && koliSize > 0 && (
+          <span>
+            1 {koliUnit} = <b className="text-slate-700">{koliSize} {packUnit}</b>
+          </span>
+        )}
+        {groupName && <span>Grup <b className="text-slate-700">{groupName}</b></span>}
+      </div>
 
-      {open && (
+      <Collapse open={open}>
         <form
           action={updateAction}
           className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3"
@@ -237,11 +242,9 @@ export function ProductRow({
             </SubmitButton>
           </div>
         </form>
-      )}
 
-      {/* Bundle (isi gabungan): form terpisah karena aksinya beda.
-          Dipakai untuk listing "mix" — 1 box berisi beberapa product sekaligus. */}
-      {open && (
+        {/* Bundle (isi gabungan): form terpisah karena aksinya beda.
+            Dipakai untuk listing "mix" — 1 box berisi beberapa product sekaligus. */}
         <BundleEditor
           productId={id}
           initialIsBundle={isBundle}
@@ -250,7 +253,7 @@ export function ProductRow({
           unitOf={unitOf}
           action={bundleAction}
         />
-      )}
+      </Collapse>
     </div>
   );
 }

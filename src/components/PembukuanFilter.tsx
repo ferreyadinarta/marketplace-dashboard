@@ -54,12 +54,12 @@ export default function PembukuanFilter({
   const hasFilter = params.toString().length > 0;
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="block w-full sm:w-auto">
+    <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+      <label className="col-span-2 block sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Rentang tanggal</span>
         <DateRangePicker initialFrom={initialFrom} initialTo={initialTo} defaultAll />
       </label>
-      <label className="block w-full sm:w-auto">
+      <label className="block min-w-0 sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Marketplace</span>
         <Select
           className="w-full sm:w-auto sm:min-w-40"
@@ -75,7 +75,7 @@ export default function PembukuanFilter({
           ]}
         />
       </label>
-      <label className="block w-full sm:w-auto">
+      <label className="block min-w-0 sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Toko</span>
         <Select
           className="w-full sm:w-auto sm:min-w-44"
@@ -88,7 +88,7 @@ export default function PembukuanFilter({
           disabled={storeOptions.length === 0}
         />
       </label>
-      <label className="block w-full sm:w-auto">
+      <label className="block min-w-0 sm:w-auto">
         <span className="mb-1 block text-xs font-medium text-slate-600">Grup / Brand</span>
         <Select
           className="w-full sm:w-auto sm:min-w-44"
@@ -105,7 +105,7 @@ export default function PembukuanFilter({
       {hasFilter && (
         <button
           onClick={() => router.push("/pembukuan", { scroll: false })}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
         >
           <RotateCcw size={15} /> Reset
         </button>
@@ -113,7 +113,7 @@ export default function PembukuanFilter({
 
       <a
         href={`/api/export?${qs}`}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 sm:ml-auto sm:w-auto"
+        className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 sm:ml-auto sm:w-auto"
       >
         <Download size={16} /> Export Excel
       </a>

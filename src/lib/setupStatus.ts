@@ -2,41 +2,58 @@ import { prisma } from "./prisma";
 
 // Cek progres setup untuk memandu user (tanpa perlu tutorial).
 export async function getSetupStatus() {
-  const [storeCount, productCount, productWithHpp, groupCount, unmappedCount] =
-    await Promise.all([
-      prisma.store.count(),
-      prisma.product.count(),
-      prisma.product.count({ where: { hpp: { gt: 0 } } }),
-      prisma.bookkeepingGroup.count(),
-      prisma.productMapping.count({ where: { productId: null } }),
-    ]);
+  const [storeCount, productCount, noHppCount, noStockCount, unmappedCount] = await Promise.all([
+    prisma.store.count(),
+    prisma.product.count({ where: { isBundle: false } }),
+    // bundle tidak punya HPP/stok sendiri → tidak dihitung
+    prisma.product.count({ where: { isBundle: false, hpp: { lte: 0 } } }),
+    prisma.product.count({ where: { isBundle: false, opnames: { none: {} }, restocks: { none: {} } } }),
+    prisma.productMapping.count({ where: { productId: null } }),
+  ]);
 
-  // Langkah setup sekali-jalan sebelum pembukuan berfungsi.
+  // Urutan = urutan yang benar-benar dibutuhkan. Grup pembukuan opsional
+  // (ada di form tambah product), jadi bukan langkah wajib.
   const steps = [
     {
       key: "toko",
+      cta: "Buka halaman Toko",
       done: storeCount > 0,
       title: "Tambah toko",
-      desc: "Daftarkan toko & marketplace.",
+      desc: "Hubungkan Shopee atau daftarkan toko secara manual.",
       href: "/master/toko",
     },
     {
-      key: "grup",
-      done: groupCount > 0,
-      title: "Buat grup pembukuan",
-      desc: "Kelompokkan product per brand (ex: Flimty, Hotto) untuk tabel pembukuan.",
-      href: "/master/product",
+      key: "product",
+      cta: "Tambah product",
+      done: productCount > 0,
+      title: "Tambah product",
+      desc: "Daftarkan barang yang kamu jual.",
+      href: "/master/product?tambah=1",
     },
     {
-      key: "product",
-      done: productCount > 0 && productWithHpp > 0,
-      title: "Isi product & HPP",
-      desc: "Masukkan product dan modal (HPP) tiap product untuk hitung profit.",
-      href: "/master/product",
+      key: "hpp",
+      cta: "Isi HPP sekarang",
+      done: productCount > 0 && noHppCount === 0,
+      title: "Isi HPP (modal)",
+      desc:
+        noHppCount > 0 && productCount > 0
+          ? `${noHppCount} product belum ada HPP — tanpa ini profit tidak bisa dihitung.`
+          : "Modal tiap product, supaya profit terhitung benar.",
+      href: "/master/product?harga=1#isi-harga",
     },
-    // Catatan: mapping SKU TIDAK dimasukkan sebagai langkah setup — itu tugas
-    // berulang (SKU baru bisa muncul kapan saja), sudah ditangani banner
-    // "X SKU belum dipetakan" di dashboard. Menaruhnya di sini = redundan.
+    {
+      key: "stok",
+      cta: "Mulai hitung stok",
+      done: productCount > 0 && noStockCount === 0,
+      title: "Hitung stok awal",
+      desc:
+        noStockCount > 0 && productCount > 0
+          ? `${noStockCount} product belum punya stok awal.`
+          : "Hitung stok fisik di gudang sekali, sisanya otomatis.",
+      href: "/stok/hitung",
+    },
+    // Mapping SKU sengaja bukan langkah setup — SKU baru bisa muncul kapan
+    // saja, jadi sudah ditangani "Perlu dicek" di dashboard.
   ];
 
   const doneCount = steps.filter((s) => s.done).length;

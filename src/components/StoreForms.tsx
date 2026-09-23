@@ -4,6 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Plus, Settings2, ChevronDown } from "lucide-react";
 import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/SubmitButton";
+import { Collapse } from "@/components/Collapse";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -35,10 +36,10 @@ export function AdvancedApiSection({
         </span>
         <ChevronDown
           size={16}
-          className={`transition-transform ${open ? "rotate-180" : ""}`}
+          className={`transition-transform duration-300 ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {open && (
+      <Collapse open={open}>
         <div className="mt-3">
           <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
             Bagian ini untuk menghubungkan toko ke API marketplace (diisi oleh
@@ -47,7 +48,7 @@ export function AdvancedApiSection({
           </p>
           {children}
         </div>
-      )}
+      </Collapse>
     </div>
   );
 }

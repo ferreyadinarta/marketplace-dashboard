@@ -31,7 +31,7 @@ export function SyncPayoutsButton({ action }: { action: (days?: number) => Promi
         toast(
           `${r.payouts} pencairan · ${r.orders} order ditandai cair` +
             (r.unmatched
-              ? ` · ${r.unmatched} order belum ada di database (tarik order lebih lama dulu di Master Toko)`
+              ? ` · ${r.unmatched} order belum ada di database (tarik order lebih lama dulu di halaman Toko)`
               : "")
         );
       startTransition(() => router.refresh());
@@ -50,7 +50,7 @@ export function SyncPayoutsButton({ action }: { action: (days?: number) => Promi
       className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-70"
     >
       {busy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-      {busy ? "Menarik pencairan…" : "Tarik data pencairan"}
+      {busy ? "Memperbarui…" : "Perbarui dari Shopee"}
     </button>
   );
 }

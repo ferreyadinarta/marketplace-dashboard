@@ -37,8 +37,8 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
     !!params.get("q") || !!params.get("status") || !!params.get("marketplace") || !!params.get("storeId");
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div>
+    <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+      <div className="col-span-2 sm:col-span-1">
         <label className="mb-1 block text-xs font-medium text-slate-600">Cari SKU / nama</label>
         <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -61,10 +61,10 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
         </div>
       </div>
 
-      <div>
+      <div className="min-w-0">
         <label className="mb-1 block text-xs font-medium text-slate-600">Status</label>
         <Select
-          className="min-w-44"
+          className="w-full sm:w-auto sm:min-w-44"
           value={params.get("status") ?? ""}
           onValueChange={(v) => setParam("status", v)}
           options={[
@@ -75,10 +75,10 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
         />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <label className="mb-1 block text-xs font-medium text-slate-600">Marketplace</label>
         <Select
-          className="min-w-40"
+          className="w-full sm:w-auto sm:min-w-40"
           value={params.get("marketplace") ?? ""}
           onValueChange={(v) => setParam("marketplace", v)}
           options={[
@@ -90,10 +90,10 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
         />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <label className="mb-1 block text-xs font-medium text-slate-600">Toko</label>
         <Select
-          className="min-w-44"
+          className="w-full sm:w-auto sm:min-w-44"
           value={params.get("storeId") ?? ""}
           onValueChange={(v) => setParam("storeId", v)}
           options={[{ value: "", label: "Semua toko" }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}

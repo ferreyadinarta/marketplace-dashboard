@@ -20,24 +20,30 @@ import {
 import { Logo } from "@/components/ui";
 import { logout } from "@/app/login/actions";
 
+// Dikelompokkan per tugas user: lihat hasil → catat harian → atur data.
 const groups = [
   {
-    label: "Laporan",
+    label: "Lihat hasil",
     items: [
-      { href: "/", label: "Dashboard", desc: "Ringkasan & profit", icon: LayoutDashboard },
-      { href: "/pembukuan", label: "Pembukuan", desc: "Per grup product", icon: BookOpen },
-      { href: "/wa", label: "Penjualan WA", desc: "Jual manual WA / offline", icon: MessageCircle },
-      { href: "/konsinyasi", label: "Grosir / Reseller", desc: "Jual putus ke reseller", icon: Handshake },
-      { href: "/rekonsiliasi", label: "Rekonsiliasi Dana", desc: "Cek dana cair", icon: Wallet },
+      { href: "/", label: "Dashboard", desc: "Omzet & profit", icon: LayoutDashboard },
+      { href: "/pembukuan", label: "Pembukuan", desc: "Rincian per product", icon: BookOpen },
+      { href: "/rekonsiliasi", label: "Dana Cair", desc: "Uang dari marketplace", icon: Wallet },
     ],
   },
   {
-    label: "Pengaturan",
+    label: "Catat harian",
     items: [
-      { href: "/master/product", label: "Master Product", desc: "Product, HPP, grup", icon: Package },
-      { href: "/stok", label: "Stok Opname", desc: "Stok, barang masuk, opname", icon: Boxes },
-      { href: "/master/toko", label: "Master Toko", desc: "Nama toko & marketplace", icon: Store },
-      { href: "/master/mapping", label: "Mapping SKU", desc: "Samakan SKU", icon: Link2 },
+      { href: "/wa", label: "Penjualan WA", desc: "Jual manual / offline", icon: MessageCircle },
+      { href: "/konsinyasi", label: "Grosir / Reseller", desc: "Jual putus ke reseller", icon: Handshake },
+      { href: "/stok", label: "Stok", desc: "Barang masuk & opname", icon: Boxes },
+    ],
+  },
+  {
+    label: "Atur data",
+    items: [
+      { href: "/master/product", label: "Product", desc: "Nama, HPP, harga", icon: Package },
+      { href: "/master/toko", label: "Toko", desc: "Hubungkan marketplace", icon: Store },
+      { href: "/master/mapping", label: "Mapping SKU", desc: "Hubungkan SKU ke product", icon: Link2 },
     ],
   },
 ];
@@ -77,7 +83,7 @@ export default function Sidebar({ env }: { env: string }) {
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2">
         {groups.map((g) => (
           <div key={g.label}>
-            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className="px-3 pb-1 text-xs font-semibold text-slate-400">
               {g.label}
             </p>
             <div className="space-y-0.5">
@@ -113,7 +119,7 @@ export default function Sidebar({ env }: { env: string }) {
         ))}
       </nav>
 
-      <div className="space-y-3 border-t border-slate-100 px-5 py-4">
+      <div className="border-t border-slate-100 px-5 py-4">
         <form action={logout}>
           <button
             type="submit"
@@ -122,10 +128,6 @@ export default function Sidebar({ env }: { env: string }) {
             <LogOut size={16} className="text-slate-400" /> Keluar
           </button>
         </form>
-        <div>
-          <p className="text-xs font-medium text-slate-500">Pembukuan Marketplace</p>
-          <p className="text-[11px] text-slate-400">Shopee · TikTok · Tokopedia</p>
-        </div>
       </div>
     </>
   );
@@ -148,7 +150,7 @@ export default function Sidebar({ env }: { env: string }) {
       {/* Overlay — mobile drawer */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+          className="animate-fade fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
           onClick={() => setOpen(false)}
           aria-hidden
         />

@@ -39,20 +39,20 @@ export default function StatCard({
   const deltaColor = good ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between">
-        <p className="flex items-center text-xs font-medium uppercase tracking-wide text-slate-500">
+        <p className="flex items-center text-sm font-medium text-slate-500">
           {label}
           {help && <HelpHint text={help} />}
         </p>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${a.ring} ${a.icon}`}>
+        <div className={`hidden h-9 w-9 items-center sm:flex justify-center rounded-xl ${a.ring} ${a.icon}`}>
           {icon}
         </div>
       </div>
-      <p className={`mt-3 text-2xl font-bold tracking-tight ${a.value}`}>
+      <p className={`mt-2 text-lg font-bold tracking-tight tabular-nums sm:mt-3 sm:text-2xl ${a.value}`}>
         {isCurrency ? rupiah(value) : value.toLocaleString("id-ID")}
       </p>
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
         {hasDelta && (
           <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${deltaColor}`}>
             {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}

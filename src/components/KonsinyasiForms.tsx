@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useRef, useEffect, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { Plus, Store as StoreIcon, X } from "lucide-react";
@@ -42,7 +43,7 @@ export function AddKonsinyasiStoreForm({
           name="name"
           onInput={() => error && setError(undefined)}
           placeholder="ex: Istana Buah SA"
-          className={`w-72 max-w-full ${inputClass.replace("w-full", "")} ${error ? inputErrorClass : ""}`}
+          className={`w-full sm:w-72 ${inputClass.replace("w-full", "")} ${error ? inputErrorClass : ""}`}
         />
       </Field>
       <SubmitButton variant="outline" icon={<StoreIcon size={16} />} pendingText="Menyimpan…">
@@ -96,6 +97,7 @@ type ProductOption = {
   stock?: number | null; // null = belum di-opname / untracked (dalam satuan dasar)
   priceRetail?: number;
   priceGrosir?: number;
+  missingHpp?: boolean; // HPP 0 → profit penjualan ini belum benar
 };
 // price = TOTAL harga baris ini (bukan per unit) — lebih gampang diisi:
 // user tinggal menyalin angka dari nota. priceEdited = user sudah mengetiknya
@@ -193,7 +195,7 @@ export function MultiItemSaleForm({
   if (products.length === 0) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
-        Tambah product dulu di Master Product, baru bisa catat penjualan.
+        Tambah product dulu di halaman Product, baru bisa catat penjualan.
       </p>
     );
   }
@@ -331,8 +333,8 @@ export function MultiItemSaleForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-slate-600">
-            Product — harga {isGrosir ? "grosir" : "retail"}{" "}
-            <span className="text-slate-400">total per baris</span>
+            Product yang dibeli{" "}
+            <span className="text-slate-400">(isi harga total per baris)</span>
           </span>
           {errors.items && <span className="text-xs font-medium text-red-500">{errors.items}</span>}
         </div>
@@ -426,6 +428,14 @@ export function MultiItemSaleForm({
                     </span>
                   )}
                 </div>
+              )}
+              {p?.missingHpp && (
+                <p className="mt-1 pl-1 text-xs text-amber-700">
+                  HPP product ini belum diisi, jadi profitnya belum benar.{" "}
+                  <Link href="/master/product?harga=1#isi-harga" className="font-medium underline">
+                    Isi HPP
+                  </Link>
+                </p>
               )}
             </div>
           );

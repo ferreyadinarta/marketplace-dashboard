@@ -335,7 +335,7 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
         createPortal(
           <div
             ref={popRef}
-            className="fixed z-[300] w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg"
+            className="animate-pop fixed z-[300] w-56 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-lg"
             style={{
               top: pos?.top ?? 0,
               left: pos?.left ?? 0,

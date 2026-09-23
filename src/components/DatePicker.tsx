@@ -121,7 +121,7 @@ export function DatePicker({
         createPortal(
           <div
             ref={popRef}
-            className="fixed z-[300] w-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
+            className="animate-pop fixed z-[300] w-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl"
             style={{
               top: pos?.top ?? 0,
               left: pos?.left ?? 0,
