@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Marketplace Dashboard
 
-## Getting Started
+Unified bookkeeping for a multi-channel seller — Shopee, TikTok Shop, and
+Tokopedia, plus offline/WhatsApp and reseller sales, in one dashboard (this version is only in Bahasa Indonesia).
 
-First, run the development server:
+![Dashboard](docs/screenshot.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Built for a real seller running several marketplace storefronts, who was
+reconciling everything by hand across separate seller centers.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Reports
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Dashboard** — omzet, profit, and fee summary for any period, with a daily
+  trend chart, per-marketplace breakdown, best sellers, in-flight orders, and
+  low-stock warnings
+- **Pembukuan** — profit per product group, filterable by period, store, and group
+- **Penjualan WA** — manual and offline sales, multi-item per transaction
+- **Grosir / Reseller** — outright sales tracked per reseller store
+- **Rekonsiliasi Dana** — compares the net value of completed orders against
+  money actually disbursed, pulling escrow and payout data from marketplace
+  APIs, with manual entry for non-API channels
+- Excel export across report data
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Master data
 
-## Learn More
+- **Products** — HPP, selling prices, bookkeeping groups, bulk price updates,
+  bundle/BOM composition
+- **Stok Opname** — live stock, restock with HPP snapshot at cost, single and
+  bulk counts, min-stock thresholds, 30-day opname reminders
+- **Three-tier units** — koli › box › base unit; values stored in base units,
+  displayed in whichever tier reads naturally
+- **SKU mapping** — each marketplace SKU mapped to an internal product, with
+  auto-suggestions, bulk mapping and per-unit base quantities
 
-To learn more about Next.js, take a look at the following resources:
+## Marketplace integration
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Shopee** — full OAuth flow, signed API client, order sync, webhook receiver
+- **TikTok Shop** — OAuth flow, signed client, order sync
+- **Tokopedia** — adapter scaffold
+- **Sync engine** — idempotent (no duplicate orders), resumable jobs with saved
+  cursors and progress tracking, live progress panel, daily cron at 02:00 plus a
+  secret-guarded resume endpoint for long runs
+- **Adapter pattern** — each marketplace normalizes into one shared shape, so
+  API differences never reach the database schema or the UI
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Platform
 
-## Deploy on Vercel
+- **PWA** — installable on mobile, service worker, web push for low stock (VAPID)
+- **Auth** — shared-password login with an HMAC-signed session cookie, enforced
+  in Edge middleware
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js 16 · React 19 · TypeScript · Tailwind 4 · Prisma 6 ·
+PostgreSQL (Neon) · Recharts · ExcelJS · web-push · Vercel
+
+---
+
+Built by [Ferrey Adinarta](https://ferreyadinarta.vercel.app) ·
+[LinkedIn](https://linkedin.com/in/ferrey-adinarta)
