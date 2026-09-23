@@ -23,6 +23,9 @@ import {
   previousPeriod,
 } from "@/lib/queries";
 import { getStockLevels } from "@/lib/stock";
+import { prisma } from "@/lib/prisma";
+import { formatDistanceToNow } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 import { getSetupStatus } from "@/lib/setupStatus";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange, MARKETPLACE_LABEL } from "@/lib/format";
@@ -31,7 +34,7 @@ import TrendChart from "@/components/TrendChart";
 import SetupChecklist from "@/components/SetupChecklist";
 import DateRangePicker from "@/components/DateRangePicker";
 import DashboardRefresh from "@/components/DashboardRefresh";
-import { Card, CardHeader, PageHeader } from "@/components/ui";
+import { Card, CardHeader, PageHeader, HelpHint } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +70,7 @@ export default async function DashboardPage({
   const canCompare = !period.isAll && !!filter.from && !!filter.to;
   const prev = canCompare ? previousPeriod(filter.from!, filter.to!) : null;
 
-  const [summary, inFlight, prevSummary, trend, byMp, best, setup, levels] = await Promise.all([
+  const [summary, inFlight, prevSummary, trend, byMp, best, setup, levels, lastSync] = await Promise.all([
     getSummary(filter),
     getInFlight(filter),
     prev ? getSummary({ ...filter, from: prev.from, to: prev.to }) : Promise.resolve(null),
@@ -76,6 +79,8 @@ export default async function DashboardPage({
     getBestSellers(filter, 5),
     getSetupStatus(),
     getStockLevels(),
+    // sync terakhir dari toko yang terhubung API (toko manual tidak di-sync)
+    prisma.store.aggregate({ _max: { lastSyncAt: true }, where: { accessToken: { not: null } } }),
   ]);
 
   // alert stok: menipis/habis + perlu opname (> 30 hari / belum pernah)
@@ -85,9 +90,38 @@ export default async function DashboardPage({
     (l) => !l.hasOpname || (l.anchorAt ? (nowMs - l.anchorAt.getTime()) / 86_400_000 > 30 : true)
   ).length;
 
+  const todos = [
+    setup.unmappedCount > 0 && {
+      href: "/master/mapping",
+      icon: <AlertTriangle size={18} />,
+      title: `${setup.unmappedCount} SKU belum dipetakan`,
+      detail: "penjualannya belum masuk pembukuan",
+    },
+    lowOut > 0 && {
+      href: "/stok?low=1",
+      icon: <Boxes size={18} />,
+      title: `${lowOut} product hampir/sudah habis`,
+      detail: "waktunya restock",
+    },
+    opnameOverdue > 0 && {
+      href: "/stok/hitung",
+      icon: <CalendarClock size={18} />,
+      title: `${opnameOverdue} product belum dihitung ulang`,
+      detail: "cek stok fisiknya di gudang",
+    },
+  ].filter(Boolean) as { href: string; icon: ReactNode; title: string; detail: string }[];
+
+  // tren kosong = semua hari 0 → jangan gambar garis datar yang terlihat rusak
+  const hasTrend = trend.some((t) => t.omzet !== 0 || t.profit !== 0);
+
   const margin = summary.omzet ? (summary.profit / summary.omzet) * 100 : 0;
-  const dOmzet = prevSummary ? pct(summary.omzet, prevSummary.omzet) : null;
-  const dProfit = prevSummary ? pct(summary.profit, prevSummary.profit) : null;
+  // tanpa order selesai di periode ini, "−100%" cuma menakut-nakuti → sembunyikan
+  const hasOrders = summary.jumlahOrder > 0;
+  const dOmzet = prevSummary && hasOrders ? pct(summary.omzet, prevSummary.omzet) : null;
+  const dProfit = prevSummary && hasOrders ? pct(summary.profit, prevSummary.profit) : null;
+
+  const syncedAt = lastSync._max.lastSyncAt;
+  const syncStale = syncedAt ? nowMs - syncedAt.getTime() > 86_400_000 : false;
 
   return (
     <div className="space-y-6">
@@ -97,70 +131,34 @@ export default async function DashboardPage({
         action={<DateRangePicker initialFrom={def.from} initialTo={def.to} basePath="/" />}
       />
       <DashboardRefresh />
+      {syncedAt && (
+        <p className={`-mt-3 text-xs ${syncStale ? "text-amber-700" : "text-slate-400"}`}>
+          Data marketplace diperbarui {formatDistanceToNow(syncedAt, { addSuffix: true, locale: localeId })}
+          {syncStale && (
+            <>
+              {" "}
+              — sudah lebih dari sehari.{" "}
+              <Link href="/master/toko" className="font-medium underline">
+                Cek sync
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       {!setup.complete && (
         <SetupChecklist steps={setup.steps} doneCount={setup.doneCount} total={setup.total} />
       )}
 
-      {setup.unmappedCount > 0 && (
-        <Link
-          href="/master/mapping"
-          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 hover:bg-amber-100"
-        >
-          <AlertTriangle size={18} className="shrink-0 text-amber-500" />
-          <span className="flex-1">
-            <strong>{setup.unmappedCount} SKU belum dipetakan</strong> — penjualannya belum masuk pembukuan.
-          </span>
-          <ArrowRight size={16} />
-        </Link>
-      )}
-
-      {lowOut > 0 && (
-        <Link
-          href="/stok?low=1"
-          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 hover:bg-amber-100"
-        >
-          <Boxes size={18} className="shrink-0 text-amber-500" />
-          <span className="flex-1">
-            <strong>{lowOut} product</strong> stoknya menipis atau habis — cek & restock.
-          </span>
-          <ArrowRight size={16} />
-        </Link>
-      )}
-
-      {opnameOverdue > 0 && (
-        <Link
-          href="/stok"
-          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 hover:bg-amber-100"
-        >
-          <CalendarClock size={18} className="shrink-0 text-amber-500" />
-          <span className="flex-1">
-            <strong>{opnameOverdue} product</strong> perlu di-opname — hitung stok fisiknya.
-          </span>
-          <ArrowRight size={16} />
-        </Link>
-      )}
-
-      {/* aksi cepat */}
-      <Card className="p-4">
-        <p className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Aksi Cepat</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <QuickAction href="/wa" icon={<MessageCircle size={18} />} label="Penjualan WA" />
-          <QuickAction href="/konsinyasi" icon={<Handshake size={18} />} label="Grosir / Reseller" />
-          <QuickAction href="/stok" icon={<PackagePlus size={18} />} label="Barang Masuk" />
-          <QuickAction href="/master/product" icon={<Package size={18} />} label="Tambah Product" />
-        </div>
-      </Card>
-
       {/* KPI */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label="Omzet"
           value={summary.omzet}
           icon={<TrendingUp size={18} />}
           accent="blue"
           deltaPct={dOmzet}
-          hint={canCompare ? "vs periode sebelumnya" : undefined}
+          hint={!hasOrders ? "Belum ada order selesai" : canCompare ? "vs periode sebelumnya" : undefined}
           help="Total penjualan (yang dibayar pembeli) dari semua order, sebelum dipotong biaya apa pun."
         />
         <StatCard
@@ -190,11 +188,46 @@ export default async function DashboardPage({
           }
           help={
             summary.hpp === 0 && summary.omzet > 0
-              ? "HPP semua product masih 0, jadi angka ini baru omzet dikurangi fee marketplace — BUKAN untung sebenarnya. Isi HPP di Master Product supaya profit & margin benar."
+              ? "HPP semua product masih 0, jadi angka ini baru omzet dikurangi fee marketplace — BUKAN untung sebenarnya. Isi HPP di halaman Product supaya profit & margin benar."
               : "Omzet dikurangi fee marketplace dan HPP. Inilah untung sebenarnya."
           }
         />
       </div>
+
+      {/* hal yang perlu ditindak — satu kartu, bukan banner bertumpuk */}
+      {todos.length > 0 && (
+        <Card className="overflow-hidden border-amber-200">
+          <p className="border-b border-amber-100 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-900">
+            Perlu dicek
+          </p>
+          <div className="divide-y divide-slate-100">
+            {todos.map((t) => (
+              <Link
+                key={t.href}
+                href={t.href}
+                className="flex items-center gap-3 px-5 py-3 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <span className="shrink-0 text-amber-500">{t.icon}</span>
+                <span className="flex-1">
+                  <strong className="font-semibold text-slate-900">{t.title}</strong> — {t.detail}
+                </span>
+                <ArrowRight size={16} className="shrink-0 text-slate-400" />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* aksi cepat */}
+      <Card className="p-4">
+        <p className="mb-3 px-1 text-sm font-semibold text-slate-900">Catat cepat</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <QuickAction href="/wa" icon={<MessageCircle size={18} />} label="Penjualan WA" />
+          <QuickAction href="/konsinyasi" icon={<Handshake size={18} />} label="Grosir / Reseller" />
+          <QuickAction href="/stok" icon={<PackagePlus size={18} />} label="Barang Masuk" />
+          <QuickAction href="/master/product" icon={<Package size={18} />} label="Tambah Product" />
+        </div>
+      </Card>
 
       {/* Pesanan yang belum Selesai — bukan bagian pembukuan, tapi tanpa ini
           hari-hari terakhir terlihat Rp 0 padahal penjualannya ada. */}
@@ -202,19 +235,18 @@ export default async function DashboardPage({
         <Card className="flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50/60 p-5">
           <div className="min-w-0">
             <p className="text-sm font-medium text-amber-900">
-              {inFlight.jumlahOrder} pesanan masih diproses · {rupiah(inFlight.omzet)}
+              {inFlight.jumlahOrder} pesanan belum selesai · {rupiah(inFlight.omzet)}
             </p>
             <p className="mt-0.5 text-xs text-amber-800/80">
-              Angka di atas belum menghitung ini — Shopee baru menandai Selesai beberapa hari setelah
-              barang sampai. Nilai pesanannya pasti, yang belum pasti berapa yang jadi.
+              Belum masuk angka di atas. Marketplace baru menandai Selesai beberapa hari setelah barang sampai.
             </p>
             {inFlight.sampel > 0 && (
-              <p className="mt-1 text-xs text-amber-800/80">
-                Kalau polanya sama seperti 90 hari terakhir ({inFlight.sampel} pesanan selesai):
-                ±{(inFlight.batalRate * 100).toFixed(0)}% batal, potongan ±
-                {(inFlight.feeRate * 100).toFixed(1)}% → kira-kira{" "}
-                <strong className="font-semibold">{rupiah(inFlight.perkiraanBersih)}</strong> yang
-                benar-benar masuk. Perkiraan, bukan angka pembukuan.
+              <p className="mt-1 flex items-center text-xs text-amber-800/80">
+                Perkiraan uang yang nanti masuk:&nbsp;
+                <strong className="font-semibold">±{rupiah(inFlight.perkiraanBersih)}</strong>
+                <HelpHint
+                  text={`Dihitung dari pola 90 hari terakhir (${inFlight.sampel} pesanan selesai): ±${(inFlight.batalRate * 100).toFixed(0)}% batal, potongan ±${(inFlight.feeRate * 100).toFixed(1)}%. Perkiraan, bukan angka pembukuan.`}
+                />
               </p>
             )}
           </div>
@@ -225,7 +257,7 @@ export default async function DashboardPage({
       <Card>
         <CardHeader title="Tren Omzet & Profit Harian" subtitle="Sesuai periode terpilih" />
         <div className="p-5">
-          {trend.length > 0 ? (
+          {hasTrend ? (
             <TrendChart data={trend} />
           ) : (
             <p className="py-12 text-center text-sm text-slate-400">
@@ -275,20 +307,17 @@ export default async function DashboardPage({
           <div className="space-y-3 p-4 md:hidden">
             {byMp.map((m) => (
               <div key={m.marketplace} className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-3 text-sm font-bold text-slate-900">
+                <p className="mb-3 flex items-baseline justify-between text-sm font-bold text-slate-900">
                   {MARKETPLACE_LABEL[m.marketplace] ?? m.marketplace}
+                  <span className="text-xs font-normal text-slate-400">{m.order.toLocaleString("id-ID")} order</span>
                 </p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Order</span>
-                    <span className="text-sm tabular-nums text-slate-700">{m.order.toLocaleString("id-ID")}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Omzet</span>
+                    <span className="text-xs text-slate-400">Omzet</span>
                     <span className="text-sm font-semibold tabular-nums text-slate-700">{rupiah(m.omzet)}</span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Profit</span>
+                    <span className="text-xs text-slate-400">Profit</span>
                     <span className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(m.profit)}</span>
                   </div>
                 </div>

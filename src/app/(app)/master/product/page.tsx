@@ -1,4 +1,5 @@
-import { Package, Search, CheckCircle, XCircle, PackageOpen } from "lucide-react";
+import { Package, Search, CheckCircle, XCircle, PackageOpen, Plus } from "lucide-react";
+import { Disclosure } from "@/components/Collapse";
 import { prisma } from "@/lib/prisma";
 import { createProduct, updateProduct, deleteProduct, duplicateProduct, createGroup, deleteGroup, saveBulkPrices, deleteProducts, updateBundle } from "./actions";
 import { importStoreProducts } from "../toko/import-actions";
@@ -114,8 +115,8 @@ export default async function MasterProductPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Product"
-        description="Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit."
+        title="Product"
+        description="Semua product yang kamu jual. Isi HPP (modal) tiap product supaya profit terhitung benar."
       />
 
       {/* hasil import sekarang tampil di halaman Mapping SKU (import tidak lagi
@@ -140,67 +141,41 @@ export default async function MasterProductPage({
         </div>
       )}
 
-      {/* import product dari marketplace terhubung */}
-      {connectedStores.length > 0 && (
-        <Card className="p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Import Produk dari Marketplace</h2>
-              <p className="mt-0.5 text-sm text-slate-500">
-                Tarik katalog dari toko terhubung → masuk ke <strong>Mapping SKU</strong>. Product di sini tetap
-                product <strong>dasar </strong> buatanmu; beberapa varian marketplace (mis. “1 box” &amp; “10
-                sachet”) bisa menunjuk ke satu product yang sama.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {connectedStores.map((s) => (
-                <form key={s.id} action={importStoreProducts}>
-                  <input type="hidden" name="storeId" value={s.id} />
-                  <SubmitButton variant="outline" icon={<PackageOpen size={15} />} pendingText="Import…" className="text-sm">
-                    {s.name} ({MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace})
-                  </SubmitButton>
-                </form>
-              ))}
-            </div>
+      {/* form tambah — dilipat supaya daftar product langsung terlihat */}
+      <Disclosure
+        defaultOpen={addStatus === "dupe" || one(sp.tambah) === "1" || (total === 0 && !q)}
+        icon={
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+            <Plus size={18} />
+          </span>
+        }
+        title="Tambah product baru"
+        subtitle="Isi nama, SKU, dan modal (HPP). Grup pembukuan diatur di sini juga."
+      >
+        <div className="grid border-t border-slate-100 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <AddProductForm
+              groups={groups}
+              action={createProduct}
+              productOptions={plainRows.map((o) => ({ value: o.id, label: `${o.name} (${o.sku})` }))}
+              unitOf={unitOf}
+            />
           </div>
-        </Card>
-      )}
-
-      {/* isi harga massal (HPP / retail / grosir sekaligus) */}
-      <BulkPriceForm products={plainRows} action={saveBulkPrices} />
-
-      {/* bersihkan product sampah (mis. sisa import lama) */}
-      <BulkDeleteProducts products={cleanupRows} action={deleteProducts} />
-
-      <div className="grid gap-5 lg:grid-cols-3">
-        {/* form tambah product */}
-        <Card className="lg:col-span-2">
-          <CardHeader
-            title="Tambah Product"
-            subtitle="SKU internal harus unik antar product. Pilih Bundle kalau 1 unit jual berisi beberapa product lain."
-          />
-          <AddProductForm
-            groups={groups}
-            action={createProduct}
-            productOptions={plainRows.map((o) => ({ value: o.id, label: `${o.name} (${o.sku})` }))}
-            unitOf={unitOf}
-          />
-        </Card>
-
-        {/* form tambah grup */}
-        <Card>
-          <CardHeader title="Grup Pembukuan" subtitle="Kelompok untuk tabel pembukuan." />
-          <AddGroupForm groups={groups} action={createGroup} deleteAction={deleteGroup} />
-        </Card>
-      </div>
+          <div className="border-t border-slate-100 lg:border-l lg:border-t-0">
+            <p className="px-5 pt-5 text-sm font-semibold text-slate-900">Grup pembukuan</p>
+            <p className="px-5 text-xs text-slate-500">Mengelompokkan product di halaman Pembukuan (mis. per brand).</p>
+            <AddGroupForm groups={groups} action={createGroup} deleteAction={deleteGroup} />
+          </div>
+        </div>
+      </Disclosure>
 
       {/* tabel product */}
       <Card className="overflow-hidden">
         <CardHeader
           title={`Daftar Product (${total})`}
-          subtitle="Edit HPP atau grup langsung di baris, lalu klik Update."
+          subtitle="Klik Edit di product untuk ubah HPP, harga, atau grup."
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex w-full items-center gap-2 sm:w-auto">
               <ProductSearch defaultValue={q} />
               <PaginationControls page={page} totalPages={totalPages} hrefFor={pageHref} />
             </div>
@@ -217,7 +192,7 @@ export default async function MasterProductPage({
             <EmptyState
               icon={<Package size={40} />}
               title="Belum ada product"
-              description="Tambahkan product pertama lewat form di atas."
+              description="Klik “Tambah product baru” di atas untuk mulai."
             />
           )
         ) : (
@@ -268,6 +243,43 @@ export default async function MasterProductPage({
           unit="product"
         />
       </Card>
+      {/* alat massal & jarang dipakai — di bawah daftar */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900">Alat lainnya</h2>
+      {/* import product dari marketplace terhubung */}
+        {connectedStores.length > 0 && (
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Import Produk dari Marketplace</h2>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Tarik katalog dari toko terhubung → masuk ke <strong>Mapping SKU</strong>. Product di sini tetap
+                  product <strong>dasar </strong> buatanmu; beberapa varian marketplace (mis. “1 box” &amp; “10
+                  sachet”) bisa menunjuk ke satu product yang sama.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {connectedStores.map((s) => (
+                  <form key={s.id} action={importStoreProducts}>
+                    <input type="hidden" name="storeId" value={s.id} />
+                    <SubmitButton variant="outline" icon={<PackageOpen size={15} />} pendingText="Import…" className="text-sm">
+                      {s.name} ({MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace})
+                    </SubmitButton>
+                  </form>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* isi harga massal (HPP / retail / grosir sekaligus) */}
+        <div id="isi-harga" className="scroll-mt-20">
+          <BulkPriceForm products={plainRows} action={saveBulkPrices} defaultOpen={one(sp.harga) === "1"} />
+        </div>
+
+        {/* bersihkan product sampah (mis. sisa import lama) */}
+        <BulkDeleteProducts products={cleanupRows} action={deleteProducts} />
+      </div>
     </div>
   );
 }

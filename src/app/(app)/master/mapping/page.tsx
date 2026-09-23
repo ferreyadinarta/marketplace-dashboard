@@ -155,9 +155,9 @@ export default async function MappingPage({
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
-            <strong>{totalUnmapped} SKU belum dipetakan.</strong> Penjualannya belum dihitung sampai dipetakan.
-            Kolom <strong>isi</strong> = berapa satuan dasar untuk 1 unit yang dijual (mis. varian “1 box” →
-            isi 16), supaya stok & profit-nya benar.
+            <strong>{totalUnmapped} SKU belum dipetakan</strong> — penjualannya belum masuk pembukuan. Pilih
+            product internalnya di tiap baris. Kalau 1 varian berisi lebih dari satu (mis. “paket 2 box”), isi
+            jumlahnya di kolom <strong>isi</strong>.
           </span>
         </div>
       )}

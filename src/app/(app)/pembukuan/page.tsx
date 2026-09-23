@@ -49,7 +49,7 @@ export default async function PembukuanPage({
             icon={<Boxes size={40} />}
             title="Belum ada product untuk dibukukan"
             description="Tambahkan product beserta HPP dan kelompokkan ke grup pembukuan dulu."
-            action={<LinkButton href="/master/product">Ke Master Product</LinkButton>}
+            action={<LinkButton href="/master/product">Ke halaman Product</LinkButton>}
           />
         </Card>
       ) : (

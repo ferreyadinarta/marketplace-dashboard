@@ -53,7 +53,7 @@ export default async function MasterTokoPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Master Toko"
+        title="Toko"
         description="Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko."
       />
 
@@ -98,8 +98,8 @@ export default async function MasterTokoPage({
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Hubungkan Marketplace Otomatis</h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              Sambungkan TikTok Shop (& Tokopedia) untuk tarik order otomatis. Kamu akan diarahkan ke
-              halaman izin — login pakai akun seller yang punya toko.
+              Sambungkan akun seller supaya order masuk otomatis. Kamu akan diarahkan ke halaman login
+              marketplace.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -56,8 +56,8 @@ export default async function RekonsiliasiPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Rekonsiliasi Dana"
-        description="Cocokkan dana yang seharusnya cair (dari order selesai) dengan pencairan nyata dari marketplace. Selisih = dana cair − seharusnya: minus berarti masih kurang, plus berarti cair lebih banyak."
+        title="Dana Cair"
+        description="Cek apakah uang dari marketplace sudah masuk sesuai penjualan. Selisih minus berarti masih ada uang yang belum cair."
       />
 
       {stores.length === 0 ? (
@@ -71,8 +71,8 @@ export default async function RekonsiliasiPage() {
       ) : (
         <Card className="overflow-hidden">
           <CardHeader
-            title="Per Toko"
-            subtitle="Dana cair diambil dari escrow Shopee yang sudah rilis. Klik tarik data untuk memperbarui."
+            title="Per toko"
+            subtitle="Uang cair dari Shopee diambil otomatis. Toko lain: catat pembayarannya manual."
             action={<SyncPayoutsButton action={syncPayouts} />}
           />
           <div className="hidden overflow-x-auto md:block">
@@ -80,8 +80,8 @@ export default async function RekonsiliasiPage() {
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-3 font-medium">Toko</th>
-                  <th className="px-5 py-3 text-right font-medium">Net Seharusnya</th>
-                  <th className="px-5 py-3 text-right font-medium">Dana Cair</th>
+                  <th className="px-5 py-3 text-right font-medium">Harusnya cair</th>
+                  <th className="px-5 py-3 text-right font-medium">Sudah cair</th>
                   <th className="px-5 py-3 text-right font-medium">Selisih</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium" />
@@ -119,7 +119,7 @@ export default async function RekonsiliasiPage() {
                       <td className="whitespace-nowrap px-5 py-3">
                         {belumAdaPayout ? (
                           <Badge color="slate">
-                            <Clock size={13} /> Payout belum masuk
+                            <Clock size={13} /> Belum ada yang cair
                           </Badge>
                         ) : cocok ? (
                           <Badge color="green">
@@ -163,7 +163,7 @@ export default async function RekonsiliasiPage() {
                     <span className="self-start whitespace-nowrap">
                       {belumAdaPayout ? (
                         <Badge color="slate">
-                          <Clock size={13} /> Payout belum masuk
+                          <Clock size={13} /> Belum ada yang cair
                         </Badge>
                       ) : cocok ? (
                         <Badge color="green">
@@ -179,11 +179,11 @@ export default async function RekonsiliasiPage() {
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Net Seharusnya</span>
+                      <span className="text-[11px] text-slate-400">Harusnya cair</span>
                       <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.netSeharusnya)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Dana Cair</span>
+                      <span className="text-[11px] text-slate-400">Sudah cair</span>
                       <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.danaCair)}</span>
                     </div>
                     <div className="flex flex-col">

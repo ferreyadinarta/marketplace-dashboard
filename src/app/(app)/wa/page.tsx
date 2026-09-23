@@ -50,6 +50,7 @@ export default async function WaPage({
     stock: stockMap.get(p.id) ?? null,
     priceRetail: p.priceRetail,
     priceGrosir: p.priceGrosir,
+    missingHpp: !p.isBundle && p.hpp === 0,
   }));
   const today = currentMonthRange().to;
 

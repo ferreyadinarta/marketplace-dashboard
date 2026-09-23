@@ -1,4 +1,4 @@
-import { Boxes, Search, PackageX, AlertTriangle, CheckCircle2, HelpCircle, CalendarClock } from "lucide-react";
+import { Boxes, Search, PackageX, AlertTriangle, CheckCircle2, CalendarClock, ClipboardCheck } from "lucide-react";
 import { getStockLevels, type StockStatus } from "@/lib/stock";
 import { currentMonthRange } from "@/lib/format";
 import { Card, CardHeader, PageHeader, Badge, EmptyState, LinkButton } from "@/components/ui";
@@ -124,32 +124,22 @@ export default async function StokPage({
         <RememberFilters storageKey="filters:stok" />
       </Suspense>
       <PageHeader
-        title="Stok Opname"
-        description="Pantau stok tiap product. Stok otomatis berkurang dari order yang Selesai (COMPLETED), bertambah dari barang masuk, dan bisa disamakan dengan hitungan fisik lewat opname."
+        title="Stok"
+        description="Stok berkurang otomatis saat order selesai dan bertambah saat kamu catat barang masuk. Opname = samakan angka di sini dengan hitungan fisik di gudang."
+        action={
+          <LinkButton href="/stok/hitung" className="w-full sm:w-auto">
+            <ClipboardCheck size={16} /> Hitung stok{overdueCount > 0 ? ` (${overdueCount})` : ""}
+          </LinkButton>
+        }
       />
 
       {/* ringkasan */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard icon={<Boxes size={18} />} label="Total product" value={summary.total} tone="slate" />
         <StatCard icon={<AlertTriangle size={18} />} label="Stok menipis" value={summary.low} tone="amber" />
         <StatCard icon={<PackageX size={18} />} label="Stok habis" value={summary.out} tone="red" />
-        <StatCard icon={<HelpCircle size={18} />} label="Belum di-opname" value={summary.unset} tone="slate" />
+        <StatCard icon={<CalendarClock size={18} />} label={`Perlu opname (>${OPNAME_DUE_DAYS} hari)`} value={overdueCount} tone={overdueCount > 0 ? "amber" : "slate"} />
       </div>
-
-      {/* notifikasi stok menipis (web push) */}
-      <NotificationToggle />
-
-      {/* pengingat opname (muncul hanya kalau ada yang perlu di-opname) */}
-      {overdueCount > 0 && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
-          <CalendarClock size={18} className="mt-0.5 shrink-0 text-amber-500" />
-          <span>
-            <strong>{overdueCount} product</strong> perlu di-opname — belum pernah dihitung atau opname terakhir lebih
-            dari {OPNAME_DUE_DAYS} hari lalu. Cek stok fisiknya lewat <strong>Opname Massal</strong> atau kolom Opname di
-            bawah.
-          </span>
-        </div>
-      )}
 
       {/* barang masuk */}
       <Card>
@@ -157,14 +147,16 @@ export default async function StokPage({
         <RestockForm products={productOptions} action={restockProducts} today={today} />
       </Card>
 
-      {/* opname massal */}
-      <BulkOpnamePanel items={bulkItems} action={saveBulkOpname} />
+      {/* opname massal — di HP diganti layar Hitung stok (daftar panjang tidak enak di layar kecil) */}
+      <div className="hidden md:block">
+        <BulkOpnamePanel items={bulkItems} action={saveBulkOpname} />
+      </div>
 
       {/* tabel stok */}
       <Card className="overflow-hidden">
         <CardHeader
           title={`Daftar Stok (${total})`}
-          subtitle="Isi kolom Opname dengan hitungan fisik untuk menyamakan stok."
+          subtitle="Angka stok menurut sistem. Hitung fisik untuk menyamakannya."
           action={
             <div className="flex flex-wrap items-center gap-2">
               <StockControls q={q} low={low} sort={sort} />
@@ -184,8 +176,8 @@ export default async function StokPage({
             <EmptyState
               icon={<Boxes size={40} />}
               title="Belum ada product"
-              description="Tambahkan product dulu di Master Product, lalu stoknya bisa dihitung di sini."
-              action={<LinkButton href="/master/product">Ke Master Product</LinkButton>}
+              description="Tambahkan product dulu di halaman Product, lalu stoknya bisa dihitung di sini."
+              action={<LinkButton href="/master/product">Ke halaman Product</LinkButton>}
             />
           )
         ) : (
@@ -193,15 +185,14 @@ export default async function StokPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="w-full px-5 py-3 font-medium">Product</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">SKU</th>
+                  <th className="px-5 py-3 font-medium">Product</th>
                   <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Stok</th>
                   <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>
                   {/* beda dengan "Terjual" di Pembukuan: di sini barang yang SUDAH KELUAR
                       gudang (terkirim + selesai), di sana yang penjualannya sudah final */}
-                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Barang keluar</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Min</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Opname (hitung fisik)</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Terkirim</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">Batas menipis</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">Hitung fisik (opname)</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,15 +201,15 @@ export default async function StokPage({
                   const info = opnameInfo(l.hasOpname, l.anchorAt, now);
                   return (
                     <tr key={l.productId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                      <td className="px-5 py-3 font-medium text-slate-900">
+                      <td className="min-w-48 px-5 py-3 font-medium text-slate-900">
                         {l.name}
+                        <span className="block font-mono text-[11px] font-normal text-slate-400">{l.sku}</span>
                         <span
                           className={`block text-[11px] font-normal ${info.overdue ? "text-amber-600" : "text-slate-400"}`}
                         >
                           {info.label}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-500">{l.sku}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         {l.status === "UNSET" ? (
                           <span className="text-base font-bold text-slate-300">—</span>
@@ -318,7 +309,7 @@ export default async function StokPage({
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="block text-[11px] text-slate-400">Barang keluar</span>
+                      <span className="block text-[11px] text-slate-400">Terkirim</span>
                       <span className="tabular-nums text-slate-600">{l.soldTotal}</span>
                       <span className="ml-1 text-xs text-slate-400">{l.unit}</span>
                     </div>
@@ -326,21 +317,16 @@ export default async function StokPage({
 
                   <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-slate-500">Min. stok (alert)</span>
+                      <span className="text-xs text-slate-500">Batas menipis</span>
                       <MinStockCell productId={l.productId} minStock={l.minStock} action={updateMinStock} />
                     </div>
-                    <div>
-                      <span className="mb-1 block text-xs text-slate-500">Opname (hitung fisik)</span>
-                      <OpnameCell
-                        productId={l.productId}
-                        current={l.current}
-                        known={l.status !== "UNSET"}
-                        unit={l.unit}
-                        packUnit={l.packUnit}
-                        packSize={l.packSize}
-                        action={saveOpname}
-                      />
-                    </div>
+                    <LinkButton
+                      href={`/stok/hitung?id=${l.productId}`}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <ClipboardCheck size={16} /> {l.status === "UNSET" ? "Hitung stok awal" : "Hitung stok fisik"}
+                    </LinkButton>
                   </div>
                 </div>
               );
@@ -358,6 +344,9 @@ export default async function StokPage({
           unit="product"
         />
       </Card>
+
+      {/* notifikasi — setup sekali, jadi di paling bawah */}
+      <NotificationToggle />
     </div>
   );
 }
