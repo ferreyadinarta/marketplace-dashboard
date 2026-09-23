@@ -1,7 +1,8 @@
 import { Link2, AlertTriangle, Search, CheckCircle, XCircle } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { MARKETPLACE_LABEL } from "@/lib/format";
+import { marketplaceLabel } from "@/lib/format";
+import { getT } from "@/lib/i18n-server";
 import { assignMapping, bulkAssignMappings } from "./actions";
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
 import { MappingRow } from "@/components/EditableRows";
@@ -21,6 +22,7 @@ export default async function MappingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const { t, lang } = await getT();
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const q = one(sp.q);
   const status = one(sp.status); // "" | "unmapped" | "mapped"
@@ -93,7 +95,7 @@ export default async function MappingPage({
   };
 
   const productOptions = [
-    { value: "", label: "— Belum dipetakan —" },
+    { value: "", label: t("Belum dipetakan", "Not mapped") },
     ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
   ];
 
@@ -130,24 +132,36 @@ export default async function MappingPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Mapping SKU"
-        description="Satu product bisa punya SKU berbeda di tiap marketplace. Hubungkan tiap SKU ke product internal supaya penjualannya masuk pembukuan."
+        title={t("Mapping SKU", "SKU Mapping")}
+        description={t(
+          "Satu product bisa punya SKU berbeda di tiap marketplace. Hubungkan tiap SKU ke product internal supaya penjualannya masuk pembukuan.",
+          "One product can have different SKUs on each marketplace. Link each SKU to an internal product so its sales are recorded in the books."
+        )}
       />
 
       {one(sp.import) === "ok" && (
         <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="mt-0.5 shrink-0 text-emerald-500" />
           <span>
-            Import selesai: <strong>{one(sp.created) || 0} SKU baru</strong>, {one(sp.existing) || 0} sudah ada
-            {Number(one(sp.nosku) || 0) > 0 ? `, ${one(sp.nosku)} dilewati (tanpa SKU)` : ""}. Pilih product
-            dasarnya di bawah — pakai tombol <strong>Saran</strong> kalau cocok.
+            {t("Import selesai: ", "Import complete: ")}
+            <strong>
+              {one(sp.created) || 0} {t("SKU baru", "new SKUs")}
+            </strong>
+            {`, ${one(sp.existing) || 0} ${t("sudah ada", "already existed")}`}
+            {Number(one(sp.nosku) || 0) > 0
+              ? `, ${one(sp.nosku)} ${t("dilewati (tanpa SKU)", "skipped (no SKU)")}`
+              : ""}
+            {t(". Pilih product dasarnya di bawah, pakai tombol ", ". Choose the base product below, use the ")}
+            <strong>{t("Saran", "Suggest")}</strong>
+            {t(" kalau cocok.", " button if it fits.")}
           </span>
         </div>
       )}
       {one(sp.import) === "error" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
-          Import gagal: {one(sp.reason) || "unknown"}
+          {t("Import gagal: ", "Import failed: ")}
+          {one(sp.reason) || "unknown"}
         </div>
       )}
 
@@ -155,9 +169,14 @@ export default async function MappingPage({
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
-            <strong>{totalUnmapped} SKU belum dipetakan</strong> — penjualannya belum masuk pembukuan. Pilih
-            product internalnya di tiap baris. Kalau 1 varian berisi lebih dari satu (mis. “paket 2 box”), isi
-            jumlahnya di kolom <strong>isi</strong>.
+            <strong>
+              {totalUnmapped} {t("SKU belum dipetakan", "SKUs not mapped")}
+            </strong>
+            {t(
+              ". Penjualannya belum masuk pembukuan. Pilih product internalnya di tiap baris. Kalau 1 varian berisi lebih dari satu (mis. “paket 2 box”), isi jumlahnya di kolom ",
+              ". Their sales aren't in the books yet. Choose the internal product for each row. If one variant contains more than one (e.g. “2-box bundle”), enter the quantity in the "
+            )}
+            <strong>{t("isi", "Contains")}</strong>.
           </span>
         </div>
       )}
@@ -166,10 +185,15 @@ export default async function MappingPage({
         <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="mt-0.5 shrink-0 text-emerald-500" />
           <span>
-            <strong>{one(sp.n) || 0} SKU dipetakan.</strong> Order lama ikut diperbarui — pembukuan & stok
-            sudah menyesuaikan.
+            <strong>
+              {one(sp.n) || 0} {t("SKU dipetakan.", "SKUs mapped.")}
+            </strong>{" "}
+            {t(
+              "Order lama ikut diperbarui, pembukuan & stok sudah menyesuaikan.",
+              "Old orders were updated too, bookkeeping & stock already reflect it."
+            )}
             {Number(one(sp.skip) || 0) > 0
-              ? ` ${one(sp.skip)} SKU dilewati (tidak ada saran yang cukup yakin).`
+              ? ` ${one(sp.skip)} ${t("SKU dilewati (tidak ada saran yang cukup yakin).", "SKUs skipped (no confident suggestion).")}`
               : ""}
           </span>
         </div>
@@ -177,7 +201,8 @@ export default async function MappingPage({
       {one(sp.bulk) === "error" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
-          Gagal memetakan massal: {one(sp.reason) || "unknown"}
+          {t("Gagal memetakan massal: ", "Bulk mapping failed: ")}
+          {one(sp.reason) || "unknown"}
         </div>
       )}
 
@@ -196,22 +221,25 @@ export default async function MappingPage({
 
       <Card className="overflow-hidden">
         <CardHeader
-          title={`SKU Marketplace (${total})`}
-          subtitle="Baris kuning = belum dipetakan."
+          title={t(`SKU Marketplace (${total})`, `Marketplace SKUs (${total})`)}
+          subtitle={t("Baris kuning = belum dipetakan.", "Yellow rows = not mapped yet.")}
           action={<PaginationControls page={page} totalPages={totalPages} hrefFor={pageHref} />}
         />
         {mappings.length === 0 ? (
           anyFilter ? (
             <EmptyState
               icon={<Search size={40} />}
-              title="Tidak ada SKU yang cocok"
-              description="Coba ubah atau reset filter di atas."
+              title={t("Tidak ada SKU yang cocok", "No matching SKUs")}
+              description={t("Coba ubah atau reset filter di atas.", "Try changing or resetting the filters above.")}
             />
           ) : (
             <EmptyState
               icon={<Link2 size={40} />}
-              title="Belum ada SKU"
-              description="Daftar SKU terisi otomatis saat order pertama masuk dari sync marketplace."
+              title={t("Belum ada SKU", "No SKUs yet")}
+              description={t(
+                "Daftar SKU terisi otomatis saat order pertama masuk dari sync marketplace.",
+                "The SKU list fills in automatically once the first order comes in from a marketplace sync."
+              )}
             />
           )
         ) : (
@@ -222,9 +250,9 @@ export default async function MappingPage({
             <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="w-[13%] px-5 py-3 font-medium">Toko</th>
-                  <th className="w-[45%] px-5 py-3 font-medium">Product di Marketplace</th>
-                  <th className="w-[42%] px-5 py-3 font-medium">Product Internal (punya kamu)</th>
+                  <th className="w-[13%] px-5 py-3 font-medium">{t("Toko", "Store")}</th>
+                  <th className="w-[45%] px-5 py-3 font-medium">{t("Product di Marketplace", "Product on Marketplace")}</th>
+                  <th className="w-[42%] px-5 py-3 font-medium">{t("Product Internal (punya kamu)", "Internal Product (yours)")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -236,7 +264,7 @@ export default async function MappingPage({
                     }`}
                   >
                     <td className="px-5 py-3 align-top">
-                      <Badge color="slate">{MARKETPLACE_LABEL[m.store.marketplace]}</Badge>
+                      <Badge color="slate">{marketplaceLabel(m.store.marketplace, lang)}</Badge>
                       <p className="mt-1 truncate text-xs text-slate-400">{m.store.name}</p>
                     </td>
                     <td className="px-5 py-3 align-top">
@@ -276,14 +304,14 @@ export default async function MappingPage({
                 <p className="mt-0.5 truncate font-mono text-[10px] text-slate-300">{m.marketplaceSku}</p>
                 <div className="mt-3 space-y-3">
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Toko</span>
+                    <span className="text-[11px] text-slate-400">{t("Toko", "Store")}</span>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <Badge color="slate">{MARKETPLACE_LABEL[m.store.marketplace]}</Badge>
+                      <Badge color="slate">{marketplaceLabel(m.store.marketplace, lang)}</Badge>
                       <span className="text-sm text-slate-600">{m.store.name}</span>
                     </div>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[11px] text-slate-400">Product Internal (punya kamu)</span>
+                    <span className="text-[11px] text-slate-400">{t("Product Internal (punya kamu)", "Internal Product (yours)")}</span>
                     <div className="mt-1">
                       <MappingRow
                         mappingId={m.id}

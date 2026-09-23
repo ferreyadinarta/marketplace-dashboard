@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -14,7 +15,7 @@ export function ConfirmModalButton({
   triggerClassName = "",
   title,
   message,
-  confirmText = "Hapus",
+  confirmText,
 }: {
   action: Action;
   id: string;
@@ -24,6 +25,7 @@ export function ConfirmModalButton({
   message: ReactNode;
   confirmText?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
@@ -39,7 +41,7 @@ export function ConfirmModalButton({
         id={id}
         title={title}
         message={message}
-        confirmText={confirmText}
+        confirmText={confirmText ?? t("Hapus", "Delete")}
         confirmIcon={<Trash2 size={15} />}
       />
     </>

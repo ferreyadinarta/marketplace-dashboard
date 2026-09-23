@@ -6,6 +6,7 @@ import { Tags, ChevronDown, Search, Loader2, Wand2 } from "lucide-react";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Collapse } from "@/components/Collapse";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -51,6 +52,7 @@ const sameUnits = (a: UnitVals, b: UnitVals) =>
 // Bar simpan yang cuma muncul kalau ADA perubahan belum disimpan.
 // Dipisah jadi komponen sendiri karena useFormStatus harus di dalam <form>.
 function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => void }) {
+  const t = useT();
   const { pending } = useFormStatus();
   const prev = useRef(false);
   const cb = useRef(onDone);
@@ -62,10 +64,10 @@ function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => voi
   useEffect(() => {
     if (!pending && prev.current) {
       cb.current();
-      window.dispatchEvent(new CustomEvent("app:toast", { detail: "Tersimpan" }));
+      window.dispatchEvent(new CustomEvent("app:toast", { detail: t("Tersimpan", "Saved") }));
     }
     prev.current = pending;
-  }, [pending]);
+  }, [pending, t]);
 
   if (!pending && dirtyCount === 0) return null;
 
@@ -74,12 +76,12 @@ function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => voi
       <p className="text-sm text-slate-600">
         {pending ? (
           <span className="inline-flex items-center gap-2 text-slate-500">
-            <Loader2 size={14} className="animate-spin" /> Menyimpan…
+            <Loader2 size={14} className="animate-spin" /> {t("Menyimpan…", "Saving…")}
           </span>
         ) : (
           <>
             <span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400 align-middle" />
-            <strong className="font-medium text-slate-800">{dirtyCount} product</strong> belum disimpan
+            <strong className="font-medium text-slate-800">{dirtyCount} product</strong> {t("belum disimpan", "not saved yet")}
           </>
         )}
       </p>
@@ -88,7 +90,7 @@ function SaveBar({ dirtyCount, onDone }: { dirtyCount: number; onDone: () => voi
         disabled={pending}
         className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
       >
-        Simpan
+        {t("Simpan", "Save")}
       </button>
     </div>
   );
@@ -110,6 +112,7 @@ export function BulkPriceForm({
   action: Action;
   defaultOpen?: boolean; // dibuka dari link "Isi HPP" → langsung tampilkan yang HPP-nya kosong
 }) {
+  const t = useT();
   const [open, setOpen] = useState(defaultOpen);
   const [tab, setTab] = useState<Tab>("harga");
   const [q, setQ] = useState("");
@@ -202,9 +205,9 @@ export function BulkPriceForm({
   const fieldCls =
     "h-9 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
   const inputCls = `${fieldCls} w-full`;
-  const tabCls = (t: Tab) =>
+  const tabCls = (tb: Tab) =>
     `rounded-lg px-4 py-1.5 text-sm font-medium transition ${
-      tab === t ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"
+      tab === tb ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"
     }`;
 
   // ringkasan template dalam bahasa manusia — dipakai di modal konfirmasi
@@ -213,7 +216,8 @@ export function BulkPriceForm({
     tplLines.push(`1 ${tpl.mainUnit || "pcs"} = ${tpl.isi} ${tpl.smallUnit}`);
   if (tpl.koliUnit && Number(tpl.isiKoli) >= 2 && tpl.smallUnit && Number(tpl.isi) >= 2)
     tplLines.push(`1 ${tpl.koliUnit} = ${tpl.isiKoli} ${tpl.mainUnit || "pcs"}`);
-  if (tplLines.length === 0) tplLines.push(`Satuan: ${tpl.mainUnit || "pcs"} (tanpa satuan kecil)`);
+  if (tplLines.length === 0)
+    tplLines.push(t(`Satuan: ${tpl.mainUnit || "pcs"} (tanpa satuan kecil)`, `Unit: ${tpl.mainUnit || "pcs"} (no small unit)`));
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -226,11 +230,14 @@ export function BulkPriceForm({
           <Tags size={18} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-slate-900">Isi Harga & Satuan Massal</span>
+          <span className="block text-sm font-semibold text-slate-900">{t("Isi Harga & Satuan Massal", "Bulk price & unit entry")}</span>
           <span className="block text-xs text-slate-500">
-            Lengkapi HPP (per satuan utama), harga jual, dan satuan (box/sachet/koli) banyak product sekaligus.
+            {t(
+              "Lengkapi HPP (per satuan utama), harga jual, dan satuan (box/sachet/koli) banyak product sekaligus.",
+              "Fill in COGS (per main unit), selling price, and units (box/sachet/carton) for many products at once."
+            )}
             {emptyCount > 0 && (
-              <span className="ml-1 font-medium text-amber-600">{emptyCount} belum ada HPP.</span>
+              <span className="ml-1 font-medium text-amber-600">{t(`${emptyCount} belum ada HPP.`, `${emptyCount} missing COGS.`)}</span>
             )}
           </span>
         </span>
@@ -244,10 +251,10 @@ export function BulkPriceForm({
           {/* tab: harga / satuan */}
           <div className="mb-3 inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button type="button" onClick={() => setTab("harga")} className={tabCls("harga")}>
-              Harga
+              {t("Harga", "Price")}
             </button>
             <button type="button" onClick={() => setTab("satuan")} className={tabCls("satuan")}>
-              Satuan
+              {t("Satuan", "Unit")}
             </button>
           </div>
 
@@ -258,7 +265,7 @@ export function BulkPriceForm({
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Cari nama atau SKU…"
+                placeholder={t("Cari nama atau SKU…", "Search name or SKU…")}
                 className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </div>
@@ -270,7 +277,7 @@ export function BulkPriceForm({
                   onChange={(e) => setOnlyEmpty(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                Hanya yang belum ada HPP
+                {t("Hanya yang belum ada HPP", "Only missing COGS")}
               </label>
             )}
           </div>
@@ -279,30 +286,30 @@ export function BulkPriceForm({
             <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
               {/* dibaca seperti kalimat: 1 box berisi 12 sachet · 1 koli berisi 24 box */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-slate-600">
-                <span className="text-xs font-medium text-indigo-900">Isi sekali:</span>
+                <span className="text-xs font-medium text-indigo-900">{t("Isi sekali:", "Fill once:")}</span>
                 <span>1</span>
                 <input
                   value={tpl.mainUnit}
                   onChange={(e) => setTplField("mainUnit", e.target.value)}
                   placeholder="box"
-                  aria-label="Satuan utama"
+                  aria-label={t("Satuan utama", "Main unit")}
                   className={`${fieldCls} w-24`}
                 />
-                <span>berisi</span>
+                <span>{t("berisi", "contains")}</span>
                 <input
                   value={tpl.isi}
                   onChange={(e) => setTplField("isi", e.target.value)}
                   type="number"
                   min="0"
                   placeholder="12"
-                  aria-label="Isi per satuan utama"
+                  aria-label={t("Isi per satuan utama", "Contents per main unit")}
                   className={`${fieldCls} w-16`}
                 />
                 <input
                   value={tpl.smallUnit}
                   onChange={(e) => setTplField("smallUnit", e.target.value)}
                   placeholder="sachet"
-                  aria-label="Satuan kecil"
+                  aria-label={t("Satuan kecil", "Small unit")}
                   className={`${fieldCls} w-24`}
                 />
                 <span className="text-slate-300">·</span>
@@ -311,17 +318,17 @@ export function BulkPriceForm({
                   value={tpl.koliUnit}
                   onChange={(e) => setTplField("koliUnit", e.target.value)}
                   placeholder="koli"
-                  aria-label="Satuan koli"
+                  aria-label={t("Satuan koli", "Carton unit")}
                   className={`${fieldCls} w-20`}
                 />
-                <span>berisi</span>
+                <span>{t("berisi", "contains")}</span>
                 <input
                   value={tpl.isiKoli}
                   onChange={(e) => setTplField("isiKoli", e.target.value)}
                   type="number"
                   min="0"
                   placeholder="24"
-                  aria-label="Isi per koli"
+                  aria-label={t("Isi per koli", "Contents per carton")}
                   className={`${fieldCls} w-16`}
                 />
                 <span>{tpl.mainUnit || "box"}</span>
@@ -333,12 +340,14 @@ export function BulkPriceForm({
                   className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
                 >
                   <Wand2 size={15} />
-                  Terapkan ke {filtered.length}
+                  {t(`Terapkan ke ${filtered.length}`, `Apply to ${filtered.length}`)}
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">
-                Berlaku untuk {filtered.length} product yang tampil (saring dulu pakai kotak Cari kalau mau
-                sebagian). Satuan kecil & koli boleh dikosongkan.
+                {t(
+                  `Berlaku untuk ${filtered.length} product yang tampil (saring dulu pakai kotak Cari kalau mau sebagian). Satuan kecil & koli boleh dikosongkan.`,
+                  `Applies to the ${filtered.length} products shown (filter with the search box first for just some of them). Small unit & carton unit can be left blank.`
+                )}
               </p>
             </div>
           )}
@@ -347,18 +356,18 @@ export function BulkPriceForm({
           {tab === "harga" ? (
             <div className="hidden gap-2 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(3,7rem)]">
               <span>Product</span>
-              <span>HPP (modal) / satuan utama</span>
-              <span>Retail</span>
-              <span>Grosir</span>
+              <span>{t("HPP (modal) / satuan utama", "COGS / main unit")}</span>
+              <span>{t("Retail", "Retail")}</span>
+              <span>{t("Grosir", "Wholesale")}</span>
             </div>
           ) : (
             <div className="hidden gap-2 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-slate-400 sm:grid sm:grid-cols-[1fr_repeat(2,6rem)_4rem_6rem_4rem]">
               <span>Product</span>
-              <span>Satuan utama</span>
-              <span>Kecil</span>
-              <span>Isi</span>
-              <span>Koli</span>
-              <span>Isi/koli</span>
+              <span>{t("Satuan utama", "Main unit")}</span>
+              <span>{t("Kecil", "Small")}</span>
+              <span>{t("Isi", "Contains")}</span>
+              <span>{t("Koli", "Carton")}</span>
+              <span>{t("Isi/koli", "Carton contents")}</span>
             </div>
           )}
 
@@ -385,8 +394,8 @@ export function BulkPriceForm({
                     placeholder={`per ${p.packSize > 0 ? p.packUnit : p.unit}`}
                     className="h-9"
                   />
-                  <CurrencyInput value={v.retail} onValueChange={(n) => set(p.id, "retail", n)} placeholder="Retail" className="h-9" />
-                  <CurrencyInput value={v.grosir} onValueChange={(n) => set(p.id, "grosir", n)} placeholder="Grosir" className="h-9" />
+                  <CurrencyInput value={v.retail} onValueChange={(n) => set(p.id, "retail", n)} placeholder={t("Retail", "Retail")} className="h-9" />
+                  <CurrencyInput value={v.grosir} onValueChange={(n) => set(p.id, "grosir", n)} placeholder={t("Grosir", "Wholesale")} className="h-9" />
                 </div>
               ) : (
                 <div
@@ -399,16 +408,16 @@ export function BulkPriceForm({
                     <p className="truncate text-sm font-medium text-slate-800">{p.name}</p>
                     <p className="truncate text-xs text-slate-400">{p.sku}</p>
                   </div>
-                  <input value={u.mainUnit} onChange={(e) => setU(p.id, "mainUnit", e.target.value)} placeholder="box" aria-label="Satuan utama" className={inputCls} />
-                  <input value={u.smallUnit} onChange={(e) => setU(p.id, "smallUnit", e.target.value)} placeholder="sachet" aria-label="Satuan kecil" className={inputCls} />
-                  <input value={u.isi} onChange={(e) => setU(p.id, "isi", e.target.value)} type="number" min="0" placeholder="12" aria-label="Isi per satuan utama" className={inputCls} />
-                  <input value={u.koliUnit} onChange={(e) => setU(p.id, "koliUnit", e.target.value)} placeholder="koli" aria-label="Satuan koli" className={inputCls} />
-                  <input value={u.isiKoli} onChange={(e) => setU(p.id, "isiKoli", e.target.value)} type="number" min="0" placeholder="24" aria-label="Isi per koli" className={inputCls} />
+                  <input value={u.mainUnit} onChange={(e) => setU(p.id, "mainUnit", e.target.value)} placeholder="box" aria-label={t("Satuan utama", "Main unit")} className={inputCls} />
+                  <input value={u.smallUnit} onChange={(e) => setU(p.id, "smallUnit", e.target.value)} placeholder="sachet" aria-label={t("Satuan kecil", "Small unit")} className={inputCls} />
+                  <input value={u.isi} onChange={(e) => setU(p.id, "isi", e.target.value)} type="number" min="0" placeholder="12" aria-label={t("Isi per satuan utama", "Contents per main unit")} className={inputCls} />
+                  <input value={u.koliUnit} onChange={(e) => setU(p.id, "koliUnit", e.target.value)} placeholder="koli" aria-label={t("Satuan koli", "Carton unit")} className={inputCls} />
+                  <input value={u.isiKoli} onChange={(e) => setU(p.id, "isiKoli", e.target.value)} type="number" min="0" placeholder="24" aria-label={t("Isi per koli", "Contents per carton")} className={inputCls} />
                 </div>
               );
             })}
             {filtered.length === 0 && (
-              <p className="py-6 text-center text-sm text-slate-400">Tidak ada product yang cocok.</p>
+              <p className="py-6 text-center text-sm text-slate-400">{t("Tidak ada product yang cocok.", "No matching products.")}</p>
             )}
           </div>
 
@@ -430,8 +439,8 @@ export function BulkPriceForm({
         onClose={() => setConfirmTpl(false)}
         onConfirm={applyTplAndSave}
         tone="primary"
-        title={`Terapkan satuan ke ${filtered.length} product?`}
-        confirmText="Terapkan & Simpan"
+        title={t(`Terapkan satuan ke ${filtered.length} product?`, `Apply unit to ${filtered.length} products?`)}
+        confirmText={t("Terapkan & Simpan", "Apply & Save")}
         message={
           <>
             <ul className="mb-2 space-y-0.5 font-medium text-slate-700">
@@ -440,15 +449,19 @@ export function BulkPriceForm({
               ))}
             </ul>
             <p>
-              Satuan lama {filtered.length} product ini akan <strong>ditimpa</strong> dan langsung tersimpan.
-              Product yang tidak tampil di daftar tidak berubah.
+              {t(
+                `Satuan lama ${filtered.length} product ini akan`,
+                `The current unit of these ${filtered.length} products will be`
+              )}{" "}
+              <strong>{t("ditimpa", "overwritten")}</strong> {t("dan langsung tersimpan.", "and saved immediately.")}{" "}
+              {t("Product yang tidak tampil di daftar tidak berubah.", "Products not shown in the list are unaffected.")}
             </p>
             <p className="mt-2 text-xs text-slate-400">
               {filtered
                 .slice(0, 4)
                 .map((p) => p.name)
                 .join(", ")}
-              {filtered.length > 4 ? ` + ${filtered.length - 4} lainnya` : ""}
+              {filtered.length > 4 ? t(` + ${filtered.length - 4} lainnya`, ` + ${filtered.length - 4} more`) : ""}
             </p>
           </>
         }

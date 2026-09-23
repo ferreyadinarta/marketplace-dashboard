@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getT } from "@/lib/i18n-server";
 
 // Hanya kontrol (prev / halaman / next) — untuk ditaruh di header (action slot).
-export function PaginationControls({
+export async function PaginationControls({
   page,
   totalPages,
   hrefFor,
@@ -12,13 +13,14 @@ export function PaginationControls({
   hrefFor: (page: number) => string;
 }) {
   if (totalPages <= 1) return null;
+  const { t } = await getT();
   const btn = "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-sm font-medium";
   const on = `${btn} border-slate-300 text-slate-700 hover:bg-slate-50`;
   const off = `${btn} border-slate-200 text-slate-300`;
   return (
     <div className="flex items-center gap-1">
       {page > 1 ? (
-        <Link scroll={false} href={hrefFor(page - 1)} className={on} aria-label="Sebelumnya">
+        <Link scroll={false} href={hrefFor(page - 1)} className={on} aria-label={t("Sebelumnya", "Previous")}>
           <ChevronLeft size={15} />
         </Link>
       ) : (
@@ -27,10 +29,10 @@ export function PaginationControls({
         </span>
       )}
       <span className="whitespace-nowrap px-2 text-sm text-slate-500">
-        Hal. {page} / {totalPages}
+        {t(`Hal. ${page} / ${totalPages}`, `Page ${page} / ${totalPages}`)}
       </span>
       {page < totalPages ? (
-        <Link scroll={false} href={hrefFor(page + 1)} className={on} aria-label="Berikutnya">
+        <Link scroll={false} href={hrefFor(page + 1)} className={on} aria-label={t("Berikutnya", "Next")}>
           <ChevronRight size={15} />
         </Link>
       ) : (
@@ -44,14 +46,14 @@ export function PaginationControls({
 
 // Pagination server component. hrefFor(p) membuat URL untuk halaman p.
 // compact=true → tanpa teks "Menampilkan…", slim & rata kanan (untuk bagian atas).
-export function Pagination({
+export async function Pagination({
   page,
   totalPages,
   total,
   from,
   to,
   hrefFor,
-  unit = "item",
+  unit,
   place = "bottom",
   compact = false,
 }: {
@@ -66,6 +68,8 @@ export function Pagination({
   compact?: boolean;
 }) {
   if (total === 0) return null;
+  const { t } = await getT();
+  const resolvedUnit = unit ?? t("item", "item");
   const border = place === "top" ? "border-b" : "border-t";
 
   const btn = "inline-flex h-9 items-center gap-1 rounded-lg border px-2.5 font-medium sm:px-3";
@@ -75,24 +79,24 @@ export function Pagination({
   const controls = (
     <div className="flex items-center gap-1">
       {page > 1 ? (
-        <Link scroll={false} href={hrefFor(page - 1)} className={btnOn} aria-label="Halaman sebelumnya">
-          <ChevronLeft size={15} /> <span className="hidden sm:inline">Sebelumnya</span>
+        <Link scroll={false} href={hrefFor(page - 1)} className={btnOn} aria-label={t("Halaman sebelumnya", "Previous page")}>
+          <ChevronLeft size={15} /> <span className="hidden sm:inline">{t("Sebelumnya", "Previous")}</span>
         </Link>
       ) : (
         <span className={btnOff}>
-          <ChevronLeft size={15} /> <span className="hidden sm:inline">Sebelumnya</span>
+          <ChevronLeft size={15} /> <span className="hidden sm:inline">{t("Sebelumnya", "Previous")}</span>
         </span>
       )}
       <span className="whitespace-nowrap px-2 text-slate-500 sm:px-3">
-        Halaman {page} / {totalPages}
+        {t(`Halaman ${page} / ${totalPages}`, `Page ${page} / ${totalPages}`)}
       </span>
       {page < totalPages ? (
-        <Link scroll={false} href={hrefFor(page + 1)} className={btnOn} aria-label="Halaman berikutnya">
-          <span className="hidden sm:inline">Berikutnya</span> <ChevronRight size={15} />
+        <Link scroll={false} href={hrefFor(page + 1)} className={btnOn} aria-label={t("Halaman berikutnya", "Next page")}>
+          <span className="hidden sm:inline">{t("Berikutnya", "Next")}</span> <ChevronRight size={15} />
         </Link>
       ) : (
         <span className={btnOff}>
-          <span className="hidden sm:inline">Berikutnya</span> <ChevronRight size={15} />
+          <span className="hidden sm:inline">{t("Berikutnya", "Next")}</span> <ChevronRight size={15} />
         </span>
       )}
     </div>
@@ -108,7 +112,7 @@ export function Pagination({
   return (
     <div className={`flex items-center justify-between gap-3 ${border} border-slate-100 px-5 py-3 text-sm`}>
       <span className="text-slate-500">
-        {from}–{to} dari {total} {unit}
+        {t(`${from}–${to} dari ${total} ${resolvedUnit}`, `${from}–${to} of ${total} ${resolvedUnit}`)}
       </span>
       {/* satu halaman saja → tombol navigasi cuma jadi hiasan mati */}
       {totalPages > 1 && controls}

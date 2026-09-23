@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { getT } from "@/lib/i18n-server";
 
 type Step = { key: string; done: boolean; title: string; desc: string; href: string; cta: string };
 
 // Stepper terpandu: cuma langkah yang sedang aktif yang punya tombol, jadi user
 // selalu tahu satu hal berikutnya yang harus dikerjakan.
-export default function SetupChecklist({
+export default async function SetupChecklist({
   steps,
   doneCount,
   total,
@@ -14,17 +15,23 @@ export default function SetupChecklist({
   doneCount: number;
   total: number;
 }) {
+  const { t } = await getT();
   const current = steps.findIndex((s) => !s.done);
 
   return (
     <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm">
       <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">Siapkan pembukuan</h2>
-          <p className="mt-0.5 text-xs text-slate-500">Ikuti urutannya — angka profit baru benar setelah semua selesai.</p>
+          <h2 className="text-sm font-semibold text-slate-900">{t("Siapkan pembukuan", "Set up bookkeeping")}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {t(
+              "Ikuti urutannya. Angka profit baru benar setelah semua selesai.",
+              "Follow the steps in order. Profit numbers are only accurate once everything is done."
+            )}
+          </p>
         </div>
         <p className="shrink-0 text-sm font-semibold text-indigo-600">
-          {doneCount} dari {total}
+          {t(`${doneCount} dari ${total}`, `${doneCount} of ${total}`)}
         </p>
       </div>
 

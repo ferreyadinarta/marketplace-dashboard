@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X, RotateCcw } from "lucide-react";
 import { Select } from "@/components/ui";
+import { useT } from "@/components/LangProvider";
 
 type Store = { id: string; name: string };
 
 export function MappingFilters({ stores }: { stores: Store[] }) {
   const router = useRouter();
   const params = useSearchParams();
+  const t = useT();
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(params.toString());
@@ -39,13 +41,13 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
   return (
     <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
       <div className="col-span-2 sm:col-span-1">
-        <label className="mb-1 block text-xs font-medium text-slate-600">Cari SKU / nama</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600">{t("Cari SKU / nama", "Search SKU / name")}</label>
         <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Cari…"
+            placeholder={t("Cari…", "Search…")}
             className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-56"
           />
           {q && (
@@ -53,7 +55,7 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
               type="button"
               onClick={() => setQ("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100"
-              aria-label="Bersihkan"
+              aria-label={t("Bersihkan", "Clear")}
             >
               <X size={14} />
             </button>
@@ -62,15 +64,15 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
       </div>
 
       <div className="min-w-0">
-        <label className="mb-1 block text-xs font-medium text-slate-600">Status</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600">{t("Status", "Status")}</label>
         <Select
           className="w-full sm:w-auto sm:min-w-44"
           value={params.get("status") ?? ""}
           onValueChange={(v) => setParam("status", v)}
           options={[
-            { value: "", label: "Semua status" },
-            { value: "unmapped", label: "Belum dipetakan" },
-            { value: "mapped", label: "Sudah dipetakan" },
+            { value: "", label: t("Semua status", "All statuses") },
+            { value: "unmapped", label: t("Belum dipetakan", "Not mapped") },
+            { value: "mapped", label: t("Sudah dipetakan", "Mapped") },
           ]}
         />
       </div>
@@ -82,7 +84,7 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
           value={params.get("marketplace") ?? ""}
           onValueChange={(v) => setParam("marketplace", v)}
           options={[
-            { value: "", label: "Semua" },
+            { value: "", label: t("Semua", "All") },
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
@@ -91,12 +93,12 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
       </div>
 
       <div className="min-w-0">
-        <label className="mb-1 block text-xs font-medium text-slate-600">Toko</label>
+        <label className="mb-1 block text-xs font-medium text-slate-600">{t("Toko", "Store")}</label>
         <Select
           className="w-full sm:w-auto sm:min-w-44"
           value={params.get("storeId") ?? ""}
           onValueChange={(v) => setParam("storeId", v)}
-          options={[{ value: "", label: "Semua toko" }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
+          options={[{ value: "", label: t("Semua toko", "All stores") }, ...stores.map((s) => ({ value: s.id, label: s.name }))]}
         />
       </div>
 
@@ -105,7 +107,7 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
           onClick={() => router.push("/master/mapping", { scroll: false })}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
         >
-          <RotateCcw size={15} /> Reset
+          <RotateCcw size={15} /> {t("Reset", "Reset")}
         </button>
       )}
     </div>

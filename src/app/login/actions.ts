@@ -3,19 +3,26 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSession, safeEqual, SESSION_COOKIE } from "@/lib/auth";
+import { getT } from "@/lib/i18n-server";
 
 export type LoginState = { error?: string };
 
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  const { t } = await getT();
   const password = String(formData.get("password") ?? "");
   const expected = process.env.APP_PASSWORD ?? "";
   const secret = process.env.AUTH_SECRET ?? "";
 
   if (!expected || !secret) {
-    return { error: "Konfigurasi auth belum lengkap (APP_PASSWORD / AUTH_SECRET)." };
+    return {
+      error: t(
+        "Konfigurasi auth belum lengkap (APP_PASSWORD / AUTH_SECRET).",
+        "Auth configuration incomplete (APP_PASSWORD / AUTH_SECRET).",
+      ),
+    };
   }
   if (!safeEqual(password, expected)) {
-    return { error: "Password salah. Coba lagi." };
+    return { error: t("Password salah. Coba lagi.", "Wrong password. Try again.") };
   }
 
   // Ingat saya: cookie tahan lama (60 hari). Kalau tidak: cookie sesi

@@ -7,6 +7,7 @@ import type { ImportedProduct } from "@/lib/adapters/types";
 import { getShopeeCatalog } from "@/lib/shopee/sync";
 import { getTiktokCatalog } from "@/lib/tiktok/sync";
 import { parseBaseQty } from "@/lib/suggestMapping";
+import { getT } from "@/lib/i18n-server";
 
 // Tarik katalog toko marketplace → siapkan daftar Mapping SKU.
 // TIDAK membuat product: Master Product berisi product DASAR buatan user, dan
@@ -16,15 +17,17 @@ export async function importStoreProducts(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   if (!storeId) return;
 
+  const { t } = await getT();
+
   let q: string;
   try {
     const store = await prisma.store.findUnique({ where: { id: storeId } });
-    if (!store) throw new Error("Toko tidak ditemukan");
+    if (!store) throw new Error(t("Toko tidak ditemukan", "Store not found"));
 
     let catalog: ImportedProduct[];
     if (store.marketplace === "SHOPEE") catalog = await getShopeeCatalog(storeId);
     else if (store.marketplace === "TIKTOK") catalog = await getTiktokCatalog(storeId);
-    else throw new Error("Import hanya untuk toko Shopee/TikTok yang terhubung.");
+    else throw new Error(t("Import hanya untuk toko Shopee/TikTok yang terhubung.", "Import is only for connected Shopee/TikTok stores."));
 
     let noSku = 0;
 
@@ -85,7 +88,7 @@ export async function importStoreProducts(formData: FormData) {
 
     q = `import=ok&created=${created}&existing=${existing}&nosku=${noSku}`;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "unknown";
+    const msg = e instanceof Error ? e.message : t("tidak diketahui", "unknown");
     q = `import=error&reason=${encodeURIComponent(msg)}`;
   }
 

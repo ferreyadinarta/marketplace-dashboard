@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Store as StoreIcon, CheckCircle2, AlertCircle, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { waktu, MARKETPLACE_LABEL } from "@/lib/format";
+import { waktu, marketplaceLabel } from "@/lib/format";
+import { getT } from "@/lib/i18n-server";
 import { createStore, updateStoreCredentials, deleteStore } from "./actions";
 import {
   Card,
@@ -36,6 +37,7 @@ export default async function MasterTokoPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const { t, lang } = await getT();
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tiktokStatus = one(sp.tiktok);
   const shopeeStatus = one(sp.shopee);
@@ -53,8 +55,11 @@ export default async function MasterTokoPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Toko"
-        description="Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko."
+        title={t("Toko", "Stores")}
+        description={t(
+          "Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko.",
+          "Register each store: just fill in the name & pick its marketplace. API settings (optional) are in the advanced section of each store."
+        )}
       />
 
       {/* progres sync yang sedang jalan (polling) — termasuk sync dari cron/tab lain */}
@@ -64,31 +69,43 @@ export default async function MasterTokoPage({
       {tiktokStatus === "connected" && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          TikTok Shop terhubung ({one(sp.n) ?? 0} toko). Klik <strong>Sync sekarang</strong> di toko-nya untuk tarik order.
+          {t(
+            `TikTok Shop terhubung (${one(sp.n) ?? 0} toko). Klik `,
+            `TikTok Shop connected (${one(sp.n) ?? 0} stores). Click `
+          )}
+          <strong>{t("Sync sekarang", "Sync now")}</strong>
+          {t(" di toko-nya untuk tarik order.", " on the store to pull orders.")}
         </div>
       )}
       {tiktokStatus === "error" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
-          Gagal menghubungkan TikTok: {reason ?? "unknown"}
+          {t("Gagal menghubungkan TikTok: ", "Failed to connect TikTok: ")}
+          {reason ?? "unknown"}
         </div>
       )}
       {shopeeStatus === "connected" && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          Shopee terhubung. Klik <strong>Sync sekarang</strong> di toko-nya untuk tarik order.
+          {t("Shopee terhubung. Klik ", "Shopee connected. Click ")}
+          <strong>{t("Sync sekarang", "Sync now")}</strong>
+          {t(" di toko-nya untuk tarik order.", " on the store to pull orders.")}
         </div>
       )}
       {shopeeStatus === "error" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
-          Gagal menghubungkan Shopee: {reason ?? "unknown"}
+          {t("Gagal menghubungkan Shopee: ", "Failed to connect Shopee: ")}
+          {reason ?? "unknown"}
         </div>
       )}
       {shopeeStatus === "notconfigured" && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
           <AlertCircle size={18} className="shrink-0 text-amber-500" />
-          Kredensial Shopee belum di-set (SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY).
+          {t(
+            "Kredensial Shopee belum di-set (SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY).",
+            "Shopee credentials aren't set yet (SHOPEE_PARTNER_ID / SHOPEE_PARTNER_KEY)."
+          )}
         </div>
       )}
 
@@ -96,10 +113,14 @@ export default async function MasterTokoPage({
       <Card className="p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Hubungkan Marketplace Otomatis</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              {t("Hubungkan Marketplace Otomatis", "Connect Marketplace Automatically")}
+            </h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              Sambungkan akun seller supaya order masuk otomatis. Kamu akan diarahkan ke halaman login
-              marketplace.
+              {t(
+                "Sambungkan akun seller supaya order masuk otomatis. Kamu akan diarahkan ke halaman login marketplace.",
+                "Connect your seller account so orders come in automatically. You'll be redirected to the marketplace login page."
+              )}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -107,21 +128,23 @@ export default async function MasterTokoPage({
               href="/api/tiktok/authorize"
               className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
             >
-              Hubungkan TikTok Shop
+              {t("Hubungkan TikTok Shop", "Connect TikTok Shop")}
             </Link>
             <Link
               href="/api/shopee/authorize"
               className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
             >
-              Hubungkan Shopee
+              {t("Hubungkan Shopee", "Connect Shopee")}
             </Link>
           </div>
         </div>
         {hasConnected && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <p className="text-xs text-slate-500">
-              Tarik order terbaru dari semua toko sekaligus. Order sebenarnya masuk realtime lewat
-              webhook; sync ini untuk menambal kalau ada yang terlewat.
+              {t(
+                "Tarik order terbaru dari semua toko sekaligus. Order sebenarnya masuk realtime lewat webhook; sync ini untuk menambal kalau ada yang terlewat.",
+                "Pull the latest orders from all stores at once. Orders actually come in real time via webhook; this sync is to catch anything that was missed."
+              )}
             </p>
             <SyncAllButton />
           </div>
@@ -130,8 +153,11 @@ export default async function MasterTokoPage({
 
       <Card>
         <CardHeader
-          title="Tambah Toko Manual"
-          subtitle="Untuk toko marketplace yang datanya diinput manual (belum/tidak lewat API). Toko grosir/reseller diatur di halaman Grosir / Reseller."
+          title={t("Tambah Toko Manual", "Add Store Manually")}
+          subtitle={t(
+            "Untuk toko marketplace yang datanya diinput manual (belum/tidak lewat API). Toko grosir/reseller diatur di halaman Grosir / Reseller.",
+            "For marketplace stores whose data is entered manually (not via API). Wholesale/reseller stores are managed on the Wholesale / Reseller page."
+          )}
         />
         <AddStoreForm action={createStore} />
       </Card>
@@ -140,8 +166,8 @@ export default async function MasterTokoPage({
         <Card>
           <EmptyState
             icon={<StoreIcon size={40} />}
-            title="Belum ada toko"
-            description="Tambahkan toko pertama lewat form di atas."
+            title={t("Belum ada toko", "No stores yet")}
+            description={t("Tambahkan toko pertama lewat form di atas.", "Add your first store using the form above.")}
           />
         </Card>
       ) : (
@@ -175,13 +201,17 @@ export default async function MasterTokoPage({
                       <h2 className="font-semibold text-slate-900">{s.name}</h2>
                       <div className="mt-0.5 flex items-center gap-2">
                         <Badge color={mpColor[s.marketplace] ?? "slate"}>
-                          {MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace}
+                          {marketplaceLabel(s.marketplace, lang)}
                         </Badge>
                         {isKonsinyasi ? (
-                          <span className="text-xs text-slate-400">Input manual (tanpa API)</span>
+                          <span className="text-xs text-slate-400">
+                            {t("Input manual (tanpa API)", "Manual input (no API)")}
+                          </span>
                         ) : (
                           <span className="text-xs text-slate-400">
-                            {s.lastSyncAt ? `Sync: ${waktu(s.lastSyncAt)}` : "Belum pernah sync"}
+                            {s.lastSyncAt
+                              ? `${t("Sync", "Sync")}: ${waktu(s.lastSyncAt, lang)}`
+                              : t("Belum pernah sync", "Never synced")}
                           </span>
                         )}
                       </div>
@@ -191,11 +221,11 @@ export default async function MasterTokoPage({
                     {!isKonsinyasi &&
                       (connected ? (
                         <Badge color="green">
-                          <CheckCircle2 size={13} /> Terhubung
+                          <CheckCircle2 size={13} /> {t("Terhubung", "Connected")}
                         </Badge>
                       ) : (
                         <Badge color="amber">
-                          <AlertCircle size={13} /> Belum terhubung
+                          <AlertCircle size={13} /> {t("Belum terhubung", "Not connected")}
                         </Badge>
                       ))}
                     {isOauth && connected && <StoreSyncButton storeId={s.id} isShopee={isShopee} />}
@@ -204,11 +234,14 @@ export default async function MasterTokoPage({
                       id={s.id}
                       trigger={<Trash2 size={16} />}
                       triggerClassName="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      title="Hapus toko ini?"
+                      title={t("Hapus toko ini?", "Delete this store?")}
                       message={
                         <>
-                          <span className="font-medium text-slate-700">{s.name}</span> beserta semua data
-                          order/penjualannya akan dihapus permanen.
+                          <span className="font-medium text-slate-700">{s.name}</span>{" "}
+                          {t(
+                            "beserta semua data order/penjualannya akan dihapus permanen.",
+                            "and all its order/sales data will be permanently deleted."
+                          )}
                         </>
                       }
                     />
@@ -226,7 +259,7 @@ export default async function MasterTokoPage({
                           <input
                             name="apiKey"
                             defaultValue={s.apiKey ?? ""}
-                            placeholder="dari developer marketplace"
+                            placeholder={t("dari developer marketplace", "from the marketplace developer console")}
                             className={inputClass}
                           />
                         </Field>
@@ -234,11 +267,14 @@ export default async function MasterTokoPage({
                           <input
                             name="apiSecret"
                             defaultValue={s.apiSecret ?? ""}
-                            placeholder="rahasia, jangan dibagikan"
+                            placeholder={t("rahasia, jangan dibagikan", "secret, don't share it")}
                             className={inputClass}
                           />
                         </Field>
-                        <Field label="Shop ID" hint="ID toko di sisi marketplace, biasanya angka.">
+                        <Field
+                          label="Shop ID"
+                          hint={t("ID toko di sisi marketplace, biasanya angka.", "The store's ID on the marketplace side, usually a number.")}
+                        >
                           <input
                             name="shopIdApi"
                             defaultValue={s.shopIdApi ?? ""}
@@ -247,11 +283,15 @@ export default async function MasterTokoPage({
                           />
                         </Field>
                         <div className="flex items-center">
-                          <Checkbox name="isActive" defaultChecked={s.isActive} label="Toko aktif (ikut sync)" />
+                          <Checkbox
+                            name="isActive"
+                            defaultChecked={s.isActive}
+                            label={t("Toko aktif (ikut sync)", "Store active (included in sync)")}
+                          />
                         </div>
                         <div className="sm:col-span-2 sm:flex sm:justify-end">
-                          <SubmitButton variant="outline" pendingText="Menyimpan…">
-                            Simpan Kredensial
+                          <SubmitButton variant="outline" pendingText={t("Menyimpan…", "Saving…")}>
+                            {t("Simpan Kredensial", "Save Credentials")}
                           </SubmitButton>
                         </div>
                       </form>

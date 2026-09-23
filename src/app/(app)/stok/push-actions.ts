@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendToAll } from "@/lib/push";
 import { checkLowStockNow } from "@/lib/lowStock";
+import { getT } from "@/lib/i18n-server";
 
 // Bentuk langganan dari browser (PushSubscription.toJSON()).
 type WebSub = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
@@ -10,10 +11,11 @@ type WebSub = { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
 // Simpan/segarkan langganan device ini.
 // Selalu balikin objek (jangan throw) supaya UI bisa menampilkan alasan aslinya.
 export async function subscribeUser(sub: WebSub): Promise<{ ok: boolean; reason?: string }> {
+  const { t } = await getT();
   const endpoint = sub?.endpoint ?? "";
   const p256dh = sub?.keys?.p256dh ?? "";
   const auth = sub?.keys?.auth ?? "";
-  if (!endpoint || !p256dh || !auth) return { ok: false, reason: "data langganan tidak lengkap" };
+  if (!endpoint || !p256dh || !auth) return { ok: false, reason: t("data langganan tidak lengkap", "incomplete subscription data") };
 
   try {
     await prisma.pushSubscription.upsert({
@@ -24,7 +26,7 @@ export async function subscribeUser(sub: WebSub): Promise<{ ok: boolean; reason?
     return { ok: true };
   } catch (e) {
     // paling sering: database lagi cold-start / tidak terjangkau
-    return { ok: false, reason: e instanceof Error ? e.message.slice(0, 120) : "database error" };
+    return { ok: false, reason: e instanceof Error ? e.message.slice(0, 120) : t("terjadi kesalahan database", "database error") };
   }
 }
 
@@ -42,9 +44,11 @@ export async function sendTestNotification(): Promise<{
   subs: number;
   reason?: string;
 }> {
+  // dipicu user dari layar → ikut bahasa yang dipilih (notifikasi cron tetap ID)
+  const { t } = await getT();
   return sendToAll({
-    title: "Notifikasi aktif",
-    body: "Nanti ada pesan di sini kalau stok menipis.",
+    title: t("Notifikasi aktif", "Notifications on"),
+    body: t("Nanti ada pesan di sini kalau stok menipis.", "You'll get a message here when stock runs low."),
     url: "/stok",
     tag: "test",
   });

@@ -1,9 +1,11 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
-import { getPembukuanByGroup, getOrdersDetail } from "@/lib/queries";
+import { getPembukuanByGroup, getOrdersDetail, NO_GROUP } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { prisma } from "@/lib/prisma";
-import { tanggal, jakartaParts, TZ, MARKETPLACE_LABEL } from "@/lib/format";
+import { tanggal, jakartaParts, TZ, marketplaceLabel } from "@/lib/format";
+import { intlLocale } from "@/lib/i18n";
+import { getT } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +33,20 @@ function sheetNameForYear(name: string, year: number, fallback = "Grup") {
   return `${clean.slice(0, 26)} ${year}`;
 }
 
+// Nama grup "Tanpa Grup" / "SKU belum dipetakan" datang hardcoded bahasa
+// Indonesia dari lib/queries.ts (file itu bukan punya kita) → dipetakan ke
+// label terjemahan di sini. getPembukuanByGroup kasih groupId, getOrdersDetail
+// cuma kasih groupName string, jadi dicocokkan juga by literal string itu.
+function tGroupLabel(groupId: string, groupName: string, t: (id: string, en: string) => string) {
+  if (groupId === NO_GROUP) return t("Tanpa Grup", "No group");
+  if (groupId === "__unmapped__") return t("SKU belum dipetakan", "Unmapped SKU");
+  return groupName;
+}
+
 // Export pembukuan ke Excel (.xlsx). Sheet Ringkasan + satu sheet per grup.
 export async function GET(req: NextRequest) {
   const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const { t, lang } = await getT();
   // defaultAll=true supaya SAMA dengan halaman Pembukuan: tanpa from/to berarti
   // "semua data". Sebelumnya export diam-diam jatuh ke bulan berjalan, jadi isi
   // & nama filenya beda dengan yang dilihat user di layar.
@@ -42,23 +55,24 @@ export async function GET(req: NextRequest) {
   const groups = await getPembukuanByGroup(filter);
   const detailRows = await getOrdersDetail(filter);
 
+  const semua = t("Semua", "All");
   // label filter untuk sheet ringkasan
-  const mpLabel = sp.marketplace ? MARKETPLACE_LABEL[sp.marketplace] ?? sp.marketplace : "Semua";
+  const mpLabel = sp.marketplace ? marketplaceLabel(sp.marketplace, lang) : semua;
   const tokoLabel = sp.storeId
     ? (await prisma.store.findUnique({ where: { id: sp.storeId } }))?.name ?? sp.storeId
-    : "Semua";
+    : semua;
   const grupLabel = sp.groupId
-    ? (await prisma.bookkeepingGroup.findUnique({ where: { id: sp.groupId } }))?.name ?? sp.groupId
-    : "Semua";
+    ? tGroupLabel(sp.groupId, (await prisma.bookkeepingGroup.findUnique({ where: { id: sp.groupId } }))?.name ?? sp.groupId, t)
+    : semua;
   const periodeLabel = period.isAll
-    ? "Semua data"
-    : `${tanggal(period.from!)} – ${tanggal(period.to!)}`;
+    ? t("Semua data", "All data")
+    : `${tanggal(period.from!, lang)} – ${tanggal(period.to!, lang)}`;
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Pembukuan Marketplace";
+  wb.creator = t("Pembukuan Marketplace", "Marketplace Bookkeeping");
 
   // ---------- Sheet Ringkasan ----------
-  const sum = wb.addWorksheet("Ringkasan", { views: [{ showGridLines: false }] });
+  const sum = wb.addWorksheet(t("Ringkasan", "Summary"), { views: [{ showGridLines: false }] });
   sum.getColumn(1).width = 22;
   sum.getColumn(2).width = 16;
   sum.getColumn(3).width = 16;
@@ -67,18 +81,18 @@ export async function GET(req: NextRequest) {
   sum.getColumn(6).width = 16;
   sum.getColumn(7).width = 12;
 
-  const title = sum.addRow(["Pembukuan Marketplace"]);
+  const title = sum.addRow([t("Pembukuan Marketplace", "Marketplace Bookkeeping")]);
   title.getCell(1).font = { bold: true, size: 16, color: { argb: "FF0F172A" } };
-  sum.addRow(["Ringkasan laporan penjualan & profit"]).getCell(1).font = {
+  sum.addRow([t("Ringkasan laporan penjualan & profit", "Summary of sales & profit report")]).getCell(1).font = {
     color: { argb: "FF64748B" },
   };
   sum.addRow([]);
   const meta: [string, string][] = [
-    ["Periode", periodeLabel],
-    ["Marketplace", mpLabel],
-    ["Toko", tokoLabel],
-    ["Grup / Brand", grupLabel],
-    ["Dibuat", tanggal(new Date())],
+    [t("Periode", "Period"), periodeLabel],
+    [t("Marketplace", "Marketplace"), mpLabel],
+    [t("Toko", "Store"), tokoLabel],
+    [t("Grup / Brand", "Group / Brand"), grupLabel],
+    [t("Dibuat", "Created"), tanggal(new Date(), lang)],
   ];
   for (const [k, v] of meta) {
     const r = sum.addRow([k, v]);
@@ -87,7 +101,15 @@ export async function GET(req: NextRequest) {
   sum.addRow([]);
 
   // tabel ringkasan per grup
-  const headerRow = sum.addRow(["Grup", "Terjual", "Omzet", "Fee", "Modal", "Profit", "Margin"]);
+  const headerRow = sum.addRow([
+    t("Grup", "Group"),
+    t("Terjual", "Sold"),
+    t("Omzet", "Revenue"),
+    "Fee",
+    t("Modal", "COGS"),
+    "Profit",
+    t("Margin", "Margin"),
+  ]);
   headerRow.eachCell((c) => {
     c.font = { bold: true, color: { argb: "FFFFFFFF" } };
     c.fill = HEADER_FILL;
@@ -99,7 +121,7 @@ export async function GET(req: NextRequest) {
     const modal = g.subtotal.omzet - g.subtotal.fee - g.subtotal.profit;
     const margin = g.subtotal.omzet ? g.subtotal.profit / g.subtotal.omzet : 0;
     const row = sum.addRow([
-      g.groupName,
+      tGroupLabel(g.groupId, g.groupName, t),
       g.subtotal.terjual,
       g.subtotal.omzet,
       g.subtotal.fee,
@@ -121,7 +143,7 @@ export async function GET(req: NextRequest) {
   }
   const grandMargin = grand.omzet ? grand.profit / grand.omzet : 0;
   const totalRow = sum.addRow([
-    "TOTAL",
+    t("TOTAL", "TOTAL"),
     grand.terjual,
     grand.omzet,
     grand.fee,
@@ -154,8 +176,16 @@ export async function GET(req: NextRequest) {
 
   if (yearAgg.size > 1) {
     sum.addRow([]);
-    sum.addRow(["Per Tahun"]).getCell(1).font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
-    const yHead = sum.addRow(["Tahun", "Terjual", "Omzet", "", "Modal", "Laba", "Margin"]);
+    sum.addRow([t("Per Tahun", "By Year")]).getCell(1).font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
+    const yHead = sum.addRow([
+      t("Tahun", "Year"),
+      t("Terjual", "Sold"),
+      t("Omzet", "Revenue"),
+      "",
+      t("Modal", "COGS"),
+      t("Laba", "Profit"),
+      t("Margin", "Margin"),
+    ]);
     yHead.eachCell((c) => {
       c.font = { bold: true, color: { argb: "FFFFFFFF" } };
       c.fill = HEADER_FILL;
@@ -178,7 +208,7 @@ export async function GET(req: NextRequest) {
   // (bulan berikutnya di sebelah kanan), dipisah 4 kolom kosong.
   // Kolom "Order" = SKU. Baris per tanggal, tanggal ditulis sekali per hari.
   const monthLabel = (d: Date) =>
-    new Intl.DateTimeFormat("id-ID", { timeZone: TZ, month: "long", year: "numeric" }).format(d).toUpperCase();
+    new Intl.DateTimeFormat(intlLocale(lang), { timeZone: TZ, month: "long", year: "numeric" }).format(d).toUpperCase();
   const monthKeyOf = (d: Date) => {
     const p = jakartaParts(d);
     return `${p.year}-${String(p.month).padStart(2, "0")}`;
@@ -192,7 +222,15 @@ export async function GET(req: NextRequest) {
   }
 
   const LEDGER_HEADERS = [
-    "No", "Tanggal", "Pembeli", "Marketplace", "Order (SKU)", "Qty", "Harga", "Ongkir/Adm", "Total",
+    "No",
+    t("Tanggal", "Date"),
+    t("Pembeli", "Buyer"),
+    "Marketplace",
+    "Order (SKU)",
+    "Qty",
+    t("Harga", "Price"),
+    t("Ongkir/Adm", "Shipping/Fee"),
+    t("Total", "Total"),
   ];
   const LEDGER_WIDTHS = [6, 13, 16, 13, 20, 7, 14, 14, 16];
   const COLS = 9;
@@ -221,7 +259,7 @@ export async function GET(req: NextRequest) {
       // baris 1: judul "SELLING <BULAN>" (merge selebar tabel)
       ws.mergeCells(1, c0, 1, c0 + COLS - 1);
       const title = ws.getCell(1, c0);
-      title.value = `SELLING ${monthLabel(monthRows[0].orderDate)}`;
+      title.value = `${t("SELLING", "SELLING")} ${monthLabel(monthRows[0].orderDate)}`;
       title.font = { bold: true, size: 12, color: { argb: "FF4338CA" } };
       title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF2FF" } };
       title.alignment = { vertical: "middle" };
@@ -243,14 +281,12 @@ export async function GET(req: NextRequest) {
       let monthModal = 0;
       for (const row of monthRows) {
         no += 1;
-        const dLabel = tanggal(row.orderDate);
+        const dLabel = tanggal(row.orderDate, lang);
         const showDate = dLabel !== curDate ? dLabel : "";
         curDate = dLabel;
         // Konsinyasi: tampilkan nama toko titipan, bukan "Konsinyasi".
         const channel =
-          row.marketplace === "KONSINYASI"
-            ? row.storeName
-            : MARKETPLACE_LABEL[row.marketplace] ?? row.marketplace;
+          row.marketplace === "KONSINYASI" ? row.storeName : marketplaceLabel(row.marketplace, lang);
         const vals = [
           no,
           showDate,
@@ -278,8 +314,8 @@ export async function GET(req: NextRequest) {
 
       // baris TOTAL (net penjualan) & LABA (profit setelah modal)
       const summary: [string, number][] = [
-        ["TOTAL", monthTotal],
-        ["LABA", monthTotal - monthModal],
+        [t("TOTAL", "TOTAL"), monthTotal],
+        [t("LABA", "PROFIT"), monthTotal - monthModal],
       ];
       for (const [label, value] of summary) {
         const labelCell = ws.getCell(r, c0 + 7);
@@ -309,10 +345,17 @@ export async function GET(req: NextRequest) {
   };
 
   for (const g of groups) {
+    // rowsByGroup dikunci dengan g.groupName MENTAH (sama seperti yang dipakai
+    // getOrdersDetail) supaya lookup-nya tetap benar; label terjemahan cuma
+    // dipakai untuk nama sheet yang tampil ke user.
     const rows = rowsByGroup.get(g.groupName) ?? [];
+    const label = tGroupLabel(g.groupId, g.groupName, t);
     if (rows.length === 0) {
-      const ws = wb.addWorksheet(uniqueName(safeSheetName(g.groupName)));
-      ws.getCell(1, 1).value = "Belum ada penjualan (selesai) untuk filter ini.";
+      const ws = wb.addWorksheet(uniqueName(safeSheetName(label)));
+      ws.getCell(1, 1).value = t(
+        "Belum ada penjualan (selesai) untuk filter ini.",
+        "No (completed) sales for this filter yet."
+      );
       continue;
     }
 
@@ -325,14 +368,16 @@ export async function GET(req: NextRequest) {
     }
 
     for (const year of [...byYear.keys()].sort((a, b) => b - a)) {
-      const ws = wb.addWorksheet(uniqueName(sheetNameForYear(g.groupName, year)));
+      const ws = wb.addWorksheet(uniqueName(sheetNameForYear(label, year)));
       renderMonths(ws, byYear.get(year)!);
     }
   }
 
   if (groups.length === 0) {
     sum.addRow([]);
-    sum.addRow(["Tidak ada data untuk filter ini."]).getCell(1).font = { color: { argb: "FF94A3B8" } };
+    sum.addRow([t("Tidak ada data untuk filter ini.", "No data for this filter.")]).getCell(1).font = {
+      color: { argb: "FF94A3B8" },
+    };
   }
 
   const buf = await wb.xlsx.writeBuffer();

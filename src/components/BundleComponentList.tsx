@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { Select, type SelectOption } from "@/components/ui";
 import { tiersOf, type UnitInfo } from "@/lib/units";
+import { useT } from "@/components/LangProvider";
 
 export type CompRow = { componentId: string; qty: string; tier: string };
 
@@ -32,13 +33,14 @@ export function BundleComponentList({
   productOptions: SelectOption[];
   unitOf?: Record<string, UnitInfo>;
 }) {
+  const t = useT();
   const setRow = (i: number, patch: Partial<CompRow>) =>
     onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
   // ganti product isi → satuannya beda; kalau tier lama tidak ada, balik ke dasar
   const chooseComponent = (i: number, next: string) => {
     const tiers = tiersOf(unitOf?.[next]);
-    const keep = tiers.some((t) => t.key === rows[i].tier);
+    const keep = tiers.some((tr) => tr.key === rows[i].tier);
     setRow(i, { componentId: next, tier: keep ? rows[i].tier : "base" });
   };
 
@@ -46,7 +48,7 @@ export function BundleComponentList({
     <div className="space-y-2">
       {rows.map((r, i) => {
         const tiers = tiersOf(unitOf?.[r.componentId]);
-        const factor = tiers.find((t) => t.key === r.tier)?.factor ?? 1;
+        const factor = tiers.find((tr) => tr.key === r.tier)?.factor ?? 1;
         const baseQty = Math.max(1, Math.floor(Number(r.qty) || 0)) * factor;
         const baseUnit = tiers[tiers.length - 1].label;
         return (
@@ -55,7 +57,7 @@ export function BundleComponentList({
               <Select
                 value={r.componentId}
                 onValueChange={(v) => chooseComponent(i, v)}
-                placeholder="Pilih product isi…"
+                placeholder={t("Pilih product isi…", "Choose content product…")}
                 options={productOptions}
                 searchable
               />
@@ -65,24 +67,24 @@ export function BundleComponentList({
               min="1"
               value={r.qty}
               onChange={(e) => setRow(i, { qty: e.target.value })}
-              aria-label="Jumlah isi"
+              aria-label={t("Jumlah isi", "Content quantity")}
               className="h-10 w-20 rounded-lg border border-slate-300 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             {r.componentId ? (
               tiers.length > 1 ? (
                 <div className="flex h-10 overflow-hidden rounded-lg border border-slate-300 text-xs">
-                  {tiers.map((t) => (
+                  {tiers.map((tr) => (
                     <button
-                      key={t.key}
+                      key={tr.key}
                       type="button"
-                      onClick={() => setRow(i, { tier: t.key })}
+                      onClick={() => setRow(i, { tier: tr.key })}
                       className={
-                        r.tier === t.key
+                        r.tier === tr.key
                           ? "bg-indigo-600 px-2.5 font-medium text-white"
                           : "px-2.5 text-slate-600 hover:bg-slate-50"
                       }
                     >
-                      {t.label}
+                      {tr.label}
                     </button>
                   ))}
                 </div>
@@ -90,7 +92,7 @@ export function BundleComponentList({
                 <span className="text-xs text-slate-500">{baseUnit}</span>
               )
             ) : (
-              <span className="text-xs text-slate-300">satuan</span>
+              <span className="text-xs text-slate-300">{t("satuan", "unit")}</span>
             )}
             {factor > 1 && (
               <span className="whitespace-nowrap text-xs text-slate-400">
@@ -101,7 +103,7 @@ export function BundleComponentList({
               type="button"
               onClick={() => onChange(rows.length === 1 ? rows : rows.filter((_, idx) => idx !== i))}
               disabled={rows.length === 1}
-              aria-label="Hapus isi"
+              aria-label={t("Hapus isi", "Remove content")}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
             >
               <X size={16} />
@@ -114,7 +116,7 @@ export function BundleComponentList({
         onClick={() => onChange([...rows, emptyCompRow()])}
         className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
       >
-        <Plus size={15} /> Tambah isi
+        <Plus size={15} /> {t("Tambah isi", "Add content")}
       </button>
     </div>
   );

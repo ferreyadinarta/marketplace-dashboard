@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { DatePicker } from "@/components/DatePicker";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { Collapse } from "@/components/Collapse";
+import { useT } from "@/components/LangProvider";
 
 type Option = { value: string; label: string };
 type Action = (formData: FormData) => void | Promise<void>;
@@ -35,6 +36,7 @@ export function RestockForm({
   action: Action;
   today: string;
 }) {
+  const t = useT();
   const [items, setItems] = useState<RItem[]>([{ productId: "", qty: "1", cost: "", unit: "base" }]);
   const [error, setError] = useState<string | undefined>();
   const prodOf = (pid: string) => products.find((p) => p.value === pid);
@@ -59,7 +61,7 @@ export function RestockForm({
   // ex: 232 sachet, 1 box = 16 sachet → "14 box 8 sachet". 240 → "15 box". 48 → "3 box".
   const fmtQty = (pid: string, base: number) => {
     const p = prodOf(pid);
-    const smallUnit = p?.unit || "unit";
+    const smallUnit = p?.unit || t("satuan", "unit");
     const n = Math.max(0, Math.floor(base));
     if (!hasPack(pid)) return `${n} ${smallUnit}`;
     const size = p?.packSize ?? 1;
@@ -97,7 +99,7 @@ export function RestockForm({
   function validate(e: FormEvent<HTMLFormElement>) {
     if (clean.length === 0) {
       e.preventDefault();
-      setError("Tambah minimal 1 product dengan jumlah.");
+      setError(t("Tambah minimal 1 product dengan jumlah.", "Add at least 1 product with a quantity."));
     } else setError(undefined);
   }
 
@@ -111,7 +113,7 @@ export function RestockForm({
   if (products.length === 0) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
-        Tambah product dulu di halaman Product, baru bisa catat barang masuk.
+        {t("Tambah product dulu di halaman Product, baru bisa catat barang masuk.", "Add a product on the Product page first, then you can record stock in.")}
       </p>
     );
   }
@@ -120,7 +122,7 @@ export function RestockForm({
     <form action={submit} onSubmit={validate} noValidate className="space-y-5 p-5">
       <input type="hidden" name="items" value={JSON.stringify(clean)} />
 
-      <Field label="Tanggal masuk">
+      <Field label={t("Tanggal masuk", "Date in")}>
         <div className="sm:max-w-[15rem]">
           <DatePicker name="tanggal" defaultValue={today} />
         </div>
@@ -128,17 +130,19 @@ export function RestockForm({
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-slate-700">Product masuk</span>
+          <span className="text-sm font-medium text-slate-700">{t("Product masuk", "Products in")}</span>
           {error && <span className="text-xs font-medium text-red-500">{error}</span>}
         </div>
         <p className="text-xs text-slate-400">
-          Pilih product, isi jumlah & satuannya. Harga beli/unit opsional — isi kalau harganya berubah supaya
-          rata-rata HPP ikut ter-update.
+          {t(
+            "Pilih product, isi jumlah & satuannya. Harga beli/unit opsional, isi kalau harganya berubah supaya rata-rata HPP ikut ter-update.",
+            "Choose a product, enter its quantity & unit. Purchase price/unit is optional, fill it in if the price changed so the average COGS updates too."
+          )}
         </p>
 
         {items.map((it, i) => {
           const p = prodOf(it.productId);
-          const baseUnit = p?.unit || "unit";
+          const baseUnit = p?.unit || t("satuan", "unit");
           const qtyNum = Math.max(0, Math.floor(Number(it.qty) || 0));
           const factor = factorOf(it.productId, it.unit);
           const addBase = qtyNum * factor;
@@ -153,20 +157,20 @@ export function RestockForm({
             <div key={i} className="rounded-xl border border-slate-200 p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="min-w-0 flex-1">
-                  <label className={lbl}>Product</label>
+                  <label className={lbl}>{t("Product", "Product")}</label>
                   <Select
                     value={it.productId}
                     onValueChange={(v) => chooseProduct(i, v)}
-                    placeholder="Pilih product…"
+                    placeholder={t("Pilih product…", "Choose product…")}
                     options={products}
                     searchable
                   />
                 </div>
                 <div className="flex gap-2">
                   <div>
-                    <label className={lbl}>Jumlah</label>
+                    <label className={lbl}>{t("Jumlah", "Quantity")}</label>
                     <input
-                      aria-label="Jumlah masuk"
+                      aria-label={t("Jumlah masuk", "Quantity in")}
                       type="number"
                       min="1"
                       value={it.qty}
@@ -175,17 +179,17 @@ export function RestockForm({
                     />
                   </div>
                   <div>
-                    <label className={lbl}>Satuan</label>
+                    <label className={lbl}>{t("Satuan", "Unit")}</label>
                     {tiers.length > 1 ? (
                       <div className="flex h-10 overflow-hidden rounded-lg border border-slate-300 text-xs">
-                        {tiers.map((t) => (
+                        {tiers.map((opt) => (
                           <button
-                            key={t.u}
+                            key={opt.u}
                             type="button"
-                            onClick={() => setUnit(i, t.u)}
-                            className={it.unit === t.u ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
+                            onClick={() => setUnit(i, opt.u)}
+                            className={it.unit === opt.u ? "bg-indigo-600 px-3 font-medium text-white" : "px-3 text-slate-600 hover:bg-slate-50"}
                           >
-                            {t.label}
+                            {opt.label}
                           </button>
                         ))}
                       </div>
@@ -198,7 +202,7 @@ export function RestockForm({
                 </div>
                 <div className="sm:w-40">
                   <label className={lbl}>
-                    Harga beli/unit <span className="text-slate-400">(opsional)</span>
+                    {t("Harga beli/unit", "Purchase price/unit")} <span className="text-slate-400">({t("opsional", "optional")})</span>
                   </label>
                   <CurrencyInput
                     value={Number(it.cost) || 0}
@@ -211,7 +215,7 @@ export function RestockForm({
                   type="button"
                   onClick={() => removeRow(i)}
                   disabled={items.length === 1}
-                  aria-label="Hapus baris"
+                  aria-label={t("Hapus baris", "Remove row")}
                   className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 sm:flex"
                 >
                   <X size={16} />
@@ -222,13 +226,16 @@ export function RestockForm({
               <div className="mt-2.5 flex items-center justify-between gap-2">
                 {p ? (
                   <p className="text-xs text-slate-500">
-                    Stok sekarang: <span className="font-medium text-slate-700">{fmtQty(it.productId, cur)}</span>
+                    {t("Stok sekarang:", "Current stock:")} <span className="font-medium text-slate-700">{fmtQty(it.productId, cur)}</span>
                     {addBase > 0 && (
-                      <> → jadi <span className="font-semibold text-emerald-600">{fmtQty(it.productId, cur + addBase)}</span></>
+                      <>
+                        {" "}
+                        {t("→ jadi", "→ becomes")} <span className="font-semibold text-emerald-600">{fmtQty(it.productId, cur + addBase)}</span>
+                      </>
                     )}
                   </p>
                 ) : (
-                  <span className="text-xs text-slate-400">Belum pilih product</span>
+                  <span className="text-xs text-slate-400">{t("Belum pilih product", "No product chosen yet")}</span>
                 )}
                 <button
                   type="button"
@@ -236,7 +243,7 @@ export function RestockForm({
                   disabled={items.length === 1}
                   className="text-xs font-medium text-red-500 hover:underline disabled:opacity-30 sm:hidden"
                 >
-                  Hapus
+                  {t("Hapus", "Delete")}
                 </button>
               </div>
             </div>
@@ -247,7 +254,7 @@ export function RestockForm({
           onClick={addRow}
           className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 sm:w-auto"
         >
-          <Plus size={15} /> Tambah product
+          <Plus size={15} /> {t("Tambah product", "Add product")}
         </button>
       </div>
 
@@ -255,11 +262,11 @@ export function RestockForm({
         <SubmitButton
           variant="primary"
           icon={<PackagePlus size={16} />}
-          pendingText="Menyimpan…"
-          notify="Barang masuk tercatat"
+          pendingText={t("Menyimpan…", "Saving…")}
+          notify={t("Barang masuk tercatat", "Stock in recorded")}
           className="w-full justify-center sm:w-auto"
         >
-          Catat Barang Masuk
+          {t("Catat Barang Masuk", "Record Stock In")}
         </SubmitButton>
       </div>
     </form>
@@ -279,6 +286,7 @@ type BulkItem = {
 };
 
 export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: Action }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState<Record<string, string>>({});
   const [units, setUnits] = useState<Record<string, "base" | "pack">>({});
@@ -314,8 +322,13 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
             <ClipboardList size={17} />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Opname Massal</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Hitung stok fisik banyak product sekaligus. Sebaiknya tiap product dihitung minimal sebulan sekali.</p>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Opname Massal", "Bulk Stock Count")}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {t(
+                "Hitung stok fisik banyak product sekaligus. Sebaiknya tiap product dihitung minimal sebulan sekali.",
+                "Count physical stock for many products at once. Each product should ideally be counted at least once a month."
+              )}
+            </p>
           </div>
         </div>
         <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
@@ -331,14 +344,14 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari nama atau SKU…"
+              placeholder={t("Cari nama atau SKU…", "Search name or SKU…")}
               className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                aria-label="Bersihkan"
+                aria-label={t("Bersihkan", "Clear")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100"
               >
                 <X size={14} />
@@ -348,7 +361,7 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
 
           <div className="max-h-[21rem] space-y-1 overflow-auto pr-1">
             {shown.length === 0 ? (
-              <p className="px-2 py-6 text-center text-sm text-slate-400">Tidak ada product yang cocok.</p>
+              <p className="px-2 py-6 text-center text-sm text-slate-400">{t("Tidak ada product yang cocok.", "No matching products.")}</p>
             ) : (
               shown.map((it) => {
                 const v = counts[it.productId] ?? "";
@@ -363,14 +376,14 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
                       <p className="font-mono text-[11px] text-slate-400">{it.sku}</p>
                     </div>
                     <span className="w-20 shrink-0 text-right text-xs text-slate-500">
-                      {it.known ? `${it.current} ${it.unit}` : "belum opname"}
+                      {it.known ? `${it.current} ${it.unit}` : t("belum opname", "not counted yet")}
                     </span>
                     <input
                       type="number"
                       min="0"
                       value={v}
                       onChange={(e) => setCount(it.productId, e.target.value)}
-                      placeholder="fisik"
+                      placeholder={t("fisik", "physical")}
                       className="h-9 w-16 shrink-0 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                     />
                     {hasPk(it) ? (
@@ -397,7 +410,7 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
                       {selisih === null ? (
                         <span className="text-slate-300">—</span>
                       ) : selisih === 0 ? (
-                        <span className="font-medium text-emerald-600">cocok</span>
+                        <span className="font-medium text-emerald-600">{t("cocok", "match")}</span>
                       ) : (
                         <span className={`font-semibold ${selisih > 0 ? "text-blue-600" : "text-red-600"}`}>
                           {selisih > 0 ? `+${selisih}` : selisih}
@@ -410,9 +423,9 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
             )}
           </div>
           <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-            <span className="text-xs text-slate-500">{filled.length} product diisi</span>
-            <SubmitButton variant="primary" disabled={filled.length === 0} pendingText="Menyimpan…" notify="Opname massal tersimpan">
-              Simpan Opname ({filled.length})
+            <span className="text-xs text-slate-500">{t(`${filled.length} product diisi`, `${filled.length} product${filled.length === 1 ? "" : "s"} filled in`)}</span>
+            <SubmitButton variant="primary" disabled={filled.length === 0} pendingText={t("Menyimpan…", "Saving…")} notify={t("Opname massal tersimpan", "Bulk stock count saved")}>
+              {t(`Simpan Opname (${filled.length})`, `Save Stock Count (${filled.length})`)}
             </SubmitButton>
           </div>
         </form>
@@ -439,6 +452,7 @@ export function OpnameCell({
   packSize: number;
   action: Action;
 }) {
+  const t = useT();
   const hasPack = packSize >= 2 && !!packUnit;
   const [val, setVal] = useState("");
   const [u, setU] = useState<"base" | "pack">(hasPack ? "pack" : "base");
@@ -483,11 +497,11 @@ export function OpnameCell({
       )}
       <span className="w-14 shrink-0 text-xs">
         {!known ? (
-          <span className="text-slate-400">stok awal</span>
+          <span className="text-slate-400">{t("stok awal", "opening stock")}</span>
         ) : selisih === null ? (
-          <span className="text-slate-300">selisih</span>
+          <span className="text-slate-300">{t("selisih", "difference")}</span>
         ) : selisih === 0 ? (
-          <span className="font-medium text-emerald-600">cocok</span>
+          <span className="font-medium text-emerald-600">{t("cocok", "match")}</span>
         ) : (
           <span className={`font-semibold ${selisih > 0 ? "text-blue-600" : "text-red-600"}`}>
             {selisih > 0 ? `+${selisih}` : selisih}
@@ -499,9 +513,9 @@ export function OpnameCell({
         disabled={counted === null}
         className="h-9 py-0 text-xs"
         pendingText="…"
-        notify="Opname tersimpan"
+        notify={t("Opname tersimpan", "Stock count saved")}
       >
-        {known ? "Opname" : "Simpan"}
+        {known ? t("Opname", "Count") : t("Simpan", "Save")}
       </SubmitButton>
     </form>
   );
@@ -517,6 +531,7 @@ export function MinStockCell({
   minStock: number;
   action: Action;
 }) {
+  const t = useT();
   const [val, setVal] = useState(String(minStock));
   const dirty = val !== String(minStock);
 
@@ -538,7 +553,7 @@ export function MinStockCell({
         className={`h-9 px-2 py-0 text-xs ${dirty ? "" : "invisible"}`}
         pendingText="…"
       >
-        Simpan
+        {t("Simpan", "Save")}
       </SubmitButton>
     </form>
   );
@@ -546,6 +561,7 @@ export function MinStockCell({
 
 // ---------- Cari + filter stok menipis + sort ----------
 export function StockControls({ q, low, sort }: { q: string; low: boolean; sort: string }) {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [text, setText] = useState(q);
@@ -556,14 +572,14 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
       first.current = false;
       return;
     }
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const next = new URLSearchParams(params.toString());
       if (text) next.set("q", text);
       else next.delete("q");
       next.delete("page");
       router.push(`/stok?${next.toString()}`, { scroll: false });
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
 
@@ -590,14 +606,14 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Cari nama atau SKU…"
+          placeholder={t("Cari nama atau SKU…", "Search name or SKU…")}
           className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-56"
         />
         {text && (
           <button
             type="button"
             onClick={() => setText("")}
-            aria-label="Bersihkan"
+            aria-label={t("Bersihkan", "Clear")}
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100"
           >
             <X size={14} />
@@ -614,7 +630,7 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
         }`}
       >
         <ClipboardCheck size={15} />
-        Stok menipis
+        {t("Stok menipis", "Low stock")}
       </button>
       <button
         type="button"
@@ -626,7 +642,7 @@ export function StockControls({ q, low, sort }: { q: string; low: boolean; sort:
         }`}
       >
         <ArrowUpNarrowWide size={15} />
-        Stok terendah
+        {t("Stok terendah", "Lowest stock")}
       </button>
     </div>
   );

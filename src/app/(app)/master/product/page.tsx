@@ -11,7 +11,8 @@ import { BulkPriceForm } from "@/components/BulkPriceForm";
 import { BulkDeleteProducts } from "@/components/BulkDeleteProducts";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Pagination, PaginationControls } from "@/components/Pagination";
-import { MARKETPLACE_LABEL } from "@/lib/format";
+import { marketplaceLabel } from "@/lib/format";
+import { getT } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 // Import katalog marketplace jalan sebagai Server Action di halaman ini dan bisa
@@ -25,6 +26,7 @@ export default async function MasterProductPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t, lang } = await getT();
   const sp = await searchParams;
   const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q) ?? "";
   const page = Math.max(1, parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page) ?? "1", 10) || 1);
@@ -116,7 +118,10 @@ export default async function MasterProductPage({
     <div className="space-y-6">
       <PageHeader
         title="Product"
-        description="Semua product yang kamu jual. Isi HPP (modal) tiap product supaya profit terhitung benar."
+        description={t(
+          "Semua product yang kamu jual. Isi HPP (modal) tiap product supaya profit terhitung benar.",
+          "All the products you sell. Fill in the COGS for each product so profit is calculated correctly."
+        )}
       />
 
       {/* hasil import sekarang tampil di halaman Mapping SKU (import tidak lagi
@@ -124,20 +129,24 @@ export default async function MasterProductPage({
       {deletedCount > 0 && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          <strong>{deletedCount} product dihapus.</strong> Order yang tadinya memakai product itu jadi belum
-          dipetakan — atur ulang di Mapping SKU kalau perlu.
+          <strong>{t(`${deletedCount} product dihapus.`, `${deletedCount} product${deletedCount === 1 ? "" : "s"} deleted.`)}</strong>{" "}
+          {t(
+            "Order yang tadinya memakai product itu jadi belum dipetakan. Atur ulang di Mapping SKU kalau perlu.",
+            "Orders that used that product are now unmapped. Re-map them in SKU Mapping if needed."
+          )}
         </div>
       )}
       {addStatus === "dupe" && (
         <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
           <XCircle size={18} className="shrink-0 text-red-500" />
-          SKU <strong className="font-mono">{dupeSku}</strong> sudah dipakai product lain. Ganti SKU yang lain.
+          {t("SKU", "SKU")} <strong className="font-mono">{dupeSku}</strong>{" "}
+          {t("sudah dipakai product lain. Ganti SKU yang lain.", "is already used by another product. Choose a different SKU.")}
         </div>
       )}
       {addStatus === "ok" && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
           <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-          Product baru ditambahkan.
+          {t("Product baru ditambahkan.", "New product added.")}
         </div>
       )}
 
@@ -149,8 +158,11 @@ export default async function MasterProductPage({
             <Plus size={18} />
           </span>
         }
-        title="Tambah product baru"
-        subtitle="Isi nama, SKU, dan modal (HPP). Grup pembukuan diatur di sini juga."
+        title={t("Tambah product baru", "Add new product")}
+        subtitle={t(
+          "Isi nama, SKU, dan modal (HPP). Grup pembukuan diatur di sini juga.",
+          "Fill in the name, SKU, and COGS. The bookkeeping group is also set here."
+        )}
       >
         <div className="grid border-t border-slate-100 lg:grid-cols-3">
           <div className="lg:col-span-2">
@@ -162,8 +174,10 @@ export default async function MasterProductPage({
             />
           </div>
           <div className="border-t border-slate-100 lg:border-l lg:border-t-0">
-            <p className="px-5 pt-5 text-sm font-semibold text-slate-900">Grup pembukuan</p>
-            <p className="px-5 text-xs text-slate-500">Mengelompokkan product di halaman Pembukuan (mis. per brand).</p>
+            <p className="px-5 pt-5 text-sm font-semibold text-slate-900">{t("Grup pembukuan", "Bookkeeping group")}</p>
+            <p className="px-5 text-xs text-slate-500">
+              {t("Mengelompokkan product di halaman Pembukuan (mis. per brand).", "Groups products on the Bookkeeping page (e.g. per brand).")}
+            </p>
             <AddGroupForm groups={groups} action={createGroup} deleteAction={deleteGroup} />
           </div>
         </div>
@@ -172,8 +186,8 @@ export default async function MasterProductPage({
       {/* tabel product */}
       <Card className="overflow-hidden">
         <CardHeader
-          title={`Daftar Product (${total})`}
-          subtitle="Klik Edit di product untuk ubah HPP, harga, atau grup."
+          title={t(`Daftar Product (${total})`, `Product list (${total})`)}
+          subtitle={t("Klik Edit di product untuk ubah HPP, harga, atau grup.", "Click Edit on a product to change its COGS, price, or group.")}
           action={
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <ProductSearch defaultValue={q} />
@@ -185,14 +199,17 @@ export default async function MasterProductPage({
           q ? (
             <EmptyState
               icon={<Search size={40} />}
-              title="Tidak ada product yang cocok"
-              description={`Tidak ditemukan product dengan kata kunci "${q}". Coba kata kunci lain.`}
+              title={t("Tidak ada product yang cocok", "No matching products")}
+              description={t(
+                `Tidak ditemukan product dengan kata kunci "${q}". Coba kata kunci lain.`,
+                `No products found for "${q}". Try a different search.`
+              )}
             />
           ) : (
             <EmptyState
               icon={<Package size={40} />}
-              title="Belum ada product"
-              description="Klik “Tambah product baru” di atas untuk mulai."
+              title={t("Belum ada product", "No products yet")}
+              description={t("Klik “Tambah product baru” di atas untuk mulai.", "Click “Add new product” above to get started.")}
             />
           )
         ) : (
@@ -214,7 +231,7 @@ export default async function MasterProductPage({
                 groupId={p.groupId ?? ""}
                 groupName={p.group?.name}
                 groupOptions={[
-                  { value: "", label: "— Tanpa grup —" },
+                  { value: "", label: t("Tanpa grup", "No group") },
                   ...groups.map((g) => ({ value: g.id, label: g.name })),
                 ]}
                 isBundle={p.isBundle}
@@ -240,30 +257,35 @@ export default async function MasterProductPage({
           from={from}
           to={to}
           hrefFor={pageHref}
-          unit="product"
+          unit={t("product", total === 1 ? "product" : "products")}
         />
       </Card>
       {/* alat massal & jarang dipakai — di bawah daftar */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900">Alat lainnya</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{t("Alat lainnya", "Other tools")}</h2>
       {/* import product dari marketplace terhubung */}
         {connectedStores.length > 0 && (
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">Import Produk dari Marketplace</h2>
+                <h2 className="text-sm font-semibold text-slate-900">{t("Import Produk dari Marketplace", "Import products from marketplace")}</h2>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Tarik katalog dari toko terhubung → masuk ke <strong>Mapping SKU</strong>. Product di sini tetap
-                  product <strong>dasar </strong> buatanmu; beberapa varian marketplace (mis. “1 box” &amp; “10
-                  sachet”) bisa menunjuk ke satu product yang sama.
+                  {t("Tarik katalog dari toko terhubung, masuk ke", "Pull the catalog from your connected store into")}{" "}
+                  <strong>{t("Mapping SKU", "SKU Mapping")}</strong>.{" "}
+                  {t("Product di sini tetap product", "Products here stay your own")}{" "}
+                  <strong>{t("dasar", "base")}</strong>{" "}
+                  {t(
+                    "buatanmu; beberapa varian marketplace (mis. “1 box” & “10 sachet”) bisa menunjuk ke satu product yang sama.",
+                    "products; multiple marketplace variants (e.g. “1 box” & “10 sachets”) can point to the same product."
+                  )}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {connectedStores.map((s) => (
                   <form key={s.id} action={importStoreProducts}>
                     <input type="hidden" name="storeId" value={s.id} />
-                    <SubmitButton variant="outline" icon={<PackageOpen size={15} />} pendingText="Import…" className="text-sm">
-                      {s.name} ({MARKETPLACE_LABEL[s.marketplace] ?? s.marketplace})
+                    <SubmitButton variant="outline" icon={<PackageOpen size={15} />} pendingText={t("Mengimpor…", "Importing…")} className="text-sm">
+                      {s.name} ({marketplaceLabel(s.marketplace, lang)})
                     </SubmitButton>
                   </form>
                 ))}

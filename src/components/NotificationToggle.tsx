@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellRing, BellOff, Share, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { subscribeUser, unsubscribeUser, sendTestNotification, checkNow } from "@/app/(app)/stok/push-actions";
+import { useT } from "@/components/LangProvider";
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -33,6 +34,7 @@ async function getOrCreateSub(reg: ServiceWorkerRegistration): Promise<PushSubsc
 }
 
 export function NotificationToggle() {
+  const t = useT();
   const [supported, setSupported] = useState(true);
   const [subscribed, setSubscribed] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | null>(null);
@@ -82,18 +84,18 @@ export function NotificationToggle() {
       const perm = await Notification.requestPermission();
       setPermission(perm);
       if (perm !== "granted") {
-        setMsg({ tone: "err", text: "Izin notifikasi ditolak. Aktifkan lewat setelan browser/HP kalau berubah pikiran." });
+        setMsg({ tone: "err", text: t("Izin notifikasi ditolak. Aktifkan lewat setelan browser/HP kalau berubah pikiran.", "Notification permission denied. Enable it via your browser/phone settings if you change your mind.") });
         return;
       }
       const reg = await navigator.serviceWorker.ready;
       const sub = await getOrCreateSub(reg);
       const res = await subscribeUser(JSON.parse(JSON.stringify(sub)));
-      if (!res?.ok) throw new Error(res?.reason || "server menolak langganan");
+      if (!res?.ok) throw new Error(res?.reason || t("server menolak langganan", "server rejected the subscription"));
       setSubscribed(true);
-      setMsg({ tone: "ok", text: "Notifikasi aktif di HP ini." });
+      setMsg({ tone: "ok", text: t("Notifikasi aktif di HP ini.", "Notifications are active on this device.") });
     } catch (e) {
       const err = e as Error;
-      setMsg({ tone: "err", text: `Gagal mengaktifkan: ${err?.message || err?.name || "tidak diketahui"}. Coba lagi.` });
+      setMsg({ tone: "err", text: `${t("Gagal mengaktifkan", "Failed to activate")}: ${err?.message || err?.name || t("tidak diketahui", "unknown")}. ${t("Coba lagi.", "Try again.")}` });
     } finally {
       setBusy(false);
       void refresh(); // pastikan tampilan cocok dengan kondisi asli
@@ -111,10 +113,10 @@ export function NotificationToggle() {
         await sub.unsubscribe();
       }
       setSubscribed(false);
-      setMsg({ tone: "ok", text: "Notifikasi dimatikan di HP ini." });
+      setMsg({ tone: "ok", text: t("Notifikasi dimatikan di HP ini.", "Notifications are turned off on this device.") });
     } catch (e) {
       const err = e as Error;
-      setMsg({ tone: "err", text: `Gagal mematikan: ${err?.message || "tidak diketahui"}.` });
+      setMsg({ tone: "err", text: `${t("Gagal mematikan", "Failed to turn off")}: ${err?.message || t("tidak diketahui", "unknown")}.` });
     } finally {
       setBusy(false);
       void refresh();
@@ -127,16 +129,16 @@ export function NotificationToggle() {
     try {
       const r = await sendTestNotification();
       if (r.sent > 0) {
-        setMsg({ tone: "ok", text: `Terkirim ke ${r.sent} device — cek layar HP.` });
+        setMsg({ tone: "ok", text: t(`Terkirim ke ${r.sent} device, cek layar HP.`, `Sent to ${r.sent} device${r.sent === 1 ? "" : "s"}, check your phone screen.`) });
       } else {
         // tampilkan alasan aslinya; tanpa ini semua kegagalan terlihat sama
         setMsg({
           tone: "err",
-          text: `Tidak terkirim (${r.subs} device terdaftar)${r.reason ? ` — ${r.reason}` : ""}.`,
+          text: `${t(`Tidak terkirim (${r.subs} device terdaftar)`, `Not sent (${r.subs} device${r.subs === 1 ? "" : "s"} registered)`)}${r.reason ? `: ${r.reason}` : ""}.`,
         });
       }
     } catch (e) {
-      setMsg({ tone: "err", text: `Gagal kirim tes: ${(e as Error)?.message || "tidak diketahui"}.` });
+      setMsg({ tone: "err", text: `${t("Gagal kirim tes", "Failed to send test")}: ${(e as Error)?.message || t("tidak diketahui", "unknown")}.` });
     } finally {
       setBusy(false);
     }
@@ -149,10 +151,12 @@ export function NotificationToggle() {
       const r = await checkNow();
       setMsg({
         tone: "ok",
-        text: r.low > 0 ? `Ada ${r.low} product menipis — cek notifikasi.` : "Stok aman, tidak ada yang menipis.",
+        text: r.low > 0
+          ? t(`Ada ${r.low} product menipis, cek notifikasi.`, `${r.low} product${r.low === 1 ? "" : "s"} low on stock, check your notifications.`)
+          : t("Stok aman, tidak ada yang menipis.", "Stock is fine, nothing is low."),
       });
     } catch (e) {
-      setMsg({ tone: "err", text: `Gagal cek: ${(e as Error)?.message || "tidak diketahui"}.` });
+      setMsg({ tone: "err", text: `${t("Gagal cek", "Failed to check")}: ${(e as Error)?.message || t("tidak diketahui", "unknown")}.` });
     } finally {
       setBusy(false);
     }
@@ -173,53 +177,59 @@ export function NotificationToggle() {
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">Notifikasi Stok Menipis</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Notifikasi Stok Menipis", "Low Stock Notifications")}</h2>
             {subscribed && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                <CheckCircle2 size={12} /> Aktif di HP ini
+                <CheckCircle2 size={12} /> {t("Aktif di HP ini", "Active on this device")}
               </span>
             )}
           </div>
           <p className="mt-0.5 text-xs text-slate-500">
-            Dapat notifikasi di HP saat ada product yang stoknya menipis atau habis. Dicek otomatis tiap hari.
+            {t(
+              "Dapat notifikasi di HP saat ada product yang stoknya menipis atau habis. Dicek otomatis tiap hari.",
+              "Get notified on your phone when a product's stock is low or runs out. Checked automatically every day."
+            )}
           </p>
 
           {!VAPID ? (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              Fitur belum dikonfigurasi (kunci VAPID belum di-set di server).
+              {t("Fitur belum dikonfigurasi (kunci VAPID belum di-set di server).", "Feature not configured yet (VAPID key not set on the server).")}
             </p>
           ) : !supported ? (
             <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              Browser ini tidak mendukung notifikasi push.
+              {t("Browser ini tidak mendukung notifikasi push.", "This browser does not support push notifications.")}
             </p>
           ) : isIOS && !standalone ? (
             <div className="mt-3 rounded-lg bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900">
-              Di iPhone, notifikasi cuma jalan kalau app dibuka dari Home Screen. Caranya: tap{" "}
-              <Share size={12} className="mb-0.5 inline" /> lalu <b>Add to Home Screen</b>{" "}
-              <Plus size={12} className="mb-0.5 inline" />, buka dari ikonnya, baru aktifkan di sini.
+              {t("Di iPhone, notifikasi cuma jalan kalau app dibuka dari Home Screen. Caranya: tap", "On iPhone, notifications only work if the app is opened from the Home Screen. To do this: tap")}{" "}
+              <Share size={12} className="mb-0.5 inline" /> {t("lalu", "then")} <b>Add to Home Screen</b>{" "}
+              <Plus size={12} className="mb-0.5 inline" />
+              {t(", buka dari ikonnya, baru aktifkan di sini.", ", open it from its icon, then activate it here.")}
             </div>
           ) : permission === "denied" && !subscribed ? (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              Izin notifikasi diblokir untuk situs ini. Aktifkan dulu lewat setelan HP/browser (Notifications →
-              izinkan), lalu buka halaman ini lagi.
+              {t(
+                "Izin notifikasi diblokir untuk situs ini. Aktifkan dulu lewat setelan HP/browser (Notifications → izinkan), lalu buka halaman ini lagi.",
+                "Notification permission is blocked for this site. Enable it first via your phone/browser settings (Notifications → allow), then open this page again."
+              )}
             </p>
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               {subscribed ? (
                 <>
                   <button onClick={cek} disabled={busy} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
-                    {busy ? "Memproses…" : "Cek stok sekarang"}
+                    {busy ? t("Memproses…", "Processing…") : t("Cek stok sekarang", "Check stock now")}
                   </button>
                   <button onClick={test} disabled={busy} className={`${btn} border border-slate-300 text-slate-700 hover:bg-slate-50`}>
-                    Kirim tes
+                    {t("Kirim tes", "Send test")}
                   </button>
                   <button onClick={unsubscribe} disabled={busy} className={`${btn} text-slate-500 hover:bg-slate-100`}>
-                    <BellOff size={14} className="mr-1" /> Matikan
+                    <BellOff size={14} className="mr-1" /> {t("Matikan", "Turn off")}
                   </button>
                 </>
               ) : (
                 <button onClick={subscribe} disabled={busy} className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`}>
-                  <Bell size={14} className="mr-1" /> {busy ? "Mengaktifkan…" : "Aktifkan notifikasi"}
+                  <Bell size={14} className="mr-1" /> {busy ? t("Mengaktifkan…", "Activating…") : t("Aktifkan notifikasi", "Enable notifications")}
                 </button>
               )}
             </div>

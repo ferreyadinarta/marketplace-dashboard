@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Trash2, ChevronDown, Search, AlertTriangle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Collapse } from "@/components/Collapse";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -19,6 +20,7 @@ export type CleanupRow = {
 // Hapus banyak product sekaligus — untuk membersihkan product sampah hasil import
 // lama (dulu import membuat 1 product per varian marketplace dengan nama panjang).
 export function BulkDeleteProducts({ products, action }: { products: CleanupRow[]; action: Action }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [onlyNoHpp, setOnlyNoHpp] = useState(true);
@@ -60,9 +62,12 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
           <Trash2 size={18} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-slate-900">Hapus Product Massal</span>
+          <span className="block text-sm font-semibold text-slate-900">{t("Hapus Product Massal", "Bulk delete products")}</span>
           <span className="block text-xs text-slate-500">
-            Bersihkan product sampah (mis. hasil import lama yang namanya panjang & HPP-nya masih 0).
+            {t(
+              "Bersihkan product sampah (mis. hasil import lama yang namanya panjang & HPP-nya masih 0).",
+              "Clean up junk products (e.g. old imports with long names and COGS still at 0)."
+            )}
           </span>
         </span>
         <ChevronDown size={18} className={`shrink-0 text-slate-400 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
@@ -76,7 +81,7 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Cari nama atau SKU…"
+                placeholder={t("Cari nama atau SKU…", "Search name or SKU…")}
                 className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </div>
@@ -87,7 +92,7 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
                 onChange={(e) => setOnlyNoHpp(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
-              Hanya yang HPP-nya 0
+              {t("Hanya yang HPP-nya 0", "Only where COGS is 0")}
             </label>
             <button
               type="button"
@@ -95,13 +100,13 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
               disabled={shown.length === 0}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
             >
-              {allShownPicked ? "Batal pilih semua" : `Pilih semua (${shown.length})`}
+              {allShownPicked ? t("Batal pilih semua", "Deselect all") : t(`Pilih semua (${shown.length})`, `Select all (${shown.length})`)}
             </button>
           </div>
 
           <div className="max-h-[24rem] space-y-1 overflow-y-auto pr-1">
             {shown.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-400">Tidak ada product yang cocok.</p>
+              <p className="py-6 text-center text-sm text-slate-400">{t("Tidak ada product yang cocok.", "No matching products.")}</p>
             ) : (
               shown.map((p) => (
                 <label
@@ -119,9 +124,9 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
                     <span className="block truncate font-mono text-[11px] text-slate-400">{p.sku}</span>
                   </span>
                   <span className="shrink-0 text-right text-[11px] text-slate-400">
-                    {p.orderItems > 0 && <span className="block">{p.orderItems} order</span>}
+                    {p.orderItems > 0 && <span className="block">{t(`${p.orderItems} order`, `${p.orderItems} order${p.orderItems === 1 ? "" : "s"}`)}</span>}
                     {p.stockRecords > 0 && (
-                      <span className="block font-medium text-amber-600">{p.stockRecords} data stok</span>
+                      <span className="block font-medium text-amber-600">{t(`${p.stockRecords} data stok`, `${p.stockRecords} stock record${p.stockRecords === 1 ? "" : "s"}`)}</span>
                     )}
                   </span>
                 </label>
@@ -130,14 +135,14 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-            <span className="text-xs text-slate-500">{ids.length} product dipilih</span>
+            <span className="text-xs text-slate-500">{t(`${ids.length} product dipilih`, `${ids.length} product${ids.length === 1 ? "" : "s"} selected`)}</span>
             <button
               type="button"
               disabled={ids.length === 0}
               onClick={() => setConfirm(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-40"
             >
-              <Trash2 size={15} /> Hapus {ids.length > 0 ? `(${ids.length})` : ""}
+              <Trash2 size={15} /> {t("Hapus", "Delete")} {ids.length > 0 ? `(${ids.length})` : ""}
             </button>
           </div>
 
@@ -145,29 +150,32 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
             open={confirm}
             onClose={() => setConfirm(false)}
             action={action}
-            title={`Hapus ${ids.length} product?`}
+            title={t(`Hapus ${ids.length} product?`, `Delete ${ids.length} product${ids.length === 1 ? "" : "s"}?`)}
             message={
               <>
-                Product yang dipilih akan dihapus permanen.
+                {t("Product yang dipilih akan dihapus permanen.", "The selected products will be permanently deleted.")}
                 {losingLinks > 0 && (
                   <>
                     {" "}
-                    <span className="font-medium text-slate-700">{losingLinks} baris order</span> tetap ada tapi jadi
-                    belum dipetakan (bisa dipetakan ulang di Mapping SKU).
+                    <span className="font-medium text-slate-700">{t(`${losingLinks} baris order`, `${losingLinks} order line${losingLinks === 1 ? "" : "s"}`)}</span>{" "}
+                    {t("tetap ada tapi jadi belum dipetakan (bisa dipetakan ulang di Mapping SKU).", "will remain but become unmapped (can be re-mapped in SKU Mapping).")}
                   </>
                 )}
                 {losingHistory > 0 && (
                   <span className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-amber-800">
                     <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                     <span>
-                      <b>{losingHistory} product</b> punya riwayat opname/barang masuk — riwayat itu ikut terhapus
-                      dan tidak bisa dikembalikan.
+                      <b>{t(`${losingHistory} product`, `${losingHistory} product${losingHistory === 1 ? "" : "s"}`)}</b>{" "}
+                      {t(
+                        "punya riwayat opname/barang masuk. Riwayat itu ikut terhapus dan tidak bisa dikembalikan.",
+                        "have stock count/restock history. That history will be deleted too and cannot be recovered."
+                      )}
                     </span>
                   </span>
                 )}
               </>
             }
-            confirmText="Hapus"
+            confirmText={t("Hapus", "Delete")}
             extraFields={<input type="hidden" name="ids" value={JSON.stringify(ids)} />}
           />
         </div>

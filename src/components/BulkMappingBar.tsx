@@ -4,13 +4,17 @@ import { useState } from "react";
 import { Wand2, Link2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Select, type SelectOption as Option } from "@/components/Select";
+import { useT } from "@/components/LangProvider";
+import type { T } from "@/lib/i18n";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
-const ISI_OPTIONS: Option[] = [
-  { value: "auto", label: "isi: tebak dari nama" },
-  ...[1, 6, 10, 12, 16, 20, 30].map((n) => ({ value: String(n), label: `isi: ${n}` })),
-];
+function isiOptions(t: T): Option[] {
+  return [
+    { value: "auto", label: t("isi: tebak dari nama", "contains: guess from name") },
+    ...[1, 6, 10, 12, 16, 20, 30].map((n) => ({ value: String(n), label: t(`isi: ${n}`, `contains: ${n}`) })),
+  ];
+}
 
 // Petakan banyak SKU sekaligus. Dua jalur, dua-duanya cuma menyentuh baris yang
 // SEDANG TERSARING dan BELUM dipetakan:
@@ -33,6 +37,7 @@ export function BulkMappingBar({
   filters: { q: string; marketplace: string; storeId: string };
   isFiltered: boolean;
 }) {
+  const t = useT();
   const [confirm, setConfirm] = useState<null | "suggest" | "product">(null);
   const [productId, setProductId] = useState("");
   const [baseQty, setBaseQty] = useState("auto");
@@ -40,7 +45,9 @@ export function BulkMappingBar({
   if (unmappedInFilter === 0) return null;
 
   const productName = options.find((o) => o.value === productId)?.label ?? "";
-  const scopeText = isFiltered ? "hasil filter sekarang" : "semua SKU yang belum dipetakan";
+  const scopeText = isFiltered
+    ? t("hasil filter sekarang", "the current filter results")
+    : t("semua SKU yang belum dipetakan", "all unmapped SKUs");
 
   const hidden = (
     <>
@@ -53,7 +60,8 @@ export function BulkMappingBar({
   return (
     <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
       <p className="text-sm font-medium text-indigo-900">
-        Petakan sekaligus: {unmappedInFilter} SKU {isFiltered ? "di hasil filter" : "yang belum dipetakan"}
+        {t("Petakan sekaligus: ", "Bulk map: ")}
+        {unmappedInFilter} SKU {isFiltered ? t("di hasil filter", "in the filter results") : t("yang belum dipetakan", "not mapped yet")}
       </p>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -62,18 +70,18 @@ export function BulkMappingBar({
           disabled={suggestable === 0}
           onClick={() => setConfirm("suggest")}
           className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
-          title={suggestable === 0 ? "Tidak ada saran yang cukup yakin" : undefined}
+          title={suggestable === 0 ? t("Tidak ada saran yang cukup yakin", "No confident suggestion available") : undefined}
         >
           <Wand2 size={15} />
-          Terima semua saran ({suggestable})
+          {t("Terima semua saran", "Accept all suggestions")} ({suggestable})
         </button>
 
-        <span className="text-center text-xs text-slate-400 sm:text-left">atau</span>
+        <span className="text-center text-xs text-slate-400 sm:text-left">{t("atau", "or")}</span>
 
         <Select
           value={productId}
           onValueChange={setProductId}
-          placeholder="— Pilih product tujuan —"
+          placeholder={t("Pilih product tujuan", "Choose target product")}
           className="w-full sm:w-56"
           options={options}
           searchable
@@ -83,7 +91,7 @@ export function BulkMappingBar({
           value={baseQty}
           onValueChange={setBaseQty}
           className="w-full sm:w-44"
-          options={ISI_OPTIONS}
+          options={isiOptions(t)}
         />
 
         <button
@@ -93,13 +101,15 @@ export function BulkMappingBar({
           className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-indigo-300 bg-white px-3 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-40"
         >
           <Link2 size={15} />
-          Petakan {unmappedInFilter} ke product ini
+          {t(`Petakan ${unmappedInFilter} ke product ini`, `Map ${unmappedInFilter} to this product`)}
         </button>
       </div>
 
       <p className="mt-2 text-xs text-slate-500">
-        Yang sudah dipetakan tidak diubah. Order lama ikut diperbaiki otomatis, jadi pembukuan & stok langsung
-        menyesuaikan.
+        {t(
+          "Yang sudah dipetakan tidak diubah. Order lama ikut diperbaiki otomatis, jadi pembukuan & stok langsung menyesuaikan.",
+          "Already-mapped rows aren't changed. Old orders are fixed automatically too, so bookkeeping & stock adjust right away."
+        )}
       </p>
 
       {/* konfirmasi: terima semua saran */}
@@ -108,20 +118,25 @@ export function BulkMappingBar({
         onClose={() => setConfirm(null)}
         action={action}
         tone="primary"
-        title={`Terima ${suggestable} saran otomatis?`}
-        confirmText="Terapkan saran"
-        busyText="Menerapkan…"
+        title={t(`Terima ${suggestable} saran otomatis?`, `Accept ${suggestable} automatic suggestions?`)}
+        confirmText={t("Terapkan saran", "Apply suggestions")}
+        busyText={t("Menerapkan…", "Applying…")}
         message={
           <>
             <p>
-              {suggestable} SKU di {scopeText} akan dipetakan ke product hasil tebakan, lengkap dengan isi per
-              unit dari teks variannya.
+              {t(
+                `${suggestable} SKU di ${scopeText} akan dipetakan ke product hasil tebakan, lengkap dengan isi per unit dari teks variannya.`,
+                `${suggestable} SKUs in ${scopeText} will be mapped to the guessed product, including the qty per unit guessed from the variant text.`
+              )}
             </p>
             <p className="mt-2">
               {unmappedInFilter - suggestable > 0
-                ? `${unmappedInFilter - suggestable} SKU tanpa saran yang cukup yakin dilewati — petakan manual.`
-                : "Semua SKU di filter ini punya saran."}{" "}
-              Bisa diubah lagi satu per satu setelah ini.
+                ? t(
+                    `${unmappedInFilter - suggestable} SKU tanpa saran yang cukup yakin dilewati. Petakan manual.`,
+                    `${unmappedInFilter - suggestable} SKUs with no confident suggestion are skipped. Map those manually.`
+                  )
+                : t("Semua SKU di filter ini punya saran.", "All SKUs in this filter have a suggestion.")}{" "}
+              {t("Bisa diubah lagi satu per satu setelah ini.", "You can still change each one individually afterward.")}
             </p>
           </>
         }
@@ -139,21 +154,25 @@ export function BulkMappingBar({
         onClose={() => setConfirm(null)}
         action={action}
         tone="primary"
-        title={`Petakan ${unmappedInFilter} SKU ke satu product?`}
-        confirmText="Petakan semua"
-        busyText="Memetakan…"
+        title={t(`Petakan ${unmappedInFilter} SKU ke satu product?`, `Map ${unmappedInFilter} SKUs to one product?`)}
+        confirmText={t("Petakan semua", "Map all")}
+        busyText={t("Memetakan…", "Mapping…")}
         message={
           <>
             <p>
-              Semua SKU belum dipetakan di {scopeText} akan diarahkan ke{" "}
+              {t("Semua SKU belum dipetakan di ", "All unmapped SKUs in ")}
+              {scopeText}
+              {t(" akan diarahkan ke ", " will be pointed to ")}
               <strong className="text-slate-700">{productName}</strong>.
             </p>
             <p className="mt-2">
-              Isi per unit:{" "}
+              {t("Isi per unit: ", "Qty per unit: ")}
               <strong className="text-slate-700">
-                {baseQty === "auto" ? "ditebak dari nama tiap SKU" : `${baseQty} satuan dasar`}
+                {baseQty === "auto"
+                  ? t("ditebak dari nama tiap SKU", "guessed from each SKU's name")
+                  : t(`${baseQty} satuan dasar`, `${baseQty} base units`)}
               </strong>
-              . Saring dulu pakai kotak Cari kalau belum yakin cakupannya.
+              . {t("Saring dulu pakai kotak Cari kalau belum yakin cakupannya.", "Filter first with the Search box if you're not sure about the scope.")}
             </p>
           </>
         }

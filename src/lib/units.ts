@@ -3,6 +3,8 @@
 // user selalu bisa dibaca ulang dalam satuan yang wajar, sementara yang
 // DISIMPAN tetap satuan dasar.
 
+import type { Lang } from "@/lib/i18n";
+
 export type UnitInfo = {
   unit: string; // satuan dasar (mis. sachet)
   packUnit: string; // mis. box
@@ -14,14 +16,17 @@ export type UnitInfo = {
 export type Tier = { key: string; label: string; factor: number };
 
 // Terbesar → terkecil. Product tanpa satuan kecil cuma punya satu tingkat.
-export function tiersOf(u?: UnitInfo): Tier[] {
-  if (!u) return [{ key: "base", label: "satuan dasar", factor: 1 }];
+// lang: opsional, hanya dipakai untuk fallback label "satuan dasar" kalau
+// product belum punya nama satuan sendiri.
+export function tiersOf(u?: UnitInfo, lang: Lang = "id"): Tier[] {
+  const baseFallback = lang === "en" ? "base unit" : "satuan dasar";
+  if (!u) return [{ key: "base", label: baseFallback, factor: 1 }];
   const out: Tier[] = [];
   const hasPack = u.packSize >= 2 && !!u.packUnit;
   const hasKoli = hasPack && u.koliSize >= 2 && !!u.koliUnit;
   if (hasKoli) out.push({ key: "koli", label: u.koliUnit, factor: u.koliSize * u.packSize });
   if (hasPack) out.push({ key: "pack", label: u.packUnit, factor: u.packSize });
-  out.push({ key: "base", label: u.unit || "satuan dasar", factor: 1 });
+  out.push({ key: "base", label: u.unit || baseFallback, factor: 1 });
   return out;
 }
 

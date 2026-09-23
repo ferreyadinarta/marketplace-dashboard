@@ -11,6 +11,7 @@ import {
   emptyCompRow,
   type CompRow,
 } from "@/components/BundleComponentList";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -31,6 +32,7 @@ export function BundleEditor({
   unitOf?: Record<string, UnitInfo>;
   action: Action;
 }) {
+  const t = useT();
   const [isBundle, setIsBundle] = useState(initialIsBundle);
   const [rows, setRows] = useState<CompRow[]>(
     initialComponents.length
@@ -56,11 +58,13 @@ export function BundleEditor({
           onChange={(e) => setIsBundle(e.target.checked)}
           className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
         />
-        <Boxes size={15} className="text-slate-400" /> Product ini bundle (isi gabungan product lain)
+        <Boxes size={15} className="text-slate-400" /> {t("Product ini bundle (isi gabungan product lain)", "This product is a bundle (mixed contents of other products)")}
       </label>
       <p className="mt-1 text-xs text-slate-400">
-        Bundle tidak dihitung stok/opname sendiri. Saat terjual, stok tiap isinya otomatis berkurang &amp;
-        modalnya = jumlah HPP isinya. Jumlah isi ditulis dalam satuan product-nya sendiri.
+        {t(
+          "Bundle tidak dihitung stok/opname sendiri. Saat terjual, stok tiap isinya otomatis berkurang & modalnya = jumlah HPP isinya. Jumlah isi ditulis dalam satuan product-nya sendiri.",
+          "A bundle has no stock/stock count of its own. When sold, the stock of each content item decreases automatically and its cost equals the sum of their COGS. Quantities are written in each content product's own unit."
+        )}
       </p>
 
       {isBundle && (
@@ -75,8 +79,8 @@ export function BundleEditor({
       )}
 
       <div className="mt-4">
-        <SubmitButton variant="outline" pendingText="Menyimpan…" notify="Bundle tersimpan">
-          Simpan Bundle
+        <SubmitButton variant="outline" pendingText={t("Menyimpan…", "Saving…")} notify={t("Bundle tersimpan", "Bundle saved")}>
+          {t("Simpan Bundle", "Save bundle")}
         </SubmitButton>
       </div>
     </form>

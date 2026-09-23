@@ -1,8 +1,9 @@
 import { CheckCircle2, AlertTriangle, Clock, Wallet, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { rupiah, MARKETPLACE_LABEL } from "@/lib/format";
+import { rupiah, marketplaceLabel } from "@/lib/format";
 import { Card, CardHeader, PageHeader, Badge, EmptyState } from "@/components/ui";
 import { waktu, dateKey } from "@/lib/format";
+import { getT } from "@/lib/i18n-server";
 import { SyncPayoutsButton } from "@/components/SyncPayoutsButton";
 import { ManualPayoutForm } from "@/components/ManualPayoutForm";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
@@ -14,6 +15,7 @@ export const maxDuration = 60;
 
 // Rekonsiliasi: bandingkan net order selesai vs dana yang benar-benar cair.
 export default async function RekonsiliasiPage() {
+  const { t, lang } = await getT();
   const stores = await prisma.store.findMany({ orderBy: { name: "asc" } });
   const today = dateKey(new Date());
   // toko tanpa API → pencairannya dicatat manual (grosir/reseller, WA, dll)
@@ -56,34 +58,43 @@ export default async function RekonsiliasiPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dana Cair"
-        description="Cek apakah uang dari marketplace sudah masuk sesuai penjualan. Selisih minus berarti masih ada uang yang belum cair."
+        title={t("Dana Cair", "Payouts")}
+        description={t(
+          "Cek apakah uang dari marketplace sudah masuk sesuai penjualan. Selisih minus berarti masih ada uang yang belum cair.",
+          "Check whether the money from marketplaces has come in as expected. A negative difference means some money hasn't been paid out yet."
+        )}
       />
 
       {stores.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Wallet size={40} />}
-            title="Belum ada toko"
-            description="Rekonsiliasi muncul setelah ada toko Shopee terhubung dan data pencairannya ditarik."
+            title={t("Belum ada toko", "No stores yet")}
+            description={t(
+              "Rekonsiliasi muncul setelah ada toko Shopee terhubung dan data pencairannya ditarik.",
+              "Reconciliation appears once a Shopee store is connected and its payout data has been pulled."
+            )}
           />
         </Card>
       ) : (
         <Card className="overflow-hidden">
           <CardHeader
-            title="Per toko"
-            subtitle="Uang cair dari Shopee diambil otomatis. Toko lain: catat pembayarannya manual."
+            title={t("Per toko", "Per store")}
+            subtitle={t(
+              "Uang cair dari Shopee diambil otomatis. Toko lain: catat pembayarannya manual.",
+              "Money paid out from Shopee is pulled automatically. Other stores: record payments manually."
+            )}
             action={<SyncPayoutsButton action={syncPayouts} />}
           />
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Toko</th>
-                  <th className="px-5 py-3 text-right font-medium">Harusnya cair</th>
-                  <th className="px-5 py-3 text-right font-medium">Sudah cair</th>
-                  <th className="px-5 py-3 text-right font-medium">Selisih</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">{t("Toko", "Store")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Harusnya cair", "Expected")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Sudah cair", "Received")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Selisih", "Difference")}</th>
+                  <th className="px-5 py-3 font-medium">{t("Status", "Status")}</th>
                   <th className="px-5 py-3 font-medium" />
                 </tr>
               </thead>
@@ -95,7 +106,7 @@ export default async function RekonsiliasiPage() {
                     <tr key={r.store.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                       <td className="px-5 py-3">
                         <p className="font-medium text-slate-900">{r.store.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-400">{MARKETPLACE_LABEL[r.store.marketplace]}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">{marketplaceLabel(r.store.marketplace, lang)}</p>
                       </td>
                       <td className="px-5 py-3 text-right text-slate-600">{rupiah(r.netSeharusnya)}</td>
                       <td className="px-5 py-3 text-right text-slate-600">{rupiah(r.danaCair)}</td>
@@ -112,22 +123,22 @@ export default async function RekonsiliasiPage() {
                         {rupiah(Math.abs(r.selisih))}
                         {r.selisih !== 0 && (
                           <span className="ml-1 text-[11px] font-normal text-slate-400">
-                            {r.selisih > 0 ? "lebih" : "kurang"}
+                            {r.selisih > 0 ? t("lebih", "more") : t("kurang", "less")}
                           </span>
                         )}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3">
                         {belumAdaPayout ? (
                           <Badge color="slate">
-                            <Clock size={13} /> Belum ada yang cair
+                            <Clock size={13} /> {t("Belum ada yang cair", "Nothing paid out yet")}
                           </Badge>
                         ) : cocok ? (
                           <Badge color="green">
-                            <CheckCircle2 size={13} /> Cocok
+                            <CheckCircle2 size={13} /> {t("Cocok", "Matches")}
                           </Badge>
                         ) : (
                           <Badge color="amber">
-                            <AlertTriangle size={13} /> Perlu dicek
+                            <AlertTriangle size={13} /> {t("Perlu dicek", "Needs attention")}
                           </Badge>
                         )}
                       </td>
@@ -158,20 +169,20 @@ export default async function RekonsiliasiPage() {
                   <div className="flex flex-col gap-2">
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900">{r.store.name}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">{MARKETPLACE_LABEL[r.store.marketplace]}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{marketplaceLabel(r.store.marketplace, lang)}</p>
                     </div>
                     <span className="self-start whitespace-nowrap">
                       {belumAdaPayout ? (
                         <Badge color="slate">
-                          <Clock size={13} /> Belum ada yang cair
+                          <Clock size={13} /> {t("Belum ada yang cair", "Nothing paid out yet")}
                         </Badge>
                       ) : cocok ? (
                         <Badge color="green">
-                          <CheckCircle2 size={13} /> Cocok
+                          <CheckCircle2 size={13} /> {t("Cocok", "Matches")}
                         </Badge>
                       ) : (
                         <Badge color="amber">
-                          <AlertTriangle size={13} /> Perlu dicek
+                          <AlertTriangle size={13} /> {t("Perlu dicek", "Needs attention")}
                         </Badge>
                       )}
                     </span>
@@ -179,15 +190,15 @@ export default async function RekonsiliasiPage() {
 
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Harusnya cair</span>
+                      <span className="text-[11px] text-slate-400">{t("Harusnya cair", "Expected")}</span>
                       <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.netSeharusnya)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Sudah cair</span>
+                      <span className="text-[11px] text-slate-400">{t("Sudah cair", "Received")}</span>
                       <span className="font-semibold tabular-nums text-slate-600">{rupiah(r.danaCair)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Selisih</span>
+                      <span className="text-[11px] text-slate-400">{t("Selisih", "Difference")}</span>
                       <span
                         className={`font-semibold tabular-nums ${
                           r.selisih === 0
@@ -201,7 +212,7 @@ export default async function RekonsiliasiPage() {
                         {rupiah(Math.abs(r.selisih))}
                         {r.selisih !== 0 && (
                           <span className="ml-1 text-[11px] font-normal text-slate-400">
-                            {r.selisih > 0 ? "lebih" : "kurang"}
+                            {r.selisih > 0 ? t("lebih", "more") : t("kurang", "less")}
                           </span>
                         )}
                       </span>
@@ -228,25 +239,28 @@ export default async function RekonsiliasiPage() {
       {recentPayouts.length > 0 && (
         <Card className="overflow-hidden">
           <CardHeader
-            title="Pencairan Terakhir"
-            subtitle="Order yang dananya rilis di hari yang sama digabung jadi satu pencairan."
+            title={t("Pencairan Terakhir", "Recent Payouts")}
+            subtitle={t(
+              "Order yang dananya rilis di hari yang sama digabung jadi satu pencairan.",
+              "Orders whose funds are released on the same day are grouped into one payout."
+            )}
           />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Tanggal cair</th>
-                  <th className="px-5 py-3 font-medium">Toko</th>
-                  <th className="px-5 py-3 text-right font-medium">Jumlah</th>
+                  <th className="px-5 py-3 font-medium">{t("Tanggal cair", "Payout date")}</th>
+                  <th className="px-5 py-3 font-medium">{t("Toko", "Store")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Jumlah", "Amount")}</th>
                   <th className="px-5 py-3 text-right font-medium">Order</th>
-                  <th className="px-5 py-3 font-medium">Referensi</th>
+                  <th className="px-5 py-3 font-medium">{t("Referensi", "Reference")}</th>
                   <th className="px-5 py-3 font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {recentPayouts.map((p) => (
                   <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                    <td className="px-5 py-3 text-slate-700">{waktu(p.payoutDate).split(",")[0]}</td>
+                    <td className="px-5 py-3 text-slate-700">{waktu(p.payoutDate, lang).split(",")[0]}</td>
                     <td className="px-5 py-3 text-slate-600">{p.store.name}</td>
                     <td className="px-5 py-3 text-right font-medium text-slate-800">{rupiah(p.amount)}</td>
                     <td className="px-5 py-3 text-right text-slate-500">{p._count.orders}</td>
@@ -257,11 +271,17 @@ export default async function RekonsiliasiPage() {
                         id={p.id}
                         trigger={<Trash2 size={15} />}
                         triggerClassName="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                        title="Hapus pencairan ini?"
+                        title={t("Hapus pencairan ini?", "Delete this payout?")}
                         message={
                           <>
-                            Pencairan <strong className="text-slate-700">{rupiah(p.amount)}</strong> untuk{" "}
-                            {p.store.name} akan dihapus. Order yang tertaut jadi belum cair lagi.
+                            {t("Pencairan ", "Payout ")}
+                            <strong className="text-slate-700">{rupiah(p.amount)}</strong>
+                            {t(" untuk ", " for ")}
+                            {p.store.name}
+                            {t(
+                              " akan dihapus. Order yang tertaut jadi belum cair lagi.",
+                              " will be deleted. Linked orders go back to not paid out."
+                            )}
                           </>
                         }
                       />

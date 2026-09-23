@@ -1,4 +1,5 @@
 import { Card, PageHeader } from "@/components/ui";
+import { getT } from "@/lib/i18n-server";
 
 // Skeleton yang tampil INSTAN saat filter diganti (loading boundary Next.js).
 // Memberi feedback "sedang memuat" tanpa layar kosong / data lama menggantung.
@@ -6,12 +7,16 @@ function Bar({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
-export default function PembukuanLoading() {
+export default async function PembukuanLoading() {
+  const { t } = await getT();
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Pembukuan"
-        description="Penjualan tiap product dikelompokkan per grup. Atur rentang tanggal & marketplace, lalu export ke Excel."
+        title={t("Pembukuan", "Bookkeeping")}
+        description={t(
+          "Penjualan tiap product dikelompokkan per grup. Atur rentang tanggal & marketplace, lalu export ke Excel.",
+          "Sales for each product are grouped per bookkeeping group. Set the date range & marketplace, then export to Excel."
+        )}
       />
 
       {/* filter bar */}

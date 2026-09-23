@@ -69,7 +69,7 @@ export async function syncAllStores(days = 30, budgetMs = 45_000): Promise<SyncA
         storeIndex: i + 1,
         ...(p.created != null ? { created: baseCreated + p.created } : {}),
         ...(p.updated != null ? { updated: baseUpdated + p.updated } : {}),
-        message: p.message ? `${s.name} — ${p.message}` : undefined,
+        message: p.message ? `${s.name}: ${p.message}` : undefined,
       });
 
     try {
@@ -96,7 +96,7 @@ export async function syncAllStores(days = 30, budgetMs = 45_000): Promise<SyncA
     partial: res.partial,
     error: res.errors.length ? res.errors.map((e) => `${e.store}: ${e.message}`).join(" · ") : undefined,
     message: res.partial
-      ? `Sebagian: ${res.created} baru, ${res.updated} diperbarui — masih ada sisa`
+      ? `Sebagian: ${res.created} baru, ${res.updated} diperbarui, masih ada sisa`
       : `Selesai: ${res.created} baru, ${res.updated} diperbarui`,
   });
 

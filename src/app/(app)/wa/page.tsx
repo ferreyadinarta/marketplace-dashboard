@@ -7,6 +7,7 @@ import { MultiItemSaleForm } from "@/components/KonsinyasiForms";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Pagination } from "@/components/Pagination";
 import { createWaSale, deleteWaSale } from "./actions";
+import { getT } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function WaPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const { t, lang } = await getT();
   const page = Math.max(1, parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page) ?? "1", 10) || 1);
 
   const where = { store: { marketplace: "WA" } };
@@ -57,34 +59,43 @@ export default async function WaPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Penjualan WA / Offline"
-        description="Catat penjualan manual lewat WhatsApp atau offline ke pembeli langsung. Otomatis masuk ke pembukuan, dashboard, & stok."
+        title={t("Penjualan WA / Offline", "WA / Offline Sales")}
+        description={t(
+          "Catat penjualan manual lewat WhatsApp atau offline ke pembeli langsung. Otomatis masuk ke pembukuan, dashboard, & stok.",
+          "Record manual sales made via WhatsApp or offline directly to a buyer. Automatically added to bookkeeping, the dashboard, and stock."
+        )}
       />
 
       <Card>
-        <CardHeader title="Catat Penjualan WA" subtitle="Satu baris = satu penjualan retail." />
+        <CardHeader
+          title={t("Catat Penjualan WA", "Record a WA Sale")}
+          subtitle={t("Satu baris = satu penjualan retail.", "One row = one retail sale.")}
+        />
         <MultiItemSaleForm variant="wa" products={productOptions} action={createWaSale} today={today} />
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader title={`Riwayat Penjualan (${total})`} subtitle="Penjualan WA / offline yang sudah dicatat." />
+        <CardHeader
+          title={t(`Riwayat Penjualan (${total})`, `Sales History (${total})`)}
+          subtitle={t("Penjualan WA / offline yang sudah dicatat.", "WA / offline sales recorded so far.")}
+        />
         {sales.length === 0 ? (
           <EmptyState
             icon={<Package size={40} />}
-            title="Belum ada penjualan WA"
-            description="Catat penjualan pertama lewat form di atas."
+            title={t("Belum ada penjualan WA", "No WA sales yet")}
+            description={t("Catat penjualan pertama lewat form di atas.", "Record your first sale using the form above.")}
           />
         ) : (
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Tanggal</th>
-                  <th className="px-5 py-3 font-medium">Pembeli</th>
+                  <th className="px-5 py-3 font-medium">{t("Tanggal", "Date")}</th>
+                  <th className="px-5 py-3 font-medium">{t("Pembeli", "Buyer")}</th>
                   <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 text-right font-medium">Jumlah</th>
-                  <th className="px-5 py-3 text-right font-medium">Omzet</th>
-                  <th className="px-5 py-3 text-right font-medium">Hapus</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Jumlah", "Qty")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Omzet", "Revenue")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Hapus", "Delete")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,7 +103,7 @@ export default async function WaPage({
                   const totalQty = o.items.reduce((a, it) => a + it.qty, 0);
                   return (
                     <tr key={o.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                      <td className="whitespace-nowrap px-5 py-3 align-top text-slate-600">{tanggal(o.orderDate)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 align-top text-slate-600">{tanggal(o.orderDate, lang)}</td>
                       <td className="px-5 py-3 align-top text-slate-600">{o.buyerName ?? "-"}</td>
                       <td className="px-5 py-3 align-top font-medium text-slate-900">
                         <div className="space-y-0.5">
@@ -131,7 +142,7 @@ export default async function WaPage({
               return (
                 <div key={o.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-900">{tanggal(o.orderDate)}</div>
+                    <div className="text-sm font-semibold text-slate-900">{tanggal(o.orderDate, lang)}</div>
                     <form action={deleteWaSale} className="inline">
                       <input type="hidden" name="id" value={o.id} />
                       <SubmitButton
@@ -145,7 +156,7 @@ export default async function WaPage({
                   </div>
                   <div className="mt-3 space-y-3">
                     <div>
-                      <span className="text-[11px] text-slate-400">Pembeli</span>
+                      <span className="text-[11px] text-slate-400">{t("Pembeli", "Buyer")}</span>
                       <div className="text-sm text-slate-600">{o.buyerName ?? "-"}</div>
                     </div>
                     <div>
@@ -160,11 +171,11 @@ export default async function WaPage({
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <span className="text-[11px] text-slate-400">Jumlah</span>
+                        <span className="text-[11px] text-slate-400">{t("Jumlah", "Qty")}</span>
                         <div className="text-sm tabular-nums text-slate-600">{totalQty}</div>
                       </div>
                       <div>
-                        <span className="text-[11px] text-slate-400">Omzet</span>
+                        <span className="text-[11px] text-slate-400">{t("Omzet", "Revenue")}</span>
                         <div className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(o.totalAmount)}</div>
                       </div>
                     </div>
@@ -181,7 +192,7 @@ export default async function WaPage({
           from={fromRow}
           to={toRow}
           hrefFor={pageHref}
-          unit="penjualan"
+          unit={t("penjualan", "sales")}
         />
       </Card>
     </div>

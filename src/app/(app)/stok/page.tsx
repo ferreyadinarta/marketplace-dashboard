@@ -7,26 +7,30 @@ import { RestockForm, OpnameCell, MinStockCell, StockControls, BulkOpnamePanel }
 import { RememberFilters } from "@/components/RememberFilters";
 import { NotificationToggle } from "@/components/NotificationToggle";
 import { Pagination, PaginationControls } from "@/components/Pagination";
+import { getT } from "@/lib/i18n-server";
+import type { T } from "@/lib/i18n";
 import { restockProducts, saveOpname, saveBulkOpname, updateMinStock } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const PER_PAGE = 12;
 
-const statusMeta: Record<StockStatus, { label: string; color: "red" | "amber" | "green" | "slate" }> = {
-  OUT: { label: "Habis", color: "red" },
-  LOW: { label: "Menipis", color: "amber" },
-  OK: { label: "Aman", color: "green" },
-  UNSET: { label: "Belum opname", color: "slate" },
-};
+function statusMeta(t: T): Record<StockStatus, { label: string; color: "red" | "amber" | "green" | "slate" }> {
+  return {
+    OUT: { label: t("Habis", "Out of stock"), color: "red" },
+    LOW: { label: t("Menipis", "Low"), color: "amber" },
+    OK: { label: t("Aman", "OK"), color: "green" },
+    UNSET: { label: t("Belum opname", "Not counted yet"), color: "slate" },
+  };
+}
 
 // pengingat opname: dianggap "perlu opname" kalau belum pernah opname
 // atau opname terakhir lebih dari 30 hari lalu.
 const OPNAME_DUE_DAYS = 30;
-function opnameInfo(hasOpname: boolean, anchorAt: Date | null, now: number): { label: string; overdue: boolean } {
-  if (!hasOpname || !anchorAt) return { label: "belum pernah opname", overdue: true };
+function opnameInfo(hasOpname: boolean, anchorAt: Date | null, now: number, t: T): { label: string; overdue: boolean } {
+  if (!hasOpname || !anchorAt) return { label: t("belum pernah opname", "never counted"), overdue: true };
   const days = Math.floor((now - anchorAt.getTime()) / 86_400_000);
-  const label = days <= 0 ? "opname hari ini" : `opname ${days} hari lalu`;
+  const label = days <= 0 ? t("opname hari ini", "counted today") : t(`opname ${days} hari lalu`, `counted ${days} day${days === 1 ? "" : "s"} ago`);
   return { label, overdue: days > OPNAME_DUE_DAYS };
 }
 
@@ -46,6 +50,7 @@ export default async function StokPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getT();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const q = (one(sp.q) ?? "").trim();
@@ -64,7 +69,8 @@ export default async function StokPage({
   };
 
   const now = Date.now();
-  const overdueCount = levels.filter((l) => opnameInfo(l.hasOpname, l.anchorAt, now).overdue).length;
+  const overdueCount = levels.filter((l) => opnameInfo(l.hasOpname, l.anchorAt, now, t).overdue).length;
+  const meta = statusMeta(t);
 
   // filter cari + stok menipis
   const ql = q.toLowerCase();
@@ -88,7 +94,7 @@ export default async function StokPage({
 
   const productOptions = levels.map((l) => ({
     value: l.productId,
-    label: `${l.name} — ${l.sku}`,
+    label: `${l.name} (${l.sku})`,
     unit: l.unit,
     packUnit: l.packUnit,
     packSize: l.packSize,
@@ -124,26 +130,34 @@ export default async function StokPage({
         <RememberFilters storageKey="filters:stok" />
       </Suspense>
       <PageHeader
-        title="Stok"
-        description="Stok berkurang otomatis saat order selesai dan bertambah saat kamu catat barang masuk. Opname = samakan angka di sini dengan hitungan fisik di gudang."
+        title={t("Stok", "Stock")}
+        description={t(
+          "Stok berkurang otomatis saat order selesai dan bertambah saat kamu catat barang masuk. Opname = samakan angka di sini dengan hitungan fisik di gudang.",
+          "Stock automatically decreases when an order is completed and increases when you record stock in. Stock count = match the number here with the physical count in the warehouse."
+        )}
         action={
           <LinkButton href="/stok/hitung" className="w-full sm:w-auto">
-            <ClipboardCheck size={16} /> Hitung stok{overdueCount > 0 ? ` (${overdueCount})` : ""}
+            <ClipboardCheck size={16} /> {t("Hitung stok", "Count stock")}{overdueCount > 0 ? ` (${overdueCount})` : ""}
           </LinkButton>
         }
       />
 
       {/* ringkasan */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard icon={<Boxes size={18} />} label="Total product" value={summary.total} tone="slate" />
-        <StatCard icon={<AlertTriangle size={18} />} label="Stok menipis" value={summary.low} tone="amber" />
-        <StatCard icon={<PackageX size={18} />} label="Stok habis" value={summary.out} tone="red" />
-        <StatCard icon={<CalendarClock size={18} />} label={`Perlu opname (>${OPNAME_DUE_DAYS} hari)`} value={overdueCount} tone={overdueCount > 0 ? "amber" : "slate"} />
+        <StatCard icon={<Boxes size={18} />} label={t("Total product", "Total products")} value={summary.total} tone="slate" />
+        <StatCard icon={<AlertTriangle size={18} />} label={t("Stok menipis", "Low stock")} value={summary.low} tone="amber" />
+        <StatCard icon={<PackageX size={18} />} label={t("Stok habis", "Out of stock")} value={summary.out} tone="red" />
+        <StatCard
+          icon={<CalendarClock size={18} />}
+          label={t(`Perlu opname (>${OPNAME_DUE_DAYS} hari)`, `Needs count (>${OPNAME_DUE_DAYS} days)`)}
+          value={overdueCount}
+          tone={overdueCount > 0 ? "amber" : "slate"}
+        />
       </div>
 
       {/* barang masuk */}
       <Card>
-        <CardHeader title="Barang Masuk (Restock)" subtitle="Catat stok yang baru dibeli/masuk gudang." />
+        <CardHeader title={t("Barang Masuk (Restock)", "Stock In (Restock)")} subtitle={t("Catat stok yang baru dibeli/masuk gudang.", "Record stock that was just bought or brought into the warehouse.")} />
         <RestockForm products={productOptions} action={restockProducts} today={today} />
       </Card>
 
@@ -155,8 +169,8 @@ export default async function StokPage({
       {/* tabel stok */}
       <Card className="overflow-hidden">
         <CardHeader
-          title={`Daftar Stok (${total})`}
-          subtitle="Angka stok menurut sistem. Hitung fisik untuk menyamakannya."
+          title={t(`Daftar Stok (${total})`, `Stock List (${total})`)}
+          subtitle={t("Angka stok menurut sistem. Hitung fisik untuk menyamakannya.", "Stock numbers according to the system. Do a physical count to match them.")}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <StockControls q={q} low={low} sort={sort} />
@@ -169,15 +183,15 @@ export default async function StokPage({
           q || low ? (
             <EmptyState
               icon={<Search size={40} />}
-              title="Tidak ada product yang cocok"
-              description="Coba ubah kata kunci atau matikan filter stok menipis."
+              title={t("Tidak ada product yang cocok", "No matching products")}
+              description={t("Coba ubah kata kunci atau matikan filter stok menipis.", "Try changing the keyword or turning off the low-stock filter.")}
             />
           ) : (
             <EmptyState
               icon={<Boxes size={40} />}
-              title="Belum ada product"
-              description="Tambahkan product dulu di halaman Product, lalu stoknya bisa dihitung di sini."
-              action={<LinkButton href="/master/product">Ke halaman Product</LinkButton>}
+              title={t("Belum ada product", "No products yet")}
+              description={t("Tambahkan product dulu di halaman Product, lalu stoknya bisa dihitung di sini.", "Add a product on the Product page first, then its stock can be counted here.")}
+              action={<LinkButton href="/master/product">{t("Ke halaman Product", "Go to Product page")}</LinkButton>}
             />
           )
         ) : (
@@ -185,20 +199,20 @@ export default async function StokPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Stok</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">{t("Product", "Product")}</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">{t("Stok", "Stock")}</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">{t("Status", "Status")}</th>
                   {/* beda dengan "Terjual" di Pembukuan: di sini barang yang SUDAH KELUAR
                       gudang (terkirim + selesai), di sana yang penjualannya sudah final */}
-                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">Terkirim</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Batas menipis</th>
-                  <th className="whitespace-nowrap px-5 py-3 font-medium">Hitung fisik (opname)</th>
+                  <th className="whitespace-nowrap px-5 py-3 text-right font-medium">{t("Terkirim", "Shipped")}</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">{t("Batas menipis", "Low-stock threshold")}</th>
+                  <th className="whitespace-nowrap px-5 py-3 font-medium">{t("Hitung fisik (opname)", "Physical count (stock count)")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((l) => {
-                  const meta = statusMeta[l.status];
-                  const info = opnameInfo(l.hasOpname, l.anchorAt, now);
+                  const rowMeta = meta[l.status];
+                  const info = opnameInfo(l.hasOpname, l.anchorAt, now, t);
                   return (
                     <tr key={l.productId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                       <td className="min-w-48 px-5 py-3 font-medium text-slate-900">
@@ -234,9 +248,9 @@ export default async function StokPage({
                         )}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3">
-                        <Badge color={meta.color}>
+                        <Badge color={rowMeta.color}>
                           {l.status === "OK" && <CheckCircle2 size={13} />}
-                          {meta.label}
+                          {rowMeta.label}
                         </Badge>
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-right text-slate-500">
@@ -269,8 +283,8 @@ export default async function StokPage({
         {rows.length > 0 && (
           <div className="space-y-3 p-4 md:hidden">
             {rows.map((l) => {
-              const meta = statusMeta[l.status];
-              const info = opnameInfo(l.hasOpname, l.anchorAt, now);
+              const rowMeta = meta[l.status];
+              const info = opnameInfo(l.hasOpname, l.anchorAt, now, t);
               return (
                 <div key={l.productId} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -279,15 +293,15 @@ export default async function StokPage({
                       <p className="font-mono text-xs text-slate-500">{l.sku}</p>
                       <p className={`text-[11px] ${info.overdue ? "text-amber-600" : "text-slate-400"}`}>{info.label}</p>
                     </div>
-                    <Badge color={meta.color}>
+                    <Badge color={rowMeta.color}>
                       {l.status === "OK" && <CheckCircle2 size={13} />}
-                      {meta.label}
+                      {rowMeta.label}
                     </Badge>
                   </div>
 
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div>
-                      <span className="block text-[11px] text-slate-400">Stok</span>
+                      <span className="block text-[11px] text-slate-400">{t("Stok", "Stock")}</span>
                       {l.status === "UNSET" ? (
                         <span className="text-lg font-bold text-slate-300">—</span>
                       ) : (
@@ -309,7 +323,7 @@ export default async function StokPage({
                       )}
                     </div>
                     <div className="text-right">
-                      <span className="block text-[11px] text-slate-400">Terkirim</span>
+                      <span className="block text-[11px] text-slate-400">{t("Terkirim", "Shipped")}</span>
                       <span className="tabular-nums text-slate-600">{l.soldTotal}</span>
                       <span className="ml-1 text-xs text-slate-400">{l.unit}</span>
                     </div>
@@ -317,7 +331,7 @@ export default async function StokPage({
 
                   <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-slate-500">Batas menipis</span>
+                      <span className="text-xs text-slate-500">{t("Batas menipis", "Low-stock threshold")}</span>
                       <MinStockCell productId={l.productId} minStock={l.minStock} action={updateMinStock} />
                     </div>
                     <LinkButton
@@ -325,7 +339,7 @@ export default async function StokPage({
                       variant="outline"
                       className="w-full"
                     >
-                      <ClipboardCheck size={16} /> {l.status === "UNSET" ? "Hitung stok awal" : "Hitung stok fisik"}
+                      <ClipboardCheck size={16} /> {l.status === "UNSET" ? t("Hitung stok awal", "Count opening stock") : t("Hitung stok fisik", "Count physical stock")}
                     </LinkButton>
                   </div>
                 </div>
@@ -341,7 +355,7 @@ export default async function StokPage({
           from={from}
           to={to}
           hrefFor={pageHref}
-          unit="product"
+          unit={t("product", "products")}
         />
       </Card>
 

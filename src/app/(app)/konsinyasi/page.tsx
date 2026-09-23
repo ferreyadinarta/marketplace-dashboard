@@ -12,6 +12,7 @@ import {
   deleteKonsinyasiSale,
   deleteKonsinyasiStore,
 } from "./actions";
+import { getT } from "@/lib/i18n-server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function KonsinyasiPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
+  const { t, lang } = await getT();
   const page = Math.max(1, parseInt((Array.isArray(sp.page) ? sp.page[0] : sp.page) ?? "1", 10) || 1);
 
   const where = { store: { marketplace: "KONSINYASI" } };
@@ -68,12 +70,18 @@ export default async function KonsinyasiPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Grosir / Reseller"
-        description="Penjualan jual putus ke toko/reseller (dibayar di depan saat kirim). Otomatis masuk ke pembukuan, dashboard, & stok."
+        title={t("Grosir / Reseller", "Wholesale / Reseller")}
+        description={t(
+          "Penjualan jual putus ke toko/reseller (dibayar di depan saat kirim). Otomatis masuk ke pembukuan, dashboard, & stok.",
+          "Outright sales to stores/resellers (paid upfront on delivery). Automatically added to bookkeeping, the dashboard, and stock."
+        )}
       />
 
       <Card>
-        <CardHeader title="Toko / Reseller" subtitle="Daftar toko/reseller yang beli grosir dari kamu." />
+        <CardHeader
+          title={t("Toko / Reseller", "Stores / Resellers")}
+          subtitle={t("Daftar toko/reseller yang beli grosir dari kamu.", "List of stores/resellers that buy wholesale from you.")}
+        />
         <AddKonsinyasiStoreForm action={createKonsinyasiStore} existingNames={stores.map((s) => s.name)} />
         {stores.length > 0 && (
           <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto px-5 pb-5">
@@ -89,7 +97,10 @@ export default async function KonsinyasiPage({
       </Card>
 
       <Card>
-        <CardHeader title="Catat Penjualan Grosir" subtitle="Satu baris = satu penjualan jual putus." />
+        <CardHeader
+          title={t("Catat Penjualan Grosir", "Record a Wholesale Sale")}
+          subtitle={t("Satu baris = satu penjualan jual putus.", "One row = one outright sale.")}
+        />
         <MultiItemSaleForm
           variant="grosir"
           stores={storeOptions}
@@ -100,12 +111,15 @@ export default async function KonsinyasiPage({
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader title={`Riwayat Penjualan (${total})`} subtitle="Penjualan grosir yang sudah dicatat." />
+        <CardHeader
+          title={t(`Riwayat Penjualan (${total})`, `Sales History (${total})`)}
+          subtitle={t("Penjualan grosir yang sudah dicatat.", "Wholesale sales recorded so far.")}
+        />
         {sales.length === 0 ? (
           <EmptyState
             icon={<Package size={40} />}
-            title="Belum ada penjualan grosir"
-            description="Catat penjualan pertama lewat form di atas."
+            title={t("Belum ada penjualan grosir", "No wholesale sales yet")}
+            description={t("Catat penjualan pertama lewat form di atas.", "Record your first sale using the form above.")}
           />
         ) : (
           <>
@@ -113,12 +127,12 @@ export default async function KonsinyasiPage({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-3 font-medium">Tanggal</th>
-                  <th className="px-5 py-3 font-medium">Toko / Reseller</th>
+                  <th className="px-5 py-3 font-medium">{t("Tanggal", "Date")}</th>
+                  <th className="px-5 py-3 font-medium">{t("Toko / Reseller", "Store / Reseller")}</th>
                   <th className="px-5 py-3 font-medium">Product</th>
-                  <th className="px-5 py-3 text-right font-medium">Jumlah</th>
-                  <th className="px-5 py-3 text-right font-medium">Omzet</th>
-                  <th className="px-5 py-3 text-right font-medium">Hapus</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Jumlah", "Qty")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Omzet", "Revenue")}</th>
+                  <th className="px-5 py-3 text-right font-medium">{t("Hapus", "Delete")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -126,7 +140,7 @@ export default async function KonsinyasiPage({
                   const totalQty = o.items.reduce((a, it) => a + it.qty, 0);
                   return (
                     <tr key={o.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
-                      <td className="whitespace-nowrap px-5 py-3 align-top text-slate-600">{tanggal(o.orderDate)}</td>
+                      <td className="whitespace-nowrap px-5 py-3 align-top text-slate-600">{tanggal(o.orderDate, lang)}</td>
                       <td className="px-5 py-3 align-top text-slate-600">{o.store.name}</td>
                       <td className="px-5 py-3 align-top font-medium text-slate-900">
                         <div className="space-y-0.5">
@@ -187,15 +201,15 @@ export default async function KonsinyasiPage({
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Tanggal</span>
-                      <span className="text-sm text-slate-600">{tanggal(o.orderDate)}</span>
+                      <span className="text-[11px] text-slate-400">{t("Tanggal", "Date")}</span>
+                      <span className="text-sm text-slate-600">{tanggal(o.orderDate, lang)}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Jumlah</span>
+                      <span className="text-[11px] text-slate-400">{t("Jumlah", "Qty")}</span>
                       <span className="text-sm text-slate-600">{totalQty}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[11px] text-slate-400">Omzet</span>
+                      <span className="text-[11px] text-slate-400">{t("Omzet", "Revenue")}</span>
                       <span className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(o.totalAmount)}</span>
                     </div>
                   </div>
@@ -212,7 +226,7 @@ export default async function KonsinyasiPage({
           from={fromRow}
           to={toRow}
           hrefFor={pageHref}
-          unit="penjualan"
+          unit={t("penjualan", "sales")}
         />
       </Card>
     </div>

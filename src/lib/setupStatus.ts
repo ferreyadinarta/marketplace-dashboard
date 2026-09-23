@@ -1,7 +1,8 @@
 import { prisma } from "./prisma";
+import type { T } from "./i18n";
 
 // Cek progres setup untuk memandu user (tanpa perlu tutorial).
-export async function getSetupStatus() {
+export async function getSetupStatus(t: T) {
   const [storeCount, productCount, noHppCount, noStockCount, unmappedCount] = await Promise.all([
     prisma.store.count(),
     prisma.product.count({ where: { isBundle: false } }),
@@ -16,40 +17,49 @@ export async function getSetupStatus() {
   const steps = [
     {
       key: "toko",
-      cta: "Buka halaman Toko",
+      cta: t("Buka halaman Toko", "Open Stores page"),
       done: storeCount > 0,
-      title: "Tambah toko",
-      desc: "Hubungkan Shopee atau daftarkan toko secara manual.",
+      title: t("Tambah toko", "Add store"),
+      desc: t("Hubungkan Shopee atau daftarkan toko secara manual.", "Connect Shopee or add a store manually."),
       href: "/master/toko",
     },
     {
       key: "product",
-      cta: "Tambah product",
+      cta: t("Tambah product", "Add product"),
       done: productCount > 0,
-      title: "Tambah product",
-      desc: "Daftarkan barang yang kamu jual.",
+      title: t("Tambah product", "Add product"),
+      desc: t("Daftarkan barang yang kamu jual.", "List the items you sell."),
       href: "/master/product?tambah=1",
     },
     {
       key: "hpp",
-      cta: "Isi HPP sekarang",
+      cta: t("Isi HPP sekarang", "Enter COGS now"),
       done: productCount > 0 && noHppCount === 0,
-      title: "Isi HPP (modal)",
+      title: t("Isi HPP (modal)", "Enter COGS"),
       desc:
         noHppCount > 0 && productCount > 0
-          ? `${noHppCount} product belum ada HPP — tanpa ini profit tidak bisa dihitung.`
-          : "Modal tiap product, supaya profit terhitung benar.",
+          ? t(
+              `${noHppCount} product belum ada HPP. Tanpa ini profit tidak bisa dihitung.`,
+              `${noHppCount} ${noHppCount === 1 ? "product is" : "products are"} missing COGS. Without it, profit can't be calculated.`
+            )
+          : t("Modal tiap product, supaya profit terhitung benar.", "Cost per product, so profit is calculated correctly."),
       href: "/master/product?harga=1#isi-harga",
     },
     {
       key: "stok",
-      cta: "Mulai hitung stok",
+      cta: t("Mulai hitung stok", "Start stock count"),
       done: productCount > 0 && noStockCount === 0,
-      title: "Hitung stok awal",
+      title: t("Hitung stok awal", "Count opening stock"),
       desc:
         noStockCount > 0 && productCount > 0
-          ? `${noStockCount} product belum punya stok awal.`
-          : "Hitung stok fisik di gudang sekali, sisanya otomatis.",
+          ? t(
+              `${noStockCount} product belum punya stok awal.`,
+              `${noStockCount} ${noStockCount === 1 ? "product is" : "products are"} missing opening stock.`
+            )
+          : t(
+              "Hitung stok fisik di gudang sekali, sisanya otomatis.",
+              "Count physical stock in the warehouse once, the rest is automatic."
+            ),
       href: "/stok/hitung",
     },
     // Mapping SKU sengaja bukan langkah setup — SKU baru bisa muncul kapan

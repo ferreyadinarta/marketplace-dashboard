@@ -3,6 +3,7 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { SubmitButton } from "@/components/SubmitButton";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -16,9 +17,9 @@ export function ConfirmDialog({
   id,
   title,
   message,
-  confirmText = "Hapus",
+  confirmText,
   confirmIcon,
-  busyText = "Menghapus…",
+  busyText,
   tone = "danger",
   extraFields,
   onConfirm,
@@ -36,6 +37,9 @@ export function ConfirmDialog({
   extraFields?: ReactNode; // input tersembunyi tambahan untuk form konfirmasi
   onConfirm?: () => void; // dipakai kalau konfirmasi TIDAK submit form sendiri (mis. cuma ubah state)
 }) {
+  const t = useT();
+  const resolvedConfirmText = confirmText ?? t("Hapus", "Delete");
+  const resolvedBusyText = busyText ?? t("Menghapus…", "Deleting…");
   const [mounted, setMounted] = useState(false);
   const [show, setShow] = useState(false);
 
@@ -94,7 +98,7 @@ export function ConfirmDialog({
             onClick={onClose}
             className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 sm:flex-none"
           >
-            Batal
+            {t("Batal", "Cancel")}
           </button>
           {onConfirm ? (
             <button
@@ -104,7 +108,7 @@ export function ConfirmDialog({
                 tone === "danger" ? "bg-red-600 hover:bg-red-700" : "bg-indigo-600 hover:bg-indigo-700"
               }`}
             >
-              {confirmText}
+              {resolvedConfirmText}
             </button>
           ) : (
             <form action={action} className="flex-1 sm:flex-none">
@@ -113,10 +117,10 @@ export function ConfirmDialog({
               <SubmitButton
                 variant={tone}
                 icon={confirmIcon}
-                pendingText={busyText}
+                pendingText={resolvedBusyText}
                 className="w-full"
               >
-                {confirmText}
+                {resolvedConfirmText}
               </SubmitButton>
             </form>
           )}

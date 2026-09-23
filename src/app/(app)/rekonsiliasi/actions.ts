@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncShopeePayouts } from "@/lib/shopee/sync";
 import { eventDateFromInput } from "@/lib/format";
+import { getT } from "@/lib/i18n-server";
 
 // Tarik data PENCAIRAN dari Shopee (escrow yang sudah rilis) untuk semua toko
 // Shopee yang terhubung. Order yang dananya sudah cair ditandai ke payout-nya,
@@ -12,6 +13,7 @@ import { eventDateFromInput } from "@/lib/format";
 // Tidak redirect: dipanggil lewat fetch dari tombol di klien, biar halaman tidak
 // beku & user bebas pindah halaman (sama seperti sync order).
 export async function syncPayouts(days = 90) {
+  const { t } = await getT();
   const stores = await prisma.store.findMany({
     where: { marketplace: "SHOPEE", isActive: true, accessToken: { not: null } },
   });
@@ -42,7 +44,7 @@ export async function syncPayouts(days = 90) {
       amount += r.amount;
       unmatched += r.unmatched;
     } catch (e) {
-      errors.push(`${s.name}: ${e instanceof Error ? e.message : "unknown"}`);
+      errors.push(`${s.name}: ${e instanceof Error ? e.message : t("tidak diketahui", "unknown")}`);
     }
   }
 

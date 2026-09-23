@@ -10,6 +10,7 @@ import { BundleEditor } from "@/components/BundleEditor";
 import { rupiah } from "@/lib/format";
 import { tiersOf, splitBase, type UnitInfo } from "@/lib/units";
 import { Collapse } from "@/components/Collapse";
+import { useT } from "@/components/LangProvider";
 
 type Action = (formData: FormData) => void | Promise<void>;
 
@@ -61,6 +62,7 @@ export function ProductRow({
   deleteAction: Action;
   duplicateAction: Action;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   // tampilan "box-first": satuan utama = pack kalau ada, kecil = base
   const [mainUnit, setMainUnit] = useState(packSize > 0 ? packUnit : unit);
@@ -91,14 +93,14 @@ export function ProductRow({
               open ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Pencil size={14} /> {open ? "Tutup" : "Edit"}
+            <Pencil size={14} /> {open ? t("Tutup", "Close") : t("Edit", "Edit")}
           </button>
           <form action={duplicateAction}>
             <input type="hidden" name="id" value={id} />
             <button
               type="submit"
-              title="Duplikat product"
-              aria-label={`Duplikat ${name}`}
+              title={t("Duplikat product", "Duplicate product")}
+              aria-label={t(`Duplikat ${name}`, `Duplicate ${name}`)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               <Copy size={15} />
@@ -110,12 +112,12 @@ export function ProductRow({
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
         {!isBundle && (
           <span className={hpp === 0 ? "text-amber-600" : ""}>
-            HPP <b className={hpp === 0 ? "text-amber-700" : "text-slate-700"}>{hpp === 0 ? "belum diisi" : rupiah(hpp)}</b>
+            {t("HPP", "COGS")} <b className={hpp === 0 ? "text-amber-700" : "text-slate-700"}>{hpp === 0 ? t("belum diisi", "not set") : rupiah(hpp)}</b>
           </span>
         )}
-        <span>Retail <b className="text-slate-700">{rupiah(priceRetail)}</b></span>
-        <span>Grosir <b className="text-slate-700">{rupiah(priceGrosir)}</b></span>
-        <span>Satuan <b className="text-slate-700">{mainUnit}</b></span>
+        <span>{t("Retail", "Retail")} <b className="text-slate-700">{rupiah(priceRetail)}</b></span>
+        <span>{t("Grosir", "Wholesale")} <b className="text-slate-700">{rupiah(priceGrosir)}</b></span>
+        <span>{t("Satuan", "Unit")} <b className="text-slate-700">{mainUnit}</b></span>
         {!isBundle && packSize > 0 && (
           <span>
             1 {packUnit} = <b className="text-slate-700">{packSize} {unit}</b>
@@ -126,7 +128,7 @@ export function ProductRow({
             1 {koliUnit} = <b className="text-slate-700">{koliSize} {packUnit}</b>
           </span>
         )}
-        {groupName && <span>Grup <b className="text-slate-700">{groupName}</b></span>}
+        {groupName && <span>{t("Grup", "Group")} <b className="text-slate-700">{groupName}</b></span>}
       </div>
 
       <Collapse open={open}>
@@ -135,14 +137,17 @@ export function ProductRow({
           className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3"
         >
           <input type="hidden" name="id" value={id} />
-          <Field label="Nama product">
+          <Field label={t("Nama product", "Product name")}>
             <input
               name="name"
               defaultValue={name}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
           </Field>
-          <Field label="SKU internal" hint="Kode unik product. Kalau bentrok dengan SKU lain, perubahan SKU diabaikan.">
+          <Field
+            label={t("SKU internal", "Internal SKU")}
+            hint={t("Kode unik product. Kalau bentrok dengan SKU lain, perubahan SKU diabaikan.", "The product's unique code. If it clashes with another SKU, the change is ignored.")}
+          >
             <input
               name="sku"
               defaultValue={sku}
@@ -154,24 +159,36 @@ export function ProductRow({
             <input type="hidden" name="hpp" value={0} />
           ) : (
             <Field
-              label={`HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`}
-              hint={`Modal untuk 1 ${mainUnit.trim() || "satuan utama"} (bukan per ${smallUnit.trim() || "satuan kecil"}). Dipakai menghitung profit, bukan harga jual.`}
+              label={t(
+                `HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`,
+                `COGS per ${mainUnit.trim() || "main unit"} (Rp)`
+              )}
+              hint={t(
+                `Modal untuk 1 ${mainUnit.trim() || "satuan utama"} (bukan per ${smallUnit.trim() || "satuan kecil"}). Dipakai menghitung profit, bukan harga jual.`,
+                `Cost for 1 ${mainUnit.trim() || "main unit"} (not per ${smallUnit.trim() || "small unit"}). Used to calculate profit, not the selling price.`
+              )}
             >
               <CurrencyInput name="hpp" defaultValue={hpp} />
             </Field>
           )}
-          <Field label="Harga retail (Rp)" hint="Harga jual eceran ke pembeli langsung. Jadi default saat mencatat penjualan WA/offline.">
+          <Field
+            label={t("Harga retail (Rp)", "Retail price (Rp)")}
+            hint={t("Harga jual eceran ke pembeli langsung. Jadi default saat mencatat penjualan WA/offline.", "Retail price to direct buyers. Becomes the default when recording a WA/offline sale.")}
+          >
             <CurrencyInput name="priceRetail" defaultValue={priceRetail} />
           </Field>
-          <Field label="Harga grosir (Rp)" hint="Harga jual ke reseller/toko (lebih murah). Jadi default saat mencatat penjualan grosir.">
+          <Field
+            label={t("Harga grosir (Rp)", "Wholesale price (Rp)")}
+            hint={t("Harga jual ke reseller/toko (lebih murah). Jadi default saat mencatat penjualan grosir.", "Selling price to resellers/stores (cheaper). Becomes the default when recording a wholesale sale.")}
+          >
             <CurrencyInput name="priceGrosir" defaultValue={priceGrosir} />
           </Field>
           <Field
-            label={isBundle ? "Satuan jual" : "Satuan utama"}
+            label={isBundle ? t("Satuan jual", "Selling unit") : t("Satuan utama", "Main unit")}
             hint={
               isBundle
-                ? "Satuan saat bundle ini dijual (mis. box). Isinya diatur di daftar isi bundle di bawah."
-                : "Satuan yang biasa dipakai (mis. box, botol, pcs)."
+                ? t("Satuan saat bundle ini dijual (mis. box). Isinya diatur di daftar isi bundle di bawah.", "The unit this bundle is sold in (e.g. box). Its contents are set in the bundle contents list below.")
+                : t("Satuan yang biasa dipakai (mis. box, botol, pcs).", "The unit you normally use (e.g. box, bottle, pcs).")
             }
           >
             <input
@@ -183,12 +200,15 @@ export function ProductRow({
             />
           </Field>
           {!isBundle && (
-            <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
+            <Field
+              label={t("Satuan kecil (opsional)", "Small unit (optional)")}
+              hint={t("Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.", "If sometimes sold in a smaller unit (e.g. sachet). Leave blank if there isn't one.")}
+            >
               <input
                 name="smallUnit"
                 value={smallUnit}
                 onChange={(e) => setSmallUnit(e.target.value)}
-                placeholder="sachet"
+                placeholder={t("mis: sachet", "e.g. sachet")}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </Field>
@@ -197,8 +217,11 @@ export function ProductRow({
           {!isBundle && (
             <>
               <Field
-                label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
-                hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
+                label={t(
+                  `Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`,
+                  `Contains (1 ${mainUnit.trim() || "main"} = ? ${smallUnit.trim() || "small"})`
+                )}
+                hint={t("Contoh: 1 box = 12 sachet, isi 12. Kosong/0 kalau tanpa satuan kecil.", "Example: 1 box = 12 sachets, enter 12. Leave blank/0 if there's no small unit.")}
               >
                 <input
                   name="isi"
@@ -209,18 +232,24 @@ export function ProductRow({
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
               </Field>
-              <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+              <Field
+                label={t("Satuan koli (opsional)", "Carton unit (optional)")}
+                hint={t("Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.", "The largest unit for incoming stock (e.g. carton = a box containing several boxes). Leave blank if there isn't one.")}
+              >
                 <input
                   name="koliUnit"
                   value={koliU}
                   onChange={(e) => setKoliU(e.target.value)}
-                  placeholder="koli"
+                  placeholder={t("mis: koli", "e.g. carton")}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
               </Field>
               <Field
-                label={`Isi koli (1 ${koliU.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
-                hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+                label={t(
+                  `Isi koli (1 ${koliU.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`,
+                  `Carton contents (1 ${koliU.trim() || "carton"} = ? ${mainUnit.trim() || "box"})`
+                )}
+                hint={t("Contoh: 1 koli = 6 box, isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box).", "Example: 1 carton = 6 boxes, enter 6. Requires the small unit/contents to be set first (carton is calculated from box).")}
               >
                 <input
                   name="isiKoli"
@@ -233,12 +262,12 @@ export function ProductRow({
               </Field>
             </>
           )}
-          <Field label="Grup pembukuan">
-            <Select name="groupId" defaultValue={groupId} placeholder="— Tanpa grup —" options={groupOptions} />
+          <Field label={t("Grup pembukuan", "Bookkeeping group")}>
+            <Select name="groupId" defaultValue={groupId} placeholder={t("Tanpa grup", "No group")} options={groupOptions} />
           </Field>
           <div className="flex items-end">
-            <SubmitButton variant="primary" pendingText="Menyimpan…" notify="Product tersimpan">
-              Simpan
+            <SubmitButton variant="primary" pendingText={t("Menyimpan…", "Saving…")} notify={t("Product tersimpan", "Product saved")}>
+              {t("Simpan", "Save")}
             </SubmitButton>
           </div>
         </form>
@@ -284,6 +313,7 @@ export function MappingRow({
   options: SelectOption[];
   action: Action;
 }) {
+  const t = useT();
   const [value, setValue] = useState(initialProductId);
   const tiers = tiersOf(unitInfo?.[value]);
 
@@ -291,7 +321,7 @@ export function MappingRow({
   const [qty, setQty] = useState(String(init.qty));
   const [tier, setTier] = useState(init.tier);
 
-  const factor = tiers.find((t) => t.key === tier)?.factor ?? 1;
+  const factor = tiers.find((tr) => tr.key === tier)?.factor ?? 1;
   const baseQty = Math.max(1, Math.floor(Number(qty) || 0)) * factor;
   const baseUnit = tiers[tiers.length - 1].label;
   const dirty = value !== initialProductId || baseQty !== (initialBaseQty || 1);
@@ -343,9 +373,9 @@ export function MappingRow({
         >
           <Sparkles size={12} className="shrink-0" />
           <span className="truncate">
-            Saran: <b>{suggestion.productName}</b> · isi {suggestion.baseQty}
+            {t("Saran", "Suggestion")}: <b>{suggestion.productName}</b> · {t("isi", "contains")} {suggestion.baseQty}
           </span>
-          <span className="shrink-0 font-semibold underline">Pakai &amp; simpan</span>
+          <span className="shrink-0 font-semibold underline">{t("Pakai & simpan", "Use & save")}</span>
         </button>
       )}
 
@@ -356,7 +386,7 @@ export function MappingRow({
             name="productId"
             value={value}
             onValueChange={chooseProduct}
-            placeholder="— Belum dipetakan —"
+            placeholder={t("Belum dipetakan", "Not mapped yet")}
             className="w-full"
             options={options}
             searchable
@@ -367,30 +397,33 @@ export function MappingRow({
             satuannya belum diketahui, jadi kolomnya disembunyikan biar bersih. */}
         {value && (
           <div className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
-            isi
+            {t("isi", "contains")}
             <input
-              aria-label="Isi per unit yang dijual"
+              aria-label={t("Isi per unit yang dijual", "Quantity per unit sold")}
               type="number"
               min="1"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
-              title={`Berapa banyak untuk 1 unit yang dijual di marketplace (disimpan sebagai ${baseUnit})`}
+              title={t(
+                `Berapa banyak untuk 1 unit yang dijual di marketplace (disimpan sebagai ${baseUnit})`,
+                `How many for 1 unit sold on the marketplace (stored as ${baseUnit})`
+              )}
               className="h-9 w-14 rounded-lg border border-slate-300 px-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
             {tiers.length > 1 ? (
               <div className="flex h-9 overflow-hidden rounded-lg border border-slate-300 text-[11px]">
-                {tiers.map((t) => (
+                {tiers.map((tr) => (
                   <button
-                    key={t.key}
+                    key={tr.key}
                     type="button"
-                    onClick={() => setTier(t.key)}
+                    onClick={() => setTier(tr.key)}
                     className={
-                      tier === t.key
+                      tier === tr.key
                         ? "bg-indigo-600 px-2 font-medium text-white"
                         : "px-2 text-slate-600 hover:bg-slate-50"
                     }
                   >
-                    {t.label}
+                    {tr.label}
                   </button>
                 ))}
               </div>
@@ -405,14 +438,14 @@ export function MappingRow({
           className={`w-20 shrink-0 justify-center px-2 py-2 text-xs ${dirty ? "ring-2 ring-indigo-200" : "text-slate-400"}`}
           pendingText="…"
         >
-          {dirty ? "Simpan" : "Tersimpan"}
+          {dirty ? t("Simpan", "Save") : t("Tersimpan", "Saved")}
         </SubmitButton>
       </div>
 
       {/* total dalam satuan dasar — cuma perlu ditampilkan kalau bukan 1:1 */}
       {value && factor > 1 && (
         <p className="text-[11px] text-slate-400">
-          = {baseQty} {baseUnit} per 1 unit terjual
+          = {baseQty} {baseUnit} {t("per 1 unit terjual", "per unit sold")}
         </p>
       )}
 

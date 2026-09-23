@@ -1,5 +1,6 @@
 import { getStockLevels } from "@/lib/stock";
 import { StockCounter } from "@/components/StockCounter";
+import { getT } from "@/lib/i18n-server";
 import { saveOpname } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export default async function HitungStokPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const { t } = await getT();
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const startId = one(sp.id) ?? "";
@@ -35,7 +37,12 @@ export default async function HitungStokPage({
       current: l.current,
       known: l.status !== "UNSET",
       due,
-      lastLabel: !l.hasOpname || days === null ? "Belum pernah dihitung" : days <= 0 ? "Dihitung hari ini" : `Terakhir dihitung ${days} hari lalu`,
+      lastLabel:
+        !l.hasOpname || days === null
+          ? t("Belum pernah dihitung", "Not counted yet")
+          : days <= 0
+            ? t("Dihitung hari ini", "Counted today")
+            : t(`Terakhir dihitung ${days} hari lalu`, `Last counted ${days} day${days === 1 ? "" : "s"} ago`),
     };
   });
 

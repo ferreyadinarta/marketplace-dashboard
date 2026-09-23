@@ -3,20 +3,22 @@
 import { useState, useRef, useEffect, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker, type DateRange } from "react-day-picker";
-import { id as localeId } from "date-fns/locale";
-import { format } from "date-fns";
+import { enGB, id as idLocale } from "date-fns/locale";
+import { format, type Locale } from "date-fns";
 import { CalendarRange, ChevronDown } from "lucide-react";
+import { useT, useLang } from "@/components/LangProvider";
+import type { T } from "@/lib/i18n";
 import "react-day-picker/style.css";
 
 function ymd(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
-function labelDate(d: Date) {
-  return format(d, "d MMM yyyy", { locale: localeId });
+function labelDate(d: Date, locale: Locale) {
+  return format(d, "d MMM yyyy", { locale });
 }
 
 // preset relatif terhadap hari ini
-function buildPresets() {
+function buildPresets(t: T) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const minus = (n: number) => {
@@ -29,14 +31,14 @@ function buildPresets() {
   const lastLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
 
   return [
-    { key: "today", label: "Hari ini", from: today, to: today },
-    { key: "7d", label: "7 hari terakhir", from: minus(6), to: today },
-    { key: "30d", label: "30 hari terakhir", from: minus(29), to: today },
-    { key: "90d", label: "90 hari terakhir", from: minus(89), to: today },
-    { key: "month", label: "Bulan ini", from: firstThisMonth, to: today },
+    { key: "today", label: t("Hari ini", "Today"), from: today, to: today },
+    { key: "7d", label: t("7 hari terakhir", "Last 7 days"), from: minus(6), to: today },
+    { key: "30d", label: t("30 hari terakhir", "Last 30 days"), from: minus(29), to: today },
+    { key: "90d", label: t("90 hari terakhir", "Last 90 days"), from: minus(89), to: today },
+    { key: "month", label: t("Bulan ini", "This month"), from: firstThisMonth, to: today },
     {
       key: "lastmonth",
-      label: "Bulan lalu",
+      label: t("Bulan lalu", "Last month"),
       from: firstLastMonth,
       to: lastLastMonth,
     },
@@ -59,6 +61,9 @@ export default function DateRangePicker({
   const [open, setOpen] = useState(false);
   const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT();
+  const lang = useLang();
+  const dfLocale = lang === "en" ? enGB : idLocale;
 
   const isAll =
     params.get("all") === "1" || (defaultAll && !params.get("from") && !params.get("to"));
@@ -142,10 +147,10 @@ export default function DateRangePicker({
     setOpen(false);
   }
 
-  const presets = buildPresets();
+  const presets = buildPresets(t);
   const buttonLabel = isAll
-    ? "Semua data"
-    : `${labelDate(new Date(`${fromStr}T00:00:00`))} – ${labelDate(new Date(`${toStr}T00:00:00`))}`;
+    ? t("Semua data", "All data")
+    : `${labelDate(new Date(`${fromStr}T00:00:00`), dfLocale)} – ${labelDate(new Date(`${toStr}T00:00:00`), dfLocale)}`;
 
   const rdpStyle = {
     "--rdp-accent-color": "#4f46e5",
@@ -189,7 +194,7 @@ export default function DateRangePicker({
           {/* preset + N hari */}
           <div className="flex flex-col border-b border-slate-100 p-3 sm:w-48 sm:border-b-0 sm:border-r">
             <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Pilihan cepat
+              {t("Pilihan cepat", "Quick picks")}
             </p>
             <div className="grid grid-cols-2 gap-0.5 sm:grid-cols-1">
               {presets.map((p) => (
@@ -207,13 +212,13 @@ export default function DateRangePicker({
                 onClick={clearRange}
                 className="rounded-lg px-3 py-1.5 text-left text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
               >
-                Semua data
+                {t("Semua data", "All data")}
               </button>
             </div>
 
             <div className="mt-auto border-t border-slate-100 pt-3">
               <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                Hari terakhir
+                {t("Hari terakhir", "Last days")}
               </p>
               <div className="flex items-center gap-2 px-1">
                 <input
@@ -221,10 +226,10 @@ export default function DateRangePicker({
                   min="1"
                   value={days}
                   onChange={(e) => previewLastNDays(e.target.value)}
-                  placeholder="ex: 14"
+                  placeholder={t("cth: 14", "e.g. 14")}
                   className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
-                <span className="shrink-0 text-xs text-slate-400">hari</span>
+                <span className="shrink-0 text-xs text-slate-400">{t("hari", "days")}</span>
               </div>
             </div>
           </div>
@@ -233,7 +238,7 @@ export default function DateRangePicker({
           <div className="flex flex-col p-3">
             <DayPicker
               mode="range"
-              locale={localeId}
+              locale={dfLocale}
               selected={range}
               onSelect={setRange}
               month={month}
@@ -248,7 +253,7 @@ export default function DateRangePicker({
                 onClick={cancel}
                 className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
               >
-                Batal
+                {t("Batal", "Cancel")}
               </button>
               <button
                 type="button"
@@ -258,7 +263,7 @@ export default function DateRangePicker({
                 }
                 className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
               >
-                Terapkan
+                {t("Terapkan", "Apply")}
               </button>
             </div>
           </div>

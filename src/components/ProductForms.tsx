@@ -13,6 +13,7 @@ import {
   emptyCompRow,
   type CompRow,
 } from "@/components/BundleComponentList";
+import { useT } from "@/components/LangProvider";
 
 type Group = { id: string; name: string };
 type Action = (formData: FormData) => void | Promise<void>;
@@ -49,6 +50,7 @@ export function AddProductForm({
   productOptions?: SelectOption[]; // calon isi bundle (product biasa saja)
   unitOf?: Record<string, UnitInfo>;
 }) {
+  const t = useT();
   const [errors, setErrors] = useState<{ name?: string; sku?: string }>({});
   const [mainUnit, setMainUnit] = useState("box");
   const [smallUnit, setSmallUnit] = useState("");
@@ -80,8 +82,8 @@ export function AddProductForm({
     const name = String(fd.get("name") ?? "").trim();
     const sku = String(fd.get("sku") ?? "").trim();
     const errs: { name?: string; sku?: string } = {};
-    if (!name) errs.name = "Nama product wajib diisi.";
-    if (!sku) errs.sku = "SKU internal wajib diisi.";
+    if (!name) errs.name = t("Nama product wajib diisi.", "Product name is required.");
+    if (!sku) errs.sku = t("SKU internal wajib diisi.", "Internal SKU is required.");
     if (Object.keys(errs).length) {
       e.preventDefault();
       setErrors(errs);
@@ -110,8 +112,8 @@ export function AddProductForm({
       <div className="sm:col-span-2">
         <div className="inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
           {([
-            { key: "plain", label: "Product biasa", icon: <Package size={14} /> },
-            { key: "bundle", label: "Bundle (isi campur)", icon: <Boxes size={14} /> },
+            { key: "plain", label: t("Product biasa", "Regular product"), icon: <Package size={14} /> },
+            { key: "bundle", label: t("Bundle (isi campur)", "Bundle (mixed contents)"), icon: <Boxes size={14} /> },
           ] as const).map((m) => (
             <button
               key={m.key}
@@ -130,53 +132,61 @@ export function AddProductForm({
         </div>
         {isBundle && (
           <p className="mt-2 text-xs text-slate-500">
-            Bundle tidak punya stok & HPP sendiri: stok yang berkurang adalah isinya, modalnya = jumlah HPP
-            isinya. Isi satuan jual saja (mis. box), lalu daftar isinya di bawah.
+            {t(
+              "Bundle tidak punya stok & HPP sendiri: stok yang berkurang adalah isinya, modalnya = jumlah HPP isinya. Isi satuan jual saja (mis. box), lalu daftar isinya di bawah.",
+              "A bundle has no stock or COGS of its own: the stock that decreases is its contents, and its cost is the sum of their COGS. Just fill in the selling unit (e.g. box), then list its contents below."
+            )}
           </p>
         )}
       </div>
 
-      <Field label="Nama product" error={errors.name}>
+      <Field label={t("Nama product", "Product name")} error={errors.name}>
         <input
           name="name"
           onInput={() => errors.name && clear("name")}
-          placeholder="ex: Flimty Fiber Blackcurrant"
+          placeholder={t("mis: Flimty Fiber Blackcurrant", "e.g. Flimty Fiber Blackcurrant")}
           className={`${inputClass} ${errors.name ? inputErrorClass : ""}`}
         />
       </Field>
       <Field
-        label="SKU internal"
-        hint="Kode unik product versi kamu sendiri, bukan SKU marketplace."
+        label={t("SKU internal", "Internal SKU")}
+        hint={t("Kode unik product versi kamu sendiri, bukan SKU marketplace.", "Your own unique product code, not the marketplace SKU.")}
         error={errors.sku}
       >
         <input
           name="sku"
           onInput={() => errors.sku && clear("sku")}
-          placeholder="ex: FLM-FIBER-BC"
+          placeholder={t("mis: FLM-FIBER-BC", "e.g. FLM-FIBER-BC")}
           className={`${inputClass} ${errors.sku ? inputErrorClass : ""}`}
         />
       </Field>
       {!isBundle && (
         <Field
-          label={`HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`}
-          hint={`Modal untuk 1 ${mainUnit.trim() || "satuan utama"} — satuan yang biasa kamu beli. Bukan per ${smallUnit.trim() || "satuan kecil"}, bukan per koli.`}
+          label={t(
+            `HPP / Modal per ${mainUnit.trim() || "satuan utama"} (Rp)`,
+            `COGS per ${mainUnit.trim() || "main unit"} (Rp)`
+          )}
+          hint={t(
+            `Modal untuk 1 ${mainUnit.trim() || "satuan utama"}, satuan yang biasa kamu beli. Bukan per ${smallUnit.trim() || "satuan kecil"}, bukan per koli.`,
+            `Cost for 1 ${mainUnit.trim() || "main unit"}, the unit you usually buy in. Not per ${smallUnit.trim() || "small unit"}, not per carton.`
+          )}
         >
           <CurrencyInput name="hpp" placeholder="0" />
         </Field>
       )}
       <Field
-        label={isBundle ? "Satuan jual" : "Satuan utama"}
+        label={isBundle ? t("Satuan jual", "Selling unit") : t("Satuan utama", "Main unit")}
         hint={
           isBundle
-            ? "Satuan saat bundle ini dijual (mis. box). Isi per box diatur di daftar isi."
-            : "Satuan yang biasa dipakai (mis. box, botol, pcs)."
+            ? t("Satuan saat bundle ini dijual (mis. box). Isi per box diatur di daftar isi.", "The unit this bundle is sold in (e.g. box). Contents per box are set in the list below.")
+            : t("Satuan yang biasa dipakai (mis. box, botol, pcs).", "The unit you normally use (e.g. box, bottle, pcs).")
         }
       >
         <input
           name="mainUnit"
           value={mainUnit}
           onChange={(e) => setMainUnit(e.target.value)}
-          placeholder="ex: box"
+          placeholder={t("mis: box", "e.g. box")}
           className={inputClass}
         />
       </Field>
@@ -184,57 +194,69 @@ export function AddProductForm({
           lewat daftar isi, bukan lewat konversi satuan */}
       {!isBundle && (
         <>
-          <Field label="Satuan kecil (opsional)" hint="Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.">
+          <Field
+            label={t("Satuan kecil (opsional)", "Small unit (optional)")}
+            hint={t("Kalau kadang dijual eceran lebih kecil (mis. sachet). Kosongkan kalau tidak ada.", "If sometimes sold in a smaller unit (e.g. sachet). Leave blank if there isn't one.")}
+          >
             <input
               name="smallUnit"
               value={smallUnit}
               onChange={(e) => setSmallUnit(e.target.value)}
-              placeholder="ex: sachet"
+              placeholder={t("mis: sachet", "e.g. sachet")}
               className={inputClass}
             />
           </Field>
           <Field
-            label={`Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`}
-            hint="Contoh: 1 box = 12 sachet → isi 12. Kosong/0 kalau tanpa satuan kecil."
+            label={t(
+              `Isi (1 ${mainUnit.trim() || "utama"} = ? ${smallUnit.trim() || "kecil"})`,
+              `Contains (1 ${mainUnit.trim() || "main"} = ? ${smallUnit.trim() || "small"})`
+            )}
+            hint={t("Contoh: 1 box = 12 sachet, isi 12. Kosong/0 kalau tanpa satuan kecil.", "Example: 1 box = 12 sachets, enter 12. Leave blank/0 if there's no small unit.")}
           >
-            <input name="isi" type="number" min="0" placeholder="ex: 12" className={inputClass} />
+            <input name="isi" type="number" min="0" placeholder={t("mis: 12", "e.g. 12")} className={inputClass} />
           </Field>
-          <Field label="Satuan koli (opsional)" hint="Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.">
+          <Field
+            label={t("Satuan koli (opsional)", "Carton unit (optional)")}
+            hint={t("Satuan terbesar saat barang masuk (mis. koli = dus isi beberapa box). Kosongkan kalau tidak ada.", "The largest unit for incoming stock (e.g. carton = a box containing several boxes). Leave blank if there isn't one.")}
+          >
             <input
               name="koliUnit"
               value={koliUnit}
               onChange={(e) => setKoliUnit(e.target.value)}
-              placeholder="ex: koli"
+              placeholder={t("mis: koli", "e.g. carton")}
               className={inputClass}
             />
           </Field>
           <Field
-            label={`Isi koli (1 ${koliUnit.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`}
-            hint="Contoh: 1 koli = 6 box → isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box)."
+            label={t(
+              `Isi koli (1 ${koliUnit.trim() || "koli"} = ? ${mainUnit.trim() || "box"})`,
+              `Carton contents (1 ${koliUnit.trim() || "carton"} = ? ${mainUnit.trim() || "box"})`
+            )}
+            hint={t("Contoh: 1 koli = 6 box, isi 6. Butuh satuan kecil/isi dulu (koli dihitung dari box).", "Example: 1 carton = 6 boxes, enter 6. Requires the small unit/contents to be set first (carton is calculated from box).")}
           >
-            <input name="isiKoli" type="number" min="0" placeholder="ex: 6" className={inputClass} />
+            <input name="isiKoli" type="number" min="0" placeholder={t("mis: 6", "e.g. 6")} className={inputClass} />
           </Field>
         </>
       )}
-      <Field label="Harga retail (Rp)" hint="Default harga jual WA/offline. Bisa diubah saat mencatat penjualan.">
+      <Field label={t("Harga retail (Rp)", "Retail price (Rp)")} hint={t("Default harga jual WA/offline. Bisa diubah saat mencatat penjualan.", "Default selling price for WA/offline sales. Can be changed when recording a sale.")}>
         <CurrencyInput name="priceRetail" placeholder="0" />
       </Field>
-      <Field label="Harga grosir (Rp)" hint="Default harga jual ke reseller. Bisa diubah saat mencatat penjualan.">
+      <Field label={t("Harga grosir (Rp)", "Wholesale price (Rp)")} hint={t("Default harga jual ke reseller. Bisa diubah saat mencatat penjualan.", "Default selling price to resellers. Can be changed when recording a sale.")}>
         <CurrencyInput name="priceGrosir" placeholder="0" />
       </Field>
-      <Field label="Grup pembukuan">
+      <Field label={t("Grup pembukuan", "Bookkeeping group")}>
         <Select
           name="groupId"
-          placeholder="— Tanpa grup —"
+          placeholder={t("Tanpa grup", "No group")}
           options={[
-            { value: "", label: "— Tanpa grup —" },
+            { value: "", label: t("Tanpa grup", "No group") },
             ...groups.map((g) => ({ value: g.id, label: g.name })),
           ]}
         />
       </Field>
       {isBundle && (
         <div className="sm:col-span-2">
-          <p className="mb-2 text-sm font-medium text-slate-700">Isi bundle</p>
+          <p className="mb-2 text-sm font-medium text-slate-700">{t("Isi bundle", "Bundle contents")}</p>
           <BundleComponentList
             rows={comps}
             onChange={setComps}
@@ -242,7 +264,10 @@ export function AddProductForm({
             unitOf={unitOf}
           />
           <p className="mt-2 text-xs text-slate-400">
-            Contoh box mix 3 rasa: tiap rasa 4 sachet. Jumlah ditulis dalam satuan product isinya.
+            {t(
+              "Contoh box mix 3 rasa: tiap rasa 4 sachet. Jumlah ditulis dalam satuan product isinya.",
+              "Example, a box mixing 3 flavors: 4 sachets of each flavor. Quantities are written in each content product's own unit."
+            )}
           </p>
         </div>
       )}
@@ -253,10 +278,10 @@ export function AddProductForm({
         <SubmitButton
           variant="primary"
           icon={<Plus size={16} />}
-          pendingText="Menyimpan…"
-          notify={isBundle ? "Bundle ditambahkan" : "Product ditambahkan"}
+          pendingText={t("Menyimpan…", "Saving…")}
+          notify={isBundle ? t("Bundle ditambahkan", "Bundle added") : t("Product ditambahkan", "Product added")}
         >
-          {isBundle ? "Simpan Bundle" : "Simpan Product"}
+          {isBundle ? t("Simpan Bundle", "Save bundle") : t("Simpan Product", "Save product")}
         </SubmitButton>
       </div>
     </form>
@@ -267,6 +292,7 @@ export function AddProductForm({
 const POPOVER_W = 224; // w-56
 
 function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -281,8 +307,8 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
-      const t = e.target as Node;
-      if (ref.current?.contains(t) || popRef.current?.contains(t)) return;
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || popRef.current?.contains(target)) return;
       setOpen(false);
     }
     document.addEventListener("mousedown", onDoc);
@@ -324,7 +350,7 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
         <button
           type="button"
           onClick={toggle}
-          aria-label={`Hapus grup ${group.name}`}
+          aria-label={t(`Hapus grup ${group.name}`, `Delete group ${group.name}`)}
           className="shrink-0 rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-red-600"
         >
           <X size={12} />
@@ -343,8 +369,9 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
             }}
           >
             <p className="text-xs leading-relaxed text-slate-600 [overflow-wrap:anywhere]">
-              Hapus grup <span className="font-semibold text-slate-800">{group.name}</span>? Product-nya
-              jadi <span className="font-medium">tanpa grup</span> (tidak ikut terhapus).
+              {t("Hapus grup", "Delete group")} <span className="font-semibold text-slate-800">{group.name}</span>?{" "}
+              {t("Product-nya jadi", "Its products become")}{" "}
+              <span className="font-medium">{t("tanpa grup", "ungrouped")}</span> ({t("tidak ikut terhapus", "they are not deleted")}).
             </p>
             <div className="mt-2 flex justify-end gap-2">
               <button
@@ -352,12 +379,12 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
               >
-                Batal
+                {t("Batal", "Cancel")}
               </button>
               <form action={deleteAction} onSubmit={() => setOpen(false)}>
                 <input type="hidden" name="id" value={group.id} />
                 <SubmitButton variant="danger" className="px-2.5 py-1 text-xs" pendingText="…">
-                  Hapus
+                  {t("Hapus", "Delete")}
                 </SubmitButton>
               </form>
             </div>
@@ -378,6 +405,7 @@ export function AddGroupForm({
   action: Action;
   deleteAction: Action;
 }) {
+  const t = useT();
   const [error, setError] = useState<string | undefined>();
 
   function validate(e: FormEvent<HTMLFormElement>) {
@@ -385,10 +413,10 @@ export function AddGroupForm({
     const name = String(fd.get("name") ?? "").trim();
     if (!name) {
       e.preventDefault();
-      setError("Nama grup wajib diisi.");
+      setError(t("Nama grup wajib diisi.", "Group name is required."));
     } else if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
       e.preventDefault();
-      setError("Grup dengan nama ini sudah ada.");
+      setError(t("Grup dengan nama ini sudah ada.", "A group with this name already exists."));
     } else {
       setError(undefined);
     }
@@ -397,23 +425,23 @@ export function AddGroupForm({
   return (
     <div className="space-y-4 p-5">
       <form action={action} onSubmit={validate} noValidate className="space-y-4">
-        <Field label="Nama grup" error={error}>
+        <Field label={t("Nama grup", "Group name")} error={error}>
           <input
             name="name"
             onInput={() => error && setError(undefined)}
-            placeholder="ex: Flimty"
+            placeholder={t("mis: Flimty", "e.g. Flimty")}
             className={`${inputClass} ${error ? inputErrorClass : ""}`}
           />
         </Field>
-        <SubmitButton variant="outline" icon={<FolderPlus size={16} />} pendingText="Menyimpan…">
-          Tambah Grup
+        <SubmitButton variant="outline" icon={<FolderPlus size={16} />} pendingText={t("Menyimpan…", "Saving…")}>
+          {t("Tambah Grup", "Add group")}
         </SubmitButton>
       </form>
       <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto pt-1">
         {groups.length ? (
           groups.map((g) => <GroupChip key={g.id} group={g} deleteAction={deleteAction} />)
         ) : (
-          <span className="text-xs text-slate-400">Belum ada grup</span>
+          <span className="text-xs text-slate-400">{t("Belum ada grup", "No groups yet")}</span>
         )}
       </div>
     </div>

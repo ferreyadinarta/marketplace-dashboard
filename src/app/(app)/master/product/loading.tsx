@@ -1,15 +1,20 @@
 import { Card, PageHeader } from "@/components/ui";
+import { getT } from "@/lib/i18n-server";
 
 function Bar({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
-export default function MasterProductLoading() {
+export default async function MasterProductLoading() {
+  const { t } = await getT();
   return (
     <div className="space-y-6">
       <PageHeader
         title="Product"
-        description="Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit."
+        description={t(
+          "Daftar product beserta HPP (modal) dan grup pembukuannya. HPP dipakai untuk menghitung profit.",
+          "List of products with their COGS and bookkeeping group. COGS is used to calculate profit."
+        )}
       />
 
       {/* isi harga massal + bersihkan product */}

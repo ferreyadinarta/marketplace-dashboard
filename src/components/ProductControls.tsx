@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useT } from "@/components/LangProvider";
 
 // ---------- Search (nama / SKU) ----------
 export function ProductSearch({ defaultValue }: { defaultValue: string }) {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState(defaultValue);
@@ -35,14 +37,14 @@ export function ProductSearch({ defaultValue }: { defaultValue: string }) {
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Cari nama atau SKU…"
+        placeholder={t("Cari nama atau SKU…", "Search name or SKU…")}
         className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-64"
       />
       {q && (
         <button
           type="button"
           onClick={() => setQ("")}
-          aria-label="Bersihkan"
+          aria-label={t("Bersihkan", "Clear")}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100"
         >
           <X size={14} />
@@ -62,6 +64,7 @@ export function DeleteProductButton({
   name: string;
   action: (formData: FormData) => void | Promise<void>;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   return (
@@ -69,8 +72,8 @@ export function DeleteProductButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`Hapus ${name}`}
-        title="Hapus product"
+        aria-label={t(`Hapus ${name}`, `Delete ${name}`)}
+        title={t("Hapus product", "Delete product")}
         className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
       >
         <Trash2 size={16} />
@@ -81,11 +84,11 @@ export function DeleteProductButton({
         onClose={() => setOpen(false)}
         action={action}
         id={id}
-        title="Hapus product ini?"
+        title={t("Hapus product ini?", "Delete this product?")}
         message={
           <>
-            <span className="font-medium text-slate-700">{name}</span> akan dihapus permanen dan tidak
-            bisa dikembalikan.
+            <span className="font-medium text-slate-700">{name}</span>{" "}
+            {t("akan dihapus permanen dan tidak bisa dikembalikan.", "will be permanently deleted and cannot be recovered.")}
           </>
         }
         confirmIcon={<Trash2 size={15} />}

@@ -122,8 +122,8 @@ export async function runSyncRound(input: RoundInput): Promise<RoundResult> {
       message: !r.partial
         ? `Selesai: ${created} baru, ${updated} diperbarui`
         : willContinue
-          ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — sisanya dilanjutkan otomatis`
-          : `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui — sudah ${MAX_ROUNDS} putaran, klik Sync lagi kalau masih ada sisa`,
+          ? `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui. Sisanya dilanjutkan otomatis`
+          : `Putaran ${round} selesai: ${created} baru, ${updated} diperbarui. Sudah ${MAX_ROUNDS} putaran, klik Sync lagi kalau masih ada sisa`,
     });
 
     revalidatePath("/master/toko");

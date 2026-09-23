@@ -19,39 +19,46 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/ui";
 import { logout } from "@/app/login/actions";
+import { LangToggle } from "@/components/LangToggle";
+import { useT } from "@/components/LangProvider";
+import type { T } from "@/lib/i18n";
 
 // Dikelompokkan per tugas user: lihat hasil → catat harian → atur data.
-const groups = [
-  {
-    label: "Lihat hasil",
-    items: [
-      { href: "/", label: "Dashboard", desc: "Omzet & profit", icon: LayoutDashboard },
-      { href: "/pembukuan", label: "Pembukuan", desc: "Rincian per product", icon: BookOpen },
-      { href: "/rekonsiliasi", label: "Dana Cair", desc: "Uang dari marketplace", icon: Wallet },
-    ],
-  },
-  {
-    label: "Catat harian",
-    items: [
-      { href: "/wa", label: "Penjualan WA", desc: "Jual manual / offline", icon: MessageCircle },
-      { href: "/konsinyasi", label: "Grosir / Reseller", desc: "Jual putus ke reseller", icon: Handshake },
-      { href: "/stok", label: "Stok", desc: "Barang masuk & opname", icon: Boxes },
-    ],
-  },
-  {
-    label: "Atur data",
-    items: [
-      { href: "/master/product", label: "Product", desc: "Nama, HPP, harga", icon: Package },
-      { href: "/master/toko", label: "Toko", desc: "Hubungkan marketplace", icon: Store },
-      { href: "/master/mapping", label: "Mapping SKU", desc: "Hubungkan SKU ke product", icon: Link2 },
-    ],
-  },
-];
+function navGroups(t: T) {
+  return [
+    {
+      label: t("Lihat hasil", "Results"),
+      items: [
+        { href: "/", label: "Dashboard", desc: t("Omzet & profit", "Revenue & profit"), icon: LayoutDashboard },
+        { href: "/pembukuan", label: t("Pembukuan", "Bookkeeping"), desc: t("Rincian per product", "Breakdown per product"), icon: BookOpen },
+        { href: "/rekonsiliasi", label: t("Dana Cair", "Payouts"), desc: t("Uang dari marketplace", "Money from marketplaces"), icon: Wallet },
+      ],
+    },
+    {
+      label: t("Catat harian", "Daily records"),
+      items: [
+        { href: "/wa", label: t("Penjualan WA", "WA Sales"), desc: t("Jual manual / offline", "Manual / offline sales"), icon: MessageCircle },
+        { href: "/konsinyasi", label: t("Grosir / Reseller", "Wholesale / Reseller"), desc: t("Jual putus ke reseller", "Outright sales to resellers"), icon: Handshake },
+        { href: "/stok", label: t("Stok", "Stock"), desc: t("Barang masuk & opname", "Stock in & stock counts"), icon: Boxes },
+      ],
+    },
+    {
+      label: t("Atur data", "Manage data"),
+      items: [
+        { href: "/master/product", label: "Product", desc: t("Nama, HPP, harga", "Name, COGS, price"), icon: Package },
+        { href: "/master/toko", label: t("Toko", "Stores"), desc: t("Hubungkan marketplace", "Connect marketplaces"), icon: Store },
+        { href: "/master/mapping", label: t("Mapping SKU", "SKU Mapping"), desc: t("Hubungkan SKU ke product", "Link SKUs to products"), icon: Link2 },
+      ],
+    },
+  ];
+}
 
 export default function Sidebar({ env }: { env: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isSandbox = env !== "production";
+  const t = useT();
+  const groups = navGroups(t);
 
   // tutup drawer tiap pindah halaman
   useEffect(() => {
@@ -65,7 +72,7 @@ export default function Sidebar({ env }: { env: string }) {
         <Logo size={40} />
         <div>
           <p className="text-sm font-bold leading-tight text-slate-900">Marketplace</p>
-          <p className="text-xs text-slate-500">Pembukuan</p>
+          <p className="text-xs text-slate-500">{t("Pembukuan", "Bookkeeping")}</p>
         </div>
       </div>
 
@@ -75,7 +82,7 @@ export default function Sidebar({ env }: { env: string }) {
         <div className="px-4 pb-3">
           <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
             <span className="h-2 w-2 rounded-full bg-amber-500" />
-            Mode Sandbox
+            {t("Mode Sandbox", "Sandbox mode")}
           </div>
         </div>
       )}
@@ -119,15 +126,16 @@ export default function Sidebar({ env }: { env: string }) {
         ))}
       </nav>
 
-      <div className="border-t border-slate-100 px-5 py-4">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-3">
         <form action={logout}>
           <button
             type="submit"
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900"
           >
-            <LogOut size={16} className="text-slate-400" /> Keluar
+            <LogOut size={16} className="text-slate-400" /> {t("Keluar", "Log out")}
           </button>
         </form>
+        <LangToggle />
       </div>
     </>
   );
@@ -138,7 +146,7 @@ export default function Sidebar({ env }: { env: string }) {
       <header className="fixed inset-x-0 top-0 z-30 flex min-h-14 items-center gap-3 border-b border-slate-200 bg-white pl-[calc(env(safe-area-inset-left)+1rem)] pr-[calc(env(safe-area-inset-right)+1rem)] pt-[env(safe-area-inset-top)] lg:hidden">
         <button
           onClick={() => setOpen(true)}
-          aria-label="Buka menu"
+          aria-label={t("Buka menu", "Open menu")}
           className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200"
         >
           <Menu size={22} />
@@ -165,7 +173,7 @@ export default function Sidebar({ env }: { env: string }) {
         {/* tombol tutup — mobile */}
         <button
           onClick={() => setOpen(false)}
-          aria-label="Tutup menu"
+          aria-label={t("Tutup menu", "Close menu")}
           className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden"
         >
           <X size={18} />

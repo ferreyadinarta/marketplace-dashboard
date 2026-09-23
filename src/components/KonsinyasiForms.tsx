@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/DatePicker";
 import { CurrencyInput } from "@/components/CurrencyInput";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { rupiah } from "@/lib/format";
+import { useT } from "@/components/LangProvider";
 
 type Option = { value: string; label: string };
 type Action = (formData: FormData) => void | Promise<void>;
@@ -23,31 +24,32 @@ export function AddKonsinyasiStoreForm({
   existingNames?: string[];
 }) {
   const [error, setError] = useState<string | undefined>();
+  const t = useT();
 
   function validate(e: FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
     const name = String(fd.get("name") ?? "").trim();
     if (!name) {
       e.preventDefault();
-      setError("Nama toko wajib diisi.");
+      setError(t("Nama toko wajib diisi.", "Store name is required."));
     } else if (existingNames.some((n) => n.toLowerCase() === name.toLowerCase())) {
       e.preventDefault();
-      setError("Toko/reseller ini sudah ada.");
+      setError(t("Toko/reseller ini sudah ada.", "This store/reseller already exists."));
     } else setError(undefined);
   }
 
   return (
     <form action={action} onSubmit={validate} noValidate className="flex flex-wrap items-end gap-3 p-5">
-      <Field label="Nama toko / reseller" error={error}>
+      <Field label={t("Nama toko / reseller", "Store / reseller name")} error={error}>
         <input
           name="name"
           onInput={() => error && setError(undefined)}
-          placeholder="ex: Istana Buah SA"
+          placeholder={t("ex: Istana Buah SA", "e.g. Istana Buah SA")}
           className={`w-full sm:w-72 ${inputClass.replace("w-full", "")} ${error ? inputErrorClass : ""}`}
         />
       </Field>
-      <SubmitButton variant="outline" icon={<StoreIcon size={16} />} pendingText="Menyimpan…">
-        Tambah Toko
+      <SubmitButton variant="outline" icon={<StoreIcon size={16} />} pendingText={t("Menyimpan…", "Saving…")}>
+        {t("Tambah Toko", "Add Store")}
       </SubmitButton>
     </form>
   );
@@ -63,6 +65,7 @@ export function StoreChip({
   store: { id: string; name: string; count: number };
   deleteAction: Action;
 }) {
+  const t = useT();
   return (
     <span className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-3 pr-1 text-xs font-medium text-slate-600">
       <span className="truncate">{store.name}</span>
@@ -71,14 +74,18 @@ export function StoreChip({
         id={store.id}
         trigger={<X size={12} />}
         triggerClassName="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
-        title="Hapus toko ini?"
+        title={t("Hapus toko ini?", "Delete this store?")}
         message={
           <>
-            <span className="font-medium text-slate-700">{store.name}</span> akan dihapus permanen.
+            <span className="font-medium text-slate-700">{store.name}</span>{" "}
+            {t("akan dihapus permanen.", "will be permanently deleted.")}
             {store.count > 0 && (
               <>
                 {" "}
-                <span className="font-medium text-red-600">{store.count} penjualan</span> toko ini ikut terhapus.
+                <span className="font-medium text-red-600">
+                  {store.count} {t("penjualan", "sales")}
+                </span>{" "}
+                {t("toko ini ikut terhapus.", "for this store will be deleted too.")}
               </>
             )}
           </>
@@ -146,6 +153,7 @@ export function MultiItemSaleForm({
   action: Action;
   today: string;
 }) {
+  const t = useT();
   const isGrosir = variant === "grosir";
   const prodOf = (pid: string) => products.find((p) => p.value === pid);
   const unitOf = (pid: string) => prodOf(pid)?.unit || "";
@@ -153,11 +161,12 @@ export function MultiItemSaleForm({
     const p = prodOf(pid);
     return !!p && (p.packSize ?? 0) >= 2 && !!p.packUnit;
   };
+  const unitFallback = t("satuan", "unit");
   // label satuan yang sedang dipilih (base = satuan dasar, pack = satuan besar)
   const unitLabel = (it: Item) => {
     const p = prodOf(it.productId);
-    if (!p) return "unit";
-    return it.unit === "pack" && hasPack(it.productId) ? p.packUnit! : p.unit || "unit";
+    if (!p) return unitFallback;
+    return it.unit === "pack" && hasPack(it.productId) ? p.packUnit! : p.unit || unitFallback;
   };
   // faktor konversi ke satuan dasar (pack → packSize, base → 1)
   const factorOf = (it: Item) => (it.unit === "pack" && hasPack(it.productId) ? prodOf(it.productId)!.packSize! : 1);
@@ -188,14 +197,20 @@ export function MultiItemSaleForm({
   if (isGrosir && (!stores || stores.length === 0)) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
-        Tambah toko / reseller dulu di atas, baru bisa catat penjualan.
+        {t(
+          "Tambah toko / reseller dulu di atas, baru bisa catat penjualan.",
+          "Add a store / reseller above first before recording a sale."
+        )}
       </p>
     );
   }
   if (products.length === 0) {
     return (
       <p className="px-5 py-6 text-sm text-slate-500">
-        Tambah product dulu di halaman Product, baru bisa catat penjualan.
+        {t(
+          "Tambah product dulu di halaman Product, baru bisa catat penjualan.",
+          "Add a product on the Product page first before recording a sale."
+        )}
       </p>
     );
   }
@@ -277,8 +292,9 @@ export function MultiItemSaleForm({
 
   function validate(e: FormEvent<HTMLFormElement>) {
     const errs: { store?: string; items?: string; price?: string } = {};
-    if (isGrosir && !storeId) errs.store = "Pilih toko.";
-    if (clean.length === 0) errs.items = "Tambah minimal 1 product dengan jumlah.";
+    if (isGrosir && !storeId) errs.store = t("Pilih toko.", "Choose a store.");
+    if (clean.length === 0)
+      errs.items = t("Tambah minimal 1 product dengan jumlah.", "Add at least 1 product with a quantity.");
 
     // harga tidak boleh kosong / 0 — kalau lolos, omzet & profit jadi salah
     const bad = new Set<number>();
@@ -286,7 +302,7 @@ export function MultiItemSaleForm({
       if (!it.productId) return;
       if (Math.floor(Number(it.price) || 0) <= 0) bad.add(i);
     });
-    if (bad.size) errs.price = "Harga belum diisi.";
+    if (bad.size) errs.price = t("Harga belum diisi.", "Price hasn't been filled in.");
 
     setBadPrice(bad);
     if (Object.keys(errs).length) {
@@ -304,27 +320,27 @@ export function MultiItemSaleForm({
       {/* header order: toko (grosir), tanggal, pembeli */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {isGrosir && (
-          <Field label="Toko / reseller" error={errors.store}>
+          <Field label={t("Toko / reseller", "Store / reseller")} error={errors.store}>
             <Select
               value={storeId}
               onValueChange={(v) => {
                 setStoreId(v);
                 setErrors((s) => ({ ...s, store: undefined }));
               }}
-              placeholder="Pilih toko…"
+              placeholder={t("Pilih toko…", "Choose a store…")}
               options={stores!}
               searchable
             />
           </Field>
         )}
-        <Field label="Tanggal">
+        <Field label={t("Tanggal", "Date")}>
           <DatePicker name="tanggal" defaultValue={today} />
         </Field>
         {/* Grosir: toko/reseller sudah jadi identitas pembeli → tidak perlu nama lagi.
             WA: tidak ada toko, jadi nama pembeli berguna. */}
         {!isGrosir && (
-          <Field label="Nama pembeli (opsional)">
-            <input name="buyerName" placeholder="ex: Bu Ani" className={inputClass} />
+          <Field label={t("Nama pembeli (opsional)", "Buyer name (optional)")}>
+            <input name="buyerName" placeholder={t("ex: Bu Ani", "e.g. Ani")} className={inputClass} />
           </Field>
         )}
       </div>
@@ -333,8 +349,8 @@ export function MultiItemSaleForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-slate-600">
-            Product yang dibeli{" "}
-            <span className="text-slate-400">(isi harga total per baris)</span>
+            {t("Product yang dibeli", "Products purchased")}{" "}
+            <span className="text-slate-400">{t("(isi harga total per baris)", "(enter the total price per row)")}</span>
           </span>
           {errors.items && <span className="text-xs font-medium text-red-500">{errors.items}</span>}
         </div>
@@ -354,18 +370,18 @@ export function MultiItemSaleForm({
                   <Select
                     value={it.productId}
                     onValueChange={(v) => chooseProduct(i, v)}
-                    placeholder="Pilih product…"
+                    placeholder={t("Pilih product…", "Choose a product…")}
                     options={products}
                     searchable
                   />
                 </div>
                 <input
-                  aria-label="Jumlah"
+                  aria-label={t("Jumlah", "Quantity")}
                   type="number"
                   min="1"
                   value={it.qty}
                   onChange={(e) => setItem(i, "qty", e.target.value)}
-                  placeholder="Qty"
+                  placeholder={t("Qty", "Qty")}
                   className={`${cellInput} w-16 ${over ? "border-red-400 focus:border-red-500 focus:ring-red-100" : ""}`}
                 />
                 {showPack ? (
@@ -375,7 +391,7 @@ export function MultiItemSaleForm({
                       onClick={() => chooseUnit(i, "base")}
                       className={it.unit === "base" ? "bg-indigo-600 px-2 py-2 font-medium text-white" : "px-2 py-2 text-slate-600 hover:bg-slate-50"}
                     >
-                      {p?.unit || "sat"}
+                      {p?.unit || t("sat", "unit")}
                     </button>
                     <button
                       type="button"
@@ -387,27 +403,27 @@ export function MultiItemSaleForm({
                   </div>
                 ) : (
                   <span className="w-12 shrink-0 truncate text-xs text-slate-400" title={unitOf(it.productId)}>
-                    {unitOf(it.productId) || "unit"}
+                    {unitOf(it.productId) || unitFallback}
                   </span>
                 )}
                 <div className="w-28 shrink-0 sm:w-36">
                   <CurrencyInput
                     value={Number(it.price) || 0}
                     onValueChange={(n) => setItem(i, "price", String(n))}
-                    placeholder="Total"
+                    placeholder={t("Total", "Total")}
                     className={`h-10 ${
                       badPrice.has(i) ? "border-red-400 focus:border-red-500 focus:ring-red-100" : ""
                     }`}
                   />
                   {badPrice.has(i) && (
-                    <p className="mt-1 text-[11px] font-medium text-red-600">Harga wajib diisi</p>
+                    <p className="mt-1 text-[11px] font-medium text-red-600">{t("Harga wajib diisi", "Price is required")}</p>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={() => removeRow(i)}
                   disabled={items.length === 1}
-                  aria-label="Hapus baris"
+                  aria-label={t("Hapus baris", "Remove row")}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                 >
                   <X size={16} />
@@ -417,10 +433,15 @@ export function MultiItemSaleForm({
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 pl-1 text-xs">
                   <span className={over ? "font-medium text-red-600" : "text-slate-400"}>
                     {st == null
-                      ? "Stok belum di-opname"
-                      : `Stok: ${st} ${p?.unit ?? ""}` +
-                        (factor > 1 ? ` · jual ${it.qty} ${p?.packUnit} = ${baseQty} ${p?.unit}` : "") +
-                        (over ? " — melebihi stok!" : "")}
+                      ? t("Stok belum di-opname", "Stock not counted yet")
+                      : t(
+                          `Stok: ${st} ${p?.unit ?? ""}` +
+                            (factor > 1 ? ` · jual ${it.qty} ${p?.packUnit} = ${baseQty} ${p?.unit}` : "") +
+                            (over ? " (melebihi stok!)" : ""),
+                          `Stock: ${st} ${p?.unit ?? ""}` +
+                            (factor > 1 ? ` · selling ${it.qty} ${p?.packUnit} = ${baseQty} ${p?.unit}` : "") +
+                            (over ? " (exceeds stock!)" : "")
+                        )}
                   </span>
                   {Number(it.price) > 0 && Number(it.qty) > 1 && (
                     <span className="text-slate-400">
@@ -431,9 +452,12 @@ export function MultiItemSaleForm({
               )}
               {p?.missingHpp && (
                 <p className="mt-1 pl-1 text-xs text-amber-700">
-                  HPP product ini belum diisi, jadi profitnya belum benar.{" "}
+                  {t(
+                    "HPP product ini belum diisi, jadi profitnya belum benar.",
+                    "This product's COGS hasn't been filled in yet, so its profit isn't accurate."
+                  )}{" "}
                   <Link href="/master/product?harga=1#isi-harga" className="font-medium underline">
-                    Isi HPP
+                    {t("Isi HPP", "Fill in COGS")}
                   </Link>
                 </p>
               )}
@@ -446,27 +470,29 @@ export function MultiItemSaleForm({
           onClick={addRow}
           className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
         >
-          <Plus size={15} /> Tambah product
+          <Plus size={15} /> {t("Tambah product", "Add product")}
         </button>
       </div>
 
       {hasDup && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          Ada product yang sama di beberapa baris — jumlahnya akan <strong>digabung otomatis</strong> saat disimpan.
+          {t("Ada product yang sama di beberapa baris.", "There are duplicate products in multiple rows.")}{" "}
+          <strong>{t("Jumlahnya akan digabung otomatis", "Their quantities will be merged automatically")}</strong>{" "}
+          {t("saat disimpan.", "when saved.")}
         </p>
       )}
       <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-sm text-slate-500">
-          Total: <strong className="text-slate-900">{rupiah(grandTotal)}</strong>
+          {t("Total:", "Total:")} <strong className="text-slate-900">{rupiah(grandTotal)}</strong>
         </span>
         <SubmitButton
           variant="primary"
           icon={<Plus size={16} />}
-          pendingText="Menyimpan…"
-          notify="Penjualan tercatat"
+          pendingText={t("Menyimpan…", "Saving…")}
+          notify={t("Penjualan tercatat", "Sale recorded")}
           className="w-full justify-center sm:w-auto"
         >
-          Catat Penjualan
+          {t("Catat Penjualan", "Record Sale")}
         </SubmitButton>
       </div>
     </form>

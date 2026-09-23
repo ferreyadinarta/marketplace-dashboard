@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { RefreshCw, CheckCircle2, XCircle, AlertTriangle, ChevronDown, X, Clock } from "lucide-react";
+import { useT } from "@/components/LangProvider";
+import type { T } from "@/lib/i18n";
 
 type Job = {
   id: string;
@@ -59,25 +61,59 @@ function totalIsFinal(j: Job): boolean {
   return j.windowTotal > 0 && j.windowIndex >= j.windowTotal;
 }
 
-function shortDur(sec: number): string {
-  if (sec < 60) return `${Math.max(5, Math.round(sec / 5) * 5)} detik`;
+function shortDur(sec: number, t: T): string {
+  if (sec < 60) return `${Math.max(5, Math.round(sec / 5) * 5)} ${t("detik", "sec")}`;
   const m = Math.round(sec / 60);
-  return m < 60 ? `${m} menit` : `${Math.floor(m / 60)} jam ${m % 60} menit`;
+  return m < 60
+    ? `${m} ${t("menit", "min")}`
+    : `${Math.floor(m / 60)} ${t("jam", "hr")} ${m % 60} ${t("menit", "min")}`;
 }
 
-function elapsed(startedAt: string): string {
+function elapsed(startedAt: string, t: T): string {
   const s = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 1000));
-  return s < 60 ? `${s} detik` : `${Math.floor(s / 60)} menit ${s % 60} detik`;
+  return s < 60
+    ? `${s} ${t("detik", "sec")}`
+    : `${Math.floor(s / 60)} ${t("menit", "min")} ${s % 60} ${t("detik", "sec")}`;
 }
 
 function angka(n: number): string {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
-function title(j: Job): string {
+function title(j: Job, t: T): string {
   return j.scope === "ALL"
-    ? `Mengambil penjualan semua toko${j.storeTotal > 1 ? ` (toko ${Math.max(1, j.storeIndex)} dari ${j.storeTotal})` : ""}`
-    : `Mengambil penjualan ${j.storeName}`;
+    ? t("Mengambil penjualan semua toko", "Fetching sales for all stores") +
+        (j.storeTotal > 1
+          ? ` (${t("toko", "store")} ${Math.max(1, j.storeIndex)} ${t("dari", "of")} ${j.storeTotal})`
+          : "")
+    : t(`Mengambil penjualan ${j.storeName}`, `Fetching sales for ${j.storeName}`);
+}
+
+// Pesan dari syncRunner.ts/syncProgress.ts (lib tanpa konteks request) datang
+// sebagai satu string Indonesia. Cocokkan pola yang dikenal untuk diterjemahkan;
+// pesan dari lib lain (mis. shopee/tiktok) dibiarkan apa adanya.
+function translateSyncText(msg: string | null | undefined, t: T): string | null {
+  if (!msg) return msg ?? null;
+
+  if (msg === "Menyiapkan…") return t(msg, "Preparing…");
+
+  let m = msg.match(/^Selesai: (\d+) baru, (\d+) diperbarui$/);
+  if (m) return t(msg, `Done: ${m[1]} new, ${m[2]} updated`);
+
+  m = msg.match(/^Putaran (\d+) selesai: (\d+) baru, (\d+) diperbarui\. Sisanya dilanjutkan otomatis$/);
+  if (m) return t(msg, `Round ${m[1]} done: ${m[2]} new, ${m[3]} updated. The rest continues automatically`);
+
+  m = msg.match(/^Putaran (\d+) selesai: (\d+) baru, (\d+) diperbarui\. Sudah (\d+) putaran, klik Sync lagi kalau masih ada sisa$/);
+  if (m)
+    return t(
+      msg,
+      `Round ${m[1]} done: ${m[2]} new, ${m[3]} updated. Reached ${m[4]} rounds, click Sync again if there's more`
+    );
+
+  m = msg.match(/^Gagal: (.+)$/);
+  if (m) return t(msg, `Failed: ${m[1]}`);
+
+  return msg;
 }
 
 // per toko, bukan per job: tiap putaran bikin baris job baru
@@ -92,6 +128,7 @@ const COLLAPSE_AT = 2; // lebih dari ini → daftar idle ditutup by default
 // Muncul sendiri saat ada sync jalan (termasuk yang dijalankan cron / tab lain),
 // hilang sendiri beberapa detik setelah selesai.
 export function SyncProgressPanel() {
+  const t = useT();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [, setTick] = useState(0);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -239,7 +276,7 @@ export function SyncProgressPanel() {
         const sisa = Math.max(0, totalOrders - done);
         const perSec = rate.current.get(j.id)?.perSec ?? 0;
         // ETA cuma jujur kalau totalnya sudah pasti
-        const eta = finalTotal && sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec) : null;
+        const eta = finalTotal && sisa > 0 && perSec > 0.2 ? shortDur(sisa / perSec, t) : null;
         const waiting = !!j.finishedAt; // selesai satu bagian, menunggu lanjutan
         const pct = Math.max(percent(j), b?.pct ?? 0);
         return (
@@ -253,17 +290,22 @@ export function SyncProgressPanel() {
 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-indigo-900">
-                {title(j)}
+                {title(j, t)}
                 <span className="ml-1 font-normal opacity-70">
-                  {waiting ? `· menunggu ${elapsed(j.finishedAt ?? j.startedAt)}` : `· berjalan ${elapsed(j.startedAt)}`}
-                  {!waiting && eta ? ` · kira-kira ${eta} lagi` : ""}
+                  {waiting
+                    ? `· ${t("menunggu", "waiting")} ${elapsed(j.finishedAt ?? j.startedAt, t)}`
+                    : `· ${t("berjalan", "running")} ${elapsed(j.startedAt, t)}`}
+                  {!waiting && eta ? ` · ${t("kira-kira", "about")} ${eta} ${t("lagi", "left")}` : ""}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
                 {waiting
-                  ? "Lanjut sendiri tiap ~15 menit. Halaman boleh ditutup — atau klik Sync lagi kalau mau langsung lanjut."
-                  : (j.error ?? j.message ?? "Menyiapkan…")}
-                {j.windowTotal > 1 && !j.error ? ` (bagian ${j.windowIndex} dari ${j.windowTotal})` : ""}
+                  ? t(
+                      "Lanjut sendiri tiap ~15 menit. Halaman boleh ditutup, atau klik Sync lagi kalau mau langsung lanjut.",
+                      "Continues on its own every ~15 minutes. You can close this page, or click Sync again to continue right away."
+                    )
+                  : (translateSyncText(j.error, t) ?? translateSyncText(j.message, t) ?? t("Menyiapkan…", "Preparing…"))}
+                {j.windowTotal > 1 && !j.error ? ` (${t("bagian", "part")} ${j.windowIndex} ${t("dari", "of")} ${j.windowTotal})` : ""}
               </p>
 
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/70">
@@ -275,10 +317,10 @@ export function SyncProgressPanel() {
 
               <p className="mt-1.5 text-xs text-indigo-900 opacity-70">
                 {finalTotal && totalOrders > 0
-                  ? `${angka(done)} dari ${angka(totalOrders)} pesanan diperiksa · sisa ${angka(sisa)}`
-                  : `${angka(done)} pesanan diperiksa`}
-                {j.created > 0 ? ` · ${angka(j.created)} pesanan baru masuk` : ""}
-                {j.updated > 0 ? ` · ${angka(j.updated)} datanya diperbarui` : ""}
+                  ? `${angka(done)} ${t("dari", "of")} ${angka(totalOrders)} ${t("pesanan diperiksa", "orders checked")} · ${t("sisa", "left")} ${angka(sisa)}`
+                  : `${angka(done)} ${t("pesanan diperiksa", "orders checked")}`}
+                {j.created > 0 ? ` · ${angka(j.created)} ${t("pesanan baru masuk", "new orders")}` : ""}
+                {j.updated > 0 ? ` · ${angka(j.updated)} ${t("datanya diperbarui", "updated")}` : ""}
               </p>
             </div>
           </div>
@@ -292,18 +334,20 @@ export function SyncProgressPanel() {
             <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-emerald-900">
-                {j.scope === "ALL" ? "Semua toko selesai diambil" : `${j.storeName} selesai diambil`}
+                {j.scope === "ALL"
+                  ? t("Semua toko selesai diambil", "All stores finished fetching")
+                  : t(`${j.storeName} selesai diambil`, `${j.storeName} finished fetching`)}
               </p>
               <p className="mt-0.5 text-xs text-emerald-900 opacity-80">
                 {j.created > 0 || j.updated > 0
-                  ? `${angka(j.created)} pesanan baru masuk · ${angka(j.updated)} datanya diperbarui`
-                  : "Tidak ada pesanan baru."}
+                  ? `${angka(j.created)} ${t("pesanan baru masuk", "new orders")} · ${angka(j.updated)} ${t("datanya diperbarui", "updated")}`
+                  : t("Tidak ada pesanan baru.", "No new orders.")}
               </p>
             </div>
             <button
               type="button"
               onClick={() => dismiss(jobKey(j))}
-              aria-label="Tutup"
+              aria-label={t("Tutup", "Close")}
               className="shrink-0 rounded-md p-1 text-emerald-400 transition hover:bg-emerald-100 hover:text-emerald-700"
             >
               <X size={14} />
@@ -320,7 +364,7 @@ export function SyncProgressPanel() {
               onClick={() => setShowIdle((s) => !s)}
               className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-xs font-medium text-slate-600 transition hover:bg-slate-50"
             >
-              <span>{idle.length} pengambilan data lain</span>
+              <span>{idle.length} {t("pengambilan data lain", "other data fetches")}</span>
               <ChevronDown size={14} className={`text-slate-400 transition-transform ${collapsed ? "" : "rotate-180"}`} />
             </button>
           )}
@@ -339,22 +383,25 @@ export function SyncProgressPanel() {
                   <Icon size={15} className={`shrink-0 ${tint}`} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium text-slate-700">
-                      {title(j)}
+                      {title(j, t)}
                       <span className="ml-1.5 font-normal text-slate-400">
-                        {angka(j.created)} baru · {angka(j.updated)} diperbarui
+                        {angka(j.created)} {t("baru", "new")} · {angka(j.updated)} {t("diperbarui", "updated")}
                       </span>
                     </p>
                     <p className="truncate text-[11px] text-slate-400">
-                      {j.error ??
+                      {translateSyncText(j.error, t) ??
                         (j.partial
-                          ? "Masih ada sisa — lanjut sendiri tiap ~15 menit, atau klik Sync lagi."
-                          : (j.message ?? "Selesai"))}
+                          ? t(
+                              "Masih ada sisa. Lanjut sendiri tiap ~15 menit, atau klik Sync lagi.",
+                              "There's more left. Continues on its own every ~15 minutes, or click Sync again."
+                            )
+                          : (translateSyncText(j.message, t) ?? t("Selesai", "Done")))}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => dismiss(jobKey(j))}
-                    aria-label="Sembunyikan"
+                    aria-label={t("Sembunyikan", "Hide")}
                     className="shrink-0 rounded-md p-1 text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
                   >
                     <X size={13} />

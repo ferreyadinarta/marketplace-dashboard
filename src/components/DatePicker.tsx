@@ -3,16 +3,17 @@
 import { useState, useRef, useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
-import { id as localeId } from "date-fns/locale";
-import { format } from "date-fns";
+import { enGB, id as idLocale } from "date-fns/locale";
+import { format, type Locale } from "date-fns";
 import { CalendarDays, ChevronDown } from "lucide-react";
+import { useT, useLang } from "@/components/LangProvider";
 import "react-day-picker/style.css";
 
 function ymd(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
-function labelDate(d: Date) {
-  return format(d, "d MMM yyyy", { locale: localeId });
+function labelDate(d: Date, locale: Locale) {
+  return format(d, "d MMM yyyy", { locale });
 }
 
 // Date picker satu-tanggal, custom penuh (bukan input date bawaan OS).
@@ -34,6 +35,9 @@ export function DatePicker({
   );
   const ref = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const t = useT();
+  const lang = useLang();
+  const dfLocale = lang === "en" ? enGB : idLocale;
 
   const selected = value ? new Date(`${value}T00:00:00`) : undefined;
 
@@ -110,7 +114,7 @@ export function DatePicker({
         <span className="flex items-center gap-2">
           <CalendarDays size={16} className="shrink-0 text-slate-400" />
           <span className={selected ? "text-slate-900" : "text-slate-400"}>
-            {selected ? labelDate(selected) : "Pilih tanggal…"}
+            {selected ? labelDate(selected, dfLocale) : t("Pilih tanggal…", "Choose date…")}
           </span>
         </span>
         <ChevronDown size={15} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -130,7 +134,7 @@ export function DatePicker({
           >
             <DayPicker
               mode="single"
-              locale={localeId}
+              locale={dfLocale}
               selected={selected}
               onSelect={pick}
               month={month}

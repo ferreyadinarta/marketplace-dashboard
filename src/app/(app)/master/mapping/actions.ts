@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client"; // dipakai sebagai nilai juga (Prisma.join)
 import { suggestProduct, baseQtyFor } from "@/lib/suggestMapping";
+import { getT } from "@/lib/i18n-server";
 
 // Petakan satu baris mapping ke product DASAR + berapa satuan dasar per unit
 // (mis. varian "1 box" = 16 sachet). Lalu backfill order item lama yang SKU-nya
@@ -109,6 +110,7 @@ export async function bulkAssignMappings(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const targetProductId = String(formData.get("productId") ?? "");
   const baseQtyRaw = String(formData.get("baseQty") ?? "auto");
+  const { t } = await getT();
 
   const back = new URLSearchParams();
   if (q) back.set("q", q);
@@ -117,7 +119,7 @@ export async function bulkAssignMappings(formData: FormData) {
 
   if (mode === "product" && !targetProductId) {
     back.set("bulk", "error");
-    back.set("reason", "Product tujuan belum dipilih");
+    back.set("reason", t("Product tujuan belum dipilih", "Target product not chosen yet"));
     redirect(`/master/mapping?${back}`);
   }
 

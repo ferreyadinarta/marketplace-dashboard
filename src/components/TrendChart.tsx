@@ -10,6 +10,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { useLang, useT } from "@/components/LangProvider";
+import { intlLocale, type Lang } from "@/lib/i18n";
 
 type Point = { tanggal: string; omzet: number; profit: number };
 
@@ -19,12 +21,15 @@ function juta(v: number) {
   return String(v);
 }
 
-function tglPendek(iso: string) {
+function tglPendek(iso: string, lang: Lang) {
   const d = new Date(iso);
-  return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(d);
+  return new Intl.DateTimeFormat(intlLocale(lang), { day: "numeric", month: "short" }).format(d);
 }
 
 export default function TrendChart({ data }: { data: Point[] }) {
+  const lang = useLang();
+  const t = useT();
+
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
@@ -41,7 +46,7 @@ export default function TrendChart({ data }: { data: Point[] }) {
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
         <XAxis
           dataKey="tanggal"
-          tickFormatter={tglPendek}
+          tickFormatter={(v) => tglPendek(v, lang)}
           tick={{ fontSize: 11, fill: "#94a3b8" }}
           axisLine={false}
           tickLine={false}
@@ -55,7 +60,7 @@ export default function TrendChart({ data }: { data: Point[] }) {
           width={44}
         />
         <Tooltip
-          labelFormatter={(l) => tglPendek(String(l))}
+          labelFormatter={(l) => tglPendek(String(l), lang)}
           formatter={(v) =>
             new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
               Number(v)
@@ -64,11 +69,18 @@ export default function TrendChart({ data }: { data: Point[] }) {
           contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
         />
         <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-        <Area type="monotone" dataKey="omzet" name="Omzet" stroke="#6366f1" strokeWidth={2} fill="url(#gOmzet)" />
+        <Area
+          type="monotone"
+          dataKey="omzet"
+          name={t("Omzet", "Revenue")}
+          stroke="#6366f1"
+          strokeWidth={2}
+          fill="url(#gOmzet)"
+        />
         <Area
           type="monotone"
           dataKey="profit"
-          name="Profit Bersih"
+          name={t("Profit Bersih", "Net Profit")}
           stroke="#10b981"
           strokeWidth={2}
           fill="url(#gProfit)"

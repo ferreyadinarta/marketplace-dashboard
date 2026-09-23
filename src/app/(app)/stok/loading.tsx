@@ -1,4 +1,5 @@
 import { Card, PageHeader } from "@/components/ui";
+import { getT } from "@/lib/i18n-server";
 
 // Skeleton yang tampil INSTAN saat filter/paginasi diganti (loading boundary Next.js).
 // Memberi feedback "sedang memuat" tanpa layar kosong / data lama menggantung.
@@ -6,12 +7,16 @@ function Bar({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
-export default function StokLoading() {
+export default async function StokLoading() {
+  const { t } = await getT();
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Stok"
-        description="Pantau stok tiap product. Stok otomatis berkurang dari order yang Selesai (COMPLETED), bertambah dari barang masuk, dan bisa disamakan dengan hitungan fisik lewat opname."
+        title={t("Stok", "Stock")}
+        description={t(
+          "Pantau stok tiap product. Stok otomatis berkurang dari order yang Selesai (COMPLETED), bertambah dari barang masuk, dan bisa disamakan dengan hitungan fisik lewat opname.",
+          "Monitor stock for every product. Stock automatically decreases from Completed orders, increases from stock in, and can be matched with a physical count."
+        )}
       />
 
       {/* ringkasan */}

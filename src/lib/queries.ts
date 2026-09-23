@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { dateKey } from "./format";
 import { modalOf } from "./units";
+import { makeT, type T } from "./i18n";
 
 // HPP (modal) per SATUAN UTAMA: pakai snapshot yang dibekukan saat jual; kalau 0
 // (data lama / order marketplace) fallback ke HPP product saat ini.
@@ -214,7 +215,8 @@ type ProdLite = { id: string; name: string; sku: string; hpp: number };
 
 // pembukuan dikelompokkan per grup, tiap baris = product.
 // Product tanpa grup dikumpulkan di bucket "Tanpa Grup".
-export async function getPembukuanByGroup(f: DashboardFilter) {
+// t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
+export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")) {
   const onlyNone = f.groupId === NO_GROUP;
   const groups = onlyNone
     ? []
@@ -288,7 +290,7 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
       where: { groupId: null },
       orderBy: { name: "asc" },
     });
-    if (ungrouped.length) result.push(buildGroup(NO_GROUP, "Tanpa Grup", ungrouped));
+    if (ungrouped.length) result.push(buildGroup(NO_GROUP, t("Tanpa Grup", "No group"), ungrouped));
   }
 
   // Sisa pembulatan per baris ditempel ke baris terbesar supaya jumlah semua
@@ -316,11 +318,11 @@ export async function getPembukuanByGroup(f: DashboardFilter) {
     const profit = unmapped.omzet - unmapped.fee - unmapped.hpp;
     result.push({
       groupId: "__unmapped__",
-      groupName: "SKU belum dipetakan",
+      groupName: t("SKU belum dipetakan", "Unmapped SKU"),
       rows: [
         {
           productId: "__unmapped__",
-          name: "SKU belum dipetakan",
+          name: t("SKU belum dipetakan", "Unmapped SKU"),
           sku: "—",
           hpp: 0,
           terjual: unmapped.terjual,
@@ -364,7 +366,8 @@ export type LedgerRow = {
 
 // Ledger per-order untuk sheet ledger per brand. Satu baris = satu item order.
 // Hanya order selesai (via orderWhere). Menghormati filter grup (brand).
-export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> {
+// t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
+export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): Promise<LedgerRow[]> {
   const orders = await prisma.order.findMany({
     where: orderWhere(f),
     include: {
@@ -394,7 +397,7 @@ export async function getOrdersDetail(f: DashboardFilter): Promise<LedgerRow[]> 
         buyerName: o.buyerName ?? "-",
         marketplace: o.store.marketplace,
         storeName: o.store.name,
-        groupName: it.product?.group?.name ?? "Tanpa Grup",
+        groupName: it.product?.group?.name ?? t("Tanpa Grup", "No group"),
         sku: it.product?.sku ?? it.marketplaceSku,
         productName: it.productName,
         qty: it.qty,

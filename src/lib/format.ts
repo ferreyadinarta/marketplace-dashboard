@@ -1,3 +1,5 @@
+import { intlLocale, type Lang } from "./i18n";
+
 export function rupiah(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -38,8 +40,8 @@ export function eventDateFromInput(dateStr: string): Date {
   return new Date(`${dateStr}T12:00:00+07:00`);
 }
 
-export function tanggal(date: Date | string): string {
-  return new Intl.DateTimeFormat("id-ID", {
+export function tanggal(date: Date | string, lang: Lang = "id"): string {
+  return new Intl.DateTimeFormat(intlLocale(lang), {
     timeZone: TZ,
     day: "2-digit",
     month: "short",
@@ -48,8 +50,8 @@ export function tanggal(date: Date | string): string {
 }
 
 // Tanggal + jam (mis. untuk waktu sync terakhir): "30 Jul 2026, 14.05" WIB.
-export function waktu(date: Date | string): string {
-  return new Intl.DateTimeFormat("id-ID", {
+export function waktu(date: Date | string, lang: Lang = "id"): string {
+  return new Intl.DateTimeFormat(intlLocale(lang), {
     timeZone: TZ,
     day: "2-digit",
     month: "short",
@@ -80,3 +82,23 @@ export const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Batal",
   RETURNED: "Retur",
 };
+
+const MARKETPLACE_LABEL_EN: Record<string, string> = {
+  KONSINYASI: "Wholesale / Reseller",
+  WA: "WhatsApp / Offline",
+};
+const STATUS_LABEL_EN: Record<string, string> = {
+  PENDING: "Pending",
+  SHIPPED: "Shipped",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  RETURNED: "Returned",
+};
+
+// Versi sadar-bahasa dari dua peta di atas — pakai ini di UI.
+export function marketplaceLabel(mp: string, lang: Lang = "id"): string {
+  return (lang === "en" ? MARKETPLACE_LABEL_EN[mp] : undefined) ?? MARKETPLACE_LABEL[mp] ?? mp;
+}
+export function statusLabel(status: string, lang: Lang = "id"): string {
+  return (lang === "en" ? STATUS_LABEL_EN[status] : STATUS_LABEL[status]) ?? status;
+}

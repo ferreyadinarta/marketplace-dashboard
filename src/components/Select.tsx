@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
+import { useT } from "@/components/LangProvider";
 
 export type SelectOption = { value: string; label: string };
 
@@ -15,7 +16,7 @@ export function Select({
   defaultValue,
   value,
   onValueChange,
-  placeholder = "Pilih…",
+  placeholder,
   className = "",
   disabled = false,
   searchable = false,
@@ -30,6 +31,8 @@ export function Select({
   disabled?: boolean;
   searchable?: boolean;
 }) {
+  const t = useT();
+  const resolvedPlaceholder = placeholder ?? t("Pilih…", "Select…");
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState("");
@@ -120,7 +123,7 @@ export function Select({
         className={`flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 ${className}`}
       >
         <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-slate-400"}`}>
-          {selected ? selected.label : placeholder}
+          {selected ? selected.label : resolvedPlaceholder}
         </span>
         <ChevronDown
           size={16}
@@ -150,14 +153,14 @@ export function Select({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Cari…"
+                  placeholder={t("Cari…", "Search…")}
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
             )}
             <ul style={{ maxHeight: pos.maxH }} className="overflow-auto p-1">
               {shown.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-slate-400">Tidak ada hasil</li>
+                <li className="px-3 py-2 text-sm text-slate-400">{t("Tidak ada hasil", "No results")}</li>
               ) : (
                 shown.map((o) => {
                   const active = o.value === current;

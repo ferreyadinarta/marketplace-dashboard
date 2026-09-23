@@ -1,4 +1,5 @@
 import { Card, PageHeader } from "@/components/ui";
+import { getT } from "@/lib/i18n-server";
 
 // Skeleton yang tampil INSTAN saat dashboard sedang memuat (loading boundary Next.js).
 // Memberi feedback "sedang memuat" tanpa layar kosong / data lama menggantung.
@@ -6,12 +7,16 @@ function Bar({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
-export default function DashboardLoading() {
+export default async function DashboardLoading() {
+  const { t } = await getT();
   return (
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Ringkasan penjualan & profit dari seluruh toko dan marketplace."
+        description={t(
+          "Ringkasan penjualan & profit dari seluruh toko dan marketplace.",
+          "Summary of sales & profit across all stores and marketplaces."
+        )}
       />
 
       {/* aksi cepat */}

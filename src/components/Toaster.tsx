@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
+import { useT } from "@/components/LangProvider";
 
 type Toast = { id: number; msg: string; leaving: boolean };
 
@@ -9,11 +10,12 @@ type Toast = { id: number; msg: string; leaving: boolean };
 // notifikasi kecil di kanan-bawah dengan animasi masuk & keluar.
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const t = useT();
 
   useEffect(() => {
     let n = 0;
     function onToast(e: Event) {
-      const msg = String((e as CustomEvent).detail ?? "Tersimpan");
+      const msg = String((e as CustomEvent).detail ?? t("Tersimpan", "Saved"));
       const id = ++n;
       setToasts((t) => [...t, { id, msg, leaving: false }]);
       // mulai animasi keluar setelah 2.5s
@@ -27,7 +29,7 @@ export function Toaster() {
     }
     window.addEventListener("app:toast", onToast);
     return () => window.removeEventListener("app:toast", onToast);
-  }, []);
+  }, [t]);
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[400] flex flex-col items-end gap-2">
