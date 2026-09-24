@@ -62,7 +62,8 @@ export async function runSyncRound(input: RoundInput, budgetMs = 45_000): Promis
 
   // ---- semua toko sekaligus (job progresnya dibuat di syncAllStores) ----
   if (input.scope === "all") {
-    const r = await syncAllStores(days, budgetMs);
+    // putaran lanjutan: tiap toko mulai dari bookmark-nya, bukan dari periode terbaru lagi
+    const r = await syncAllStores(days, budgetMs, { resume: (input.round ?? 1) > 1 });
     revalidatePath("/master/toko");
     revalidatePath("/pembukuan");
     revalidatePath("/");

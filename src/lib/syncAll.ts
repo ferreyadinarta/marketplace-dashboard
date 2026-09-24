@@ -24,7 +24,7 @@ export type SyncAllResult = {
 export async function syncAllStores(
   days = 30,
   budgetMs = 45_000,
-  opts: { daily?: boolean } = {}
+  opts: { daily?: boolean; resume?: boolean } = {}
 ): Promise<SyncAllResult> {
   const started = Date.now();
   const to = new Date();
@@ -78,7 +78,12 @@ export async function syncAllStores(
 
     try {
       if (s.marketplace === "SHOPEE") {
-        const r = await syncShopeeStore(s.id, from, to, { deadlineMs: share, onProgress, preserveCursor: opts.daily });
+        const r = await syncShopeeStore(s.id, from, to, {
+          deadlineMs: share,
+          onProgress,
+          preserveCursor: opts.daily,
+          resume: opts.resume,
+        });
         res.created += r.created;
         res.updated += r.updated;
         if (r.partial) res.partial = true;
