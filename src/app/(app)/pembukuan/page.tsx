@@ -54,8 +54,8 @@ export default async function PembukuanPage({
       <PageHeader
         title={t("Pembukuan", "Bookkeeping")}
         description={t(
-          "Penjualan tiap product per grup, hanya dari pesanan yang sudah selesai, jadi angkanya final. Dashboard juga menghitung pesanan yang masih dikirim.",
-          "Sales for each product per group, from completed orders only, so the numbers are final. The dashboard also counts orders still being shipped."
+          "Penjualan tiap product per grup, dihitung saat uangnya sudah masuk ke saldo penjual (Shopee: tanggal dana cair). Dashboard menghitung lebih awal, sejak pembeli membayar.",
+          "Sales for each product per group, counted once the money reaches the seller balance (Shopee: payout date). The dashboard counts earlier, from when the buyer pays."
         )}
       />
 

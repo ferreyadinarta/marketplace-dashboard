@@ -46,10 +46,17 @@ export type DashboardFilter = {
 //  - "dibayar" (Dashboard): semua yang sudah dibayar & tidak batal (PENDING,
 //    SHIPPED, COMPLETED) → penjualan hari ini langsung kelihatan. Kalau nanti
 //    batal/retur, statusnya berubah saat sync dan otomatis keluar sendiri.
+//  - "diterima" (Pembukuan & Excel): uang sudah sampai ke saldo penjual.
+//    Shopee: dana order sudah dirilis (terhubung ke Payout), tanggalnya =
+//    tanggal cair. Toko tanpa data pencairan (WA, grosir, marketplace manual):
+//    COMPLETED per tanggal order — WA/grosir memang dibayar di tempat.
 // UNPAID, CANCELLED, RETURNED tidak pernah dihitung.
 export const PAID_STATUSES = ["PENDING", "SHIPPED", "COMPLETED"];
 
-function orderWhere(f: DashboardFilter, basis: "completed" | "paid" = "completed") {
+type Basis = "completed" | "paid" | "received";
+
+function orderWhere(f: DashboardFilter, basis: Basis = "completed") {
+  if (basis === "received") return receivedWhere(f);
   const where: Record<string, unknown> = {
     status: basis === "paid" ? { in: PAID_STATUSES } : "COMPLETED",
   };
@@ -86,6 +93,39 @@ async function feeEstimator() {
     o.status === "COMPLETED" || o.marketplaceFee > 0
       ? o.marketplaceFee
       : Math.round(o.totalAmount * (rate.get(o.storeId) ?? 0));
+}
+
+function receivedWhere(f: DashboardFilter) {
+  const range =
+    f.from || f.to ? { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } : undefined;
+  const base: Record<string, unknown> = {};
+  if (f.storeId) base.storeId = f.storeId;
+  if (f.marketplace) base.store = { marketplace: f.marketplace };
+  return {
+    AND: [
+      base,
+      {
+        OR: [
+          {
+            store: { marketplace: "SHOPEE" },
+            payoutId: { not: null },
+            status: { notIn: ["UNPAID", "CANCELLED", "RETURNED"] },
+            ...(range ? { payout: { payoutDate: range } } : {}),
+          },
+          {
+            store: { marketplace: { not: "SHOPEE" } },
+            status: "COMPLETED",
+            ...(range ? { orderDate: range } : {}),
+          },
+        ],
+      },
+    ],
+  };
+}
+
+// tanggal masuk buku: tanggal cair (Shopee) atau tanggal order (lainnya)
+function bookDateOf(o: { orderDate: Date; payout?: { payoutDate: Date } | null }): Date {
+  return o.payout?.payoutDate ?? o.orderDate;
 }
 
 // ringkasan dashboard (basis "dibayar")
@@ -276,7 +316,7 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
       });
 
   const orders = await prisma.order.findMany({
-    where: orderWhere(f),
+    where: orderWhere(f, "received"),
     include: { items: { include: { product: true } } },
   });
 
@@ -399,6 +439,7 @@ export async function getStores() {
 
 export type LedgerRow = {
   orderDate: Date;
+  bookDate: Date; // tanggal uang masuk (tanggal cair Shopee / tanggal order lainnya)
   buyerName: string;
   marketplace: string;
   storeName: string;
@@ -418,9 +459,10 @@ export type LedgerRow = {
 // t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
 export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): Promise<LedgerRow[]> {
   const orders = await prisma.order.findMany({
-    where: orderWhere(f),
+    where: orderWhere(f, "received"),
     include: {
       store: true,
+      payout: { select: { payoutDate: true } },
       items: { include: { product: { include: { group: true } } } },
     },
     orderBy: [{ orderDate: "asc" }, { createdAt: "asc" }],
@@ -443,6 +485,7 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
       }
       rows.push({
         orderDate: o.orderDate,
+        bookDate: bookDateOf(o),
         buyerName: o.buyerName ?? "-",
         marketplace: o.store.marketplace,
         storeName: o.store.name,
@@ -458,7 +501,8 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
       });
     }
   }
-  return rows;
+  // urut per tanggal uang masuk (sort stabil → urutan order tetap di hari yang sama)
+  return rows.sort((a, b) => a.bookDate.getTime() - b.bookDate.getTime());
 }
 
 export async function getGroups() {

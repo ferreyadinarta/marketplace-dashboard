@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
   // ---------- Ringkasan PER TAHUN (data multi-tahun jadi mudah dibandingkan) ----------
   const yearAgg = new Map<number, { qty: number; total: number; modal: number }>();
   for (const r of detailRows) {
-    const y = jakartaParts(r.orderDate).year;
+    const y = jakartaParts(r.bookDate).year;
     const a = yearAgg.get(y) ?? { qty: 0, total: 0, modal: 0 };
     a.qty += r.qty;
     a.total += r.total;
@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
 
   const LEDGER_HEADERS = [
     "No",
-    t("Tanggal", "Date"),
+    t("Tgl uang masuk", "Date received"),
     t("Pembeli", "Buyer"),
     "Marketplace",
     "Order (SKU)",
@@ -242,7 +242,7 @@ export async function GET(req: NextRequest) {
     // kelompokkan per bulan (urut kronologis) — rows sudah urut tanggal asc
     const byMonth = new Map<string, typeof detailRows>();
     for (const r of rows) {
-      const k = monthKeyOf(r.orderDate);
+      const k = monthKeyOf(r.bookDate);
       const arr = byMonth.get(k) ?? [];
       arr.push(r);
       byMonth.set(k, arr);
@@ -259,7 +259,7 @@ export async function GET(req: NextRequest) {
       // baris 1: judul "SELLING <BULAN>" (merge selebar tabel)
       ws.mergeCells(1, c0, 1, c0 + COLS - 1);
       const title = ws.getCell(1, c0);
-      title.value = `${t("SELLING", "SELLING")} ${monthLabel(monthRows[0].orderDate)}`;
+      title.value = `${t("SELLING", "SELLING")} ${monthLabel(monthRows[0].bookDate)}`;
       title.font = { bold: true, size: 12, color: { argb: "FF4338CA" } };
       title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEEF2FF" } };
       title.alignment = { vertical: "middle" };
@@ -281,7 +281,7 @@ export async function GET(req: NextRequest) {
       let monthModal = 0;
       for (const row of monthRows) {
         no += 1;
-        const dLabel = tanggal(row.orderDate, lang);
+        const dLabel = tanggal(row.bookDate, lang);
         const showDate = dLabel !== curDate ? dLabel : "";
         curDate = dLabel;
         // Konsinyasi: tampilkan nama toko titipan, bukan "Konsinyasi".
@@ -361,7 +361,7 @@ export async function GET(req: NextRequest) {
 
     const byYear = new Map<number, typeof detailRows>();
     for (const r of rows) {
-      const y = jakartaParts(r.orderDate).year;
+      const y = jakartaParts(r.bookDate).year;
       const arr = byYear.get(y) ?? [];
       arr.push(r);
       byYear.set(y, arr);
