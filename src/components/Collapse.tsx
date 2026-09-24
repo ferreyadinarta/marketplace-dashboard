@@ -3,13 +3,9 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
-// Buka/tutup dengan tinggi yang mengalir (grid-rows 0fr → 1fr), bukan loncat.
-// Isi tetap ter-mount supaya animasi tutup juga halus; saat tertutup dibuat
-// inert biar tidak bisa di-tab/diklik.
+// buka/tutup dengan tinggi mengalir; isi tetap ter-mount, inert saat tertutup
 export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
-  // overflow baru dibuka setelah animasi selesai — kalau langsung visible, isi
-  // "tumpah" menimpa elemen di bawah selama tinggi masih tumbuh; kalau hidden
-  // terus, elemen sticky di dalamnya tidak bisa nempel.
+  // overflow visible hanya setelah animasi selesai (biar sticky di dalam tetap jalan)
   const [settled, setSettled] = useState(open);
 
   return (

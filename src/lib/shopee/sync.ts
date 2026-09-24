@@ -242,8 +242,7 @@ export async function syncShopeeStore(
     opts.resume && store.syncCursor ? Math.floor(store.syncCursor.getTime() / 1000) : null;
   // sync baru (bukan lanjutan) → buang cursor lama, jangan sampai putaran
   // berikutnya melewati periode terbaru yang belum sempat dikerjakan
-  // preserveCursor: penyegaran harian jalan berdampingan dengan sync riwayat yang
-  // belum selesai → bookmark riwayatnya jangan dihapus/ditimpa
+  // preserveCursor: jangan ganggu bookmark sync riwayat yang belum selesai
   if (!opts.resume && !opts.preserveCursor && store.syncCursor) {
     await prisma.store.update({ where: { id: store.id }, data: { syncCursor: null } });
   }

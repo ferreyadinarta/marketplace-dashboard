@@ -92,11 +92,7 @@ button:disabled,
   background-color: #94a3b8;
 }
 
-/* ---------- gerak halus ----------
-   fill-mode backwards (bukan both): transform yang tertinggal setelah animasi
-   bikin wrapper jadi containing block → elemen position:fixed di dalamnya geser.
-   Hanya untuk yang dibuka user (dropdown, panel, dialog) —
-   bukan animasi dekoratif. Semua mati kalau user minta reduced motion. */
+/* animasi hanya untuk dropdown/panel/dialog; fill backwards supaya position:fixed di dalamnya tidak geser */
 @keyframes reveal {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }

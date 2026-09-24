@@ -41,16 +41,7 @@ export type DashboardFilter = {
   groupId?: string; // filter grup pembukuan (khusus halaman Pembukuan)
 };
 
-// Dua cara hitung penjualan:
-//  - "selesai" (Pembukuan & Excel): hanya COMPLETED → buku final, tidak berubah lagi.
-//  - "dibayar" (Dashboard): semua yang sudah dibayar & tidak batal (PENDING,
-//    SHIPPED, COMPLETED) → penjualan hari ini langsung kelihatan. Kalau nanti
-//    batal/retur, statusnya berubah saat sync dan otomatis keluar sendiri.
-//  - "diterima" (Pembukuan & Excel): uang sudah sampai ke saldo penjual.
-//    Shopee: dana order sudah dirilis (terhubung ke Payout), tanggalnya =
-//    tanggal cair. Toko tanpa data pencairan (WA, grosir, marketplace manual):
-//    COMPLETED per tanggal order — WA/grosir memang dibayar di tempat.
-// UNPAID, CANCELLED, RETURNED tidak pernah dihitung.
+// completed: Pembukuan lama · paid: Dashboard · received: Pembukuan & Excel (uang sudah cair)
 export const PAID_STATUSES = ["PENDING", "SHIPPED", "COMPLETED"];
 
 type Basis = "completed" | "paid" | "received";
@@ -73,9 +64,7 @@ function orderWhere(f: DashboardFilter, basis: Basis = "completed") {
   return where;
 }
 
-// Fee order yang belum Selesai sering belum final (atau belum ada). Kalau
-// Shopee belum kasih angkanya, perkirakan dari rata-rata fee toko itu 90 hari
-// terakhir. Order Selesai selalu pakai fee aslinya.
+// fee order yang belum final: perkiraan dari rata-rata fee toko 90 hari terakhir
 async function feeEstimator() {
   const rows = await prisma.order.groupBy({
     by: ["storeId"],

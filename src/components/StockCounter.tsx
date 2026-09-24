@@ -38,9 +38,7 @@ function breakdown(base: number, tiers: Tier[]): string {
   return parts.join(" + ") || `0 ${tiers[tiers.length - 1].label}`;
 }
 
-// Hitung stok satu product per layar — dibuat untuk dipakai sambil berdiri di
-// gudang pakai HP. Tiap tingkat satuan (koli/box/sachet) punya kolom sendiri,
-// jadi tidak ada toggle satuan yang bisa salah pencet.
+// hitung stok satu product per layar (HP); tiap satuan punya kolom sendiri
 export function StockCounter({
   items,
   startIndex,
@@ -233,8 +231,7 @@ export function StockCounter({
           ))}
         </div>
 
-        {/* hasil: angka sistem baru muncul setelah user mengisi, supaya
-            hitungannya tidak ikut-ikutan angka sistem */}
+        {/* angka sistem baru tampil setelah user mengisi */}
         <div className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm">
           {!filled ? (
             <p className="text-slate-400">{t("Isi hitunganmu dulu, angka sistem muncul setelahnya.", "Enter your count first, the system number will show up after.")}</p>
@@ -282,7 +279,7 @@ export function StockCounter({
         </button>
       )}
 
-      {/* aksi — menempel di bawah layar supaya selalu terjangkau jempol */}
+      {/* aksi menempel di bawah layar */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur lg:left-64">
         <div className="mx-auto flex max-w-md gap-2">
           <button

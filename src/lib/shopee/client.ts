@@ -169,10 +169,14 @@ export async function getEscrowList(
   const deadline = opts.deadlineMs ?? 30_000;
   const out: ShopeeEscrowRelease[] = [];
 
-  // Shopee membatasi rentang get_escrow_list 15 hari → pecah seperti order list
+  // maks 15 hari per panggilan; terbaru dulu supaya yang terpotong periode lama
   const WINDOW = 15 * 24 * 3600;
+  const windows: [number, number][] = [];
   for (let start = fromSec; start < toSec; start += WINDOW) {
-    const end = Math.min(start + WINDOW, toSec);
+    windows.push([start, Math.min(start + WINDOW, toSec)]);
+  }
+  windows.reverse();
+  for (const [start, end] of windows) {
 
     for (let page = 1; page <= 100; page++) {
       if (Date.now() - started > deadline) return out; // berhenti rapi, bukan 504

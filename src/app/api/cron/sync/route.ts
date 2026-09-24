@@ -21,13 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1) SELALU segarkan status 30 hari terakhir dulu. Dulu kalau ada sync
-    //    riwayat yang menggantung, cron cuma melanjutkan itu dan melewatkan
-    //    penyegaran → status pesanan (Selesai/Batal) bisa macet berhari-hari.
-    // 2) Sisa waktunya baru dipakai melanjutkan sync riwayat yang tertunda.
-    //    Batas Vercel 60 detik → total kerja dijaga ≤ ~50 detik.
-    // 3) Pencairan Shopee (dana yang sudah masuk saldo penjual) juga ditarik
-    //    tiap hari — Pembukuan menghitung penjualan saat uangnya cair.
+    // selalu segarkan 30 hari + pencairan dulu, sisa waktu untuk sync riwayat
     const started = Date.now();
     const pending = await findPendingRound();
     const daily = await syncAllStores(30, pending ? 20_000 : 32_000, { daily: true });
