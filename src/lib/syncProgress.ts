@@ -129,7 +129,7 @@ export async function listSyncJobs() {
         { finishedAt: null, updatedAt: { gt: new Date(now - ACTIVE_STALE_MS) } },
         { finishedAt: { gt: new Date(now - RECENT_DONE_MS) } },
         // masih ada sisa & menunggu putaran berikutnya
-        { partial: true, phase: "done", finishedAt: { gt: new Date(now - PENDING_MS) } },
+        { partial: true, phase: "done", scope: { not: "DAILY" }, finishedAt: { gt: new Date(now - PENDING_MS) } },
       ],
     },
     orderBy: { startedAt: "desc" },
@@ -151,7 +151,7 @@ export async function listSyncJobs() {
   const layak = newest.filter(
     (j) =>
       !j.finishedAt || // masih jalan
-      (j.partial && j.phase === "done") || // nunggu lanjutan
+      (j.partial && j.phase === "done" && j.scope !== "DAILY") || // nunggu lanjutan (DAILY tidak pernah dilanjutkan)
       j.finishedAt.getTime() > now - RECENT_DONE_MS // baru saja tuntas / error
   );
 

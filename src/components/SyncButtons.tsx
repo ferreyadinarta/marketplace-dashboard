@@ -87,8 +87,8 @@ function useSyncRunner() {
           if (stop.current) {
             toast(
               t(
-                `Dijeda: ${acc.created} baru, ${acc.updated} diperbarui. Sisanya dilanjutkan otomatis di server`,
-                `Paused: ${acc.created} new, ${acc.updated} updated. The rest continues automatically on the server`
+                `Dijeda: ${acc.created} baru, ${acc.updated} diperbarui. Sisanya lanjut otomatis besok pagi, atau klik Sync lagi`,
+                `Paused: ${acc.created} new, ${acc.updated} updated. The rest continues tomorrow morning, or click Sync again`
               )
             );
             break;

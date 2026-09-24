@@ -301,8 +301,8 @@ export function SyncProgressPanel() {
               <p className="mt-0.5 text-xs text-indigo-900 opacity-80">
                 {waiting
                   ? t(
-                      "Lanjut sendiri tiap ~15 menit. Halaman boleh ditutup, atau klik Sync lagi kalau mau langsung lanjut.",
-                      "Continues on its own every ~15 minutes. You can close this page, or click Sync again to continue right away."
+                      "Lanjut otomatis tiap pagi jam 09.00. Klik Sync kalau mau langsung lanjut sekarang.",
+                      "Continues automatically every morning at 09:00. Click Sync to continue right now."
                     )
                   : (translateSyncText(j.error, t) ?? translateSyncText(j.message, t) ?? t("Menyiapkan…", "Preparing…"))}
                 {j.windowTotal > 1 && !j.error ? ` (${t("bagian", "part")} ${j.windowIndex} ${t("dari", "of")} ${j.windowTotal})` : ""}
@@ -392,8 +392,8 @@ export function SyncProgressPanel() {
                       {translateSyncText(j.error, t) ??
                         (j.partial
                           ? t(
-                              "Masih ada sisa. Lanjut sendiri tiap ~15 menit, atau klik Sync lagi.",
-                              "There's more left. Continues on its own every ~15 minutes, or click Sync again."
+                              "Masih ada sisa. Lanjut otomatis besok pagi, atau klik Sync sekarang.",
+                              "There's more left. Continues tomorrow morning, or click Sync now."
                             )
                           : (translateSyncText(j.message, t) ?? t("Selesai", "Done")))}
                     </p>
