@@ -170,11 +170,11 @@ export function MultiItemSaleForm({
   };
   // faktor konversi ke satuan dasar (pack → packSize, base → 1)
   const factorOf = (it: Item) => (it.unit === "pack" && hasPack(it.productId) ? prodOf(it.productId)!.packSize! : 1);
-  // harga default per satuan yang dipilih
+  // harga di master product = per satuan UTAMA (box kalau ada), seperti HPP
   const defaultPrice = (pid: string, unit: "base" | "pack") => {
     const p = prodOf(pid);
-    const basePrice = isGrosir ? p?.priceGrosir ?? 0 : p?.priceRetail ?? 0;
-    return unit === "pack" && hasPack(pid) ? basePrice * (p!.packSize || 1) : basePrice;
+    const mainPrice = isGrosir ? p?.priceGrosir ?? 0 : p?.priceRetail ?? 0;
+    return unit === "base" && hasPack(pid) ? Math.round(mainPrice / (p!.packSize || 1)) : mainPrice;
   };
   const [storeId, setStoreId] = useState("");
   const [items, setItems] = useState<Item[]>([{ productId: "", qty: "1", price: "", unit: "base" }]);

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/components/KonsinyasiForms.tsx"
+        ],
+        "createdAt": "2026-10-03T13:42:50.726Z",
+        "reason": "Claude: gray text sits on white; hover swaps both bg tint and text color (red/indigo), no gray-on-tint state"
+      }
+    ]
+  }
+}
