@@ -17,9 +17,7 @@ import {
 } from "lucide-react";
 import {
   getSummary,
-  getDailyTrend,
-  getByMarketplace,
-  getBestSellers,
+  getDashboardData,
   previousPeriod,
 } from "@/lib/queries";
 import { getStockLevels } from "@/lib/stock";
@@ -72,12 +70,9 @@ export default async function DashboardPage({
   const canCompare = !period.isAll && !!filter.from && !!filter.to;
   const prev = canCompare ? previousPeriod(filter.from!, filter.to!) : null;
 
-  const [summary, prevSummary, trend, byMp, best, setup, levels, lastSync] = await Promise.all([
-    getSummary(filter),
+  const [{ summary, trend, byMp, best }, prevSummary, setup, levels, lastSync] = await Promise.all([
+    getDashboardData(filter, 5),
     prev ? getSummary({ ...filter, from: prev.from, to: prev.to }) : Promise.resolve(null),
-    getDailyTrend(filter),
-    getByMarketplace(filter),
-    getBestSellers(filter, 5),
     getSetupStatus(t),
     getStockLevels(),
     // sync terakhir dari toko yang terhubung API (toko manual tidak di-sync)

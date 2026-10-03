@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { dateKey } from "./format";
 import { modalOf } from "./units";
@@ -117,16 +118,54 @@ function bookDateOf(o: { orderDate: Date; payout?: { payoutDate: Date } | null }
   return o.payout?.payoutDate ?? o.orderDate;
 }
 
-// ringkasan dashboard (basis "dibayar")
-export async function getSummary(f: DashboardFilter) {
-  const [orders, feeOf] = await Promise.all([
-    prisma.order.findMany({
-      where: orderWhere(f, "paid"),
-      include: { items: { include: { product: true } } },
-    }),
-    feeEstimator(),
-  ]);
+// JOIN di DB, bukan include (IN ribuan id bikin Neon out of memory)
+function paidFilterSql(f: DashboardFilter) {
+  return Prisma.sql`o.status IN ('PENDING','SHIPPED','COMPLETED')
+    ${f.from ? Prisma.sql`AND o."orderDate" >= ${f.from}` : Prisma.empty}
+    ${f.to ? Prisma.sql`AND o."orderDate" <= ${f.to}` : Prisma.empty}
+    ${f.storeId ? Prisma.sql`AND o."storeId" = ${f.storeId}` : Prisma.empty}
+    ${f.marketplace ? Prisma.sql`AND s.marketplace = ${f.marketplace}` : Prisma.empty}`;
+}
 
+// = itemModal()
+const MODAL_SQL = Prisma.sql`(CASE WHEN oi."hppSnapshot" > 0 THEN oi."hppSnapshot" ELSE COALESCE(p.hpp, 0) END)::float8
+  * (CASE WHEN oi."baseQty" > 0 THEN oi."baseQty" ELSE oi.qty END)
+  / (CASE WHEN COALESCE(p."packSize", 0) >= 2 THEN p."packSize" ELSE 1 END)`;
+
+type PaidOrder = {
+  id: string;
+  storeId: string;
+  status: string;
+  totalAmount: number;
+  marketplaceFee: number;
+  orderDate: Date;
+  marketplace: string;
+  nilai: number;
+  nItems: number;
+  modal: number;
+};
+
+async function loadPaidOrders(f: DashboardFilter): Promise<PaidOrder[]> {
+  return prisma.$queryRaw<PaidOrder[]>`
+    SELECT o.id, o."storeId", o.status, o."totalAmount", o."marketplaceFee", o."orderDate", s.marketplace,
+      COALESCE(SUM(oi.subtotal), 0)::float8 AS nilai,
+      COUNT(oi.id)::int AS "nItems",
+      COALESCE(SUM(${MODAL_SQL}), 0)::float8 AS modal
+    FROM "Order" o
+    JOIN "Store" s ON s.id = o."storeId"
+    LEFT JOIN "OrderItem" oi ON oi."orderId" = o.id
+    LEFT JOIN "Product" p ON p.id = oi."productId"
+    WHERE ${paidFilterSql(f)}
+    GROUP BY o.id, s.marketplace`;
+}
+
+type FeeOf = Awaited<ReturnType<typeof feeEstimator>>;
+
+function orderModal(o: PaidOrder): number {
+  return o.modal;
+}
+
+function summarize(orders: PaidOrder[], feeOf: FeeOf) {
   let omzet = 0;
   let fee = 0;
   let hpp = 0;
@@ -135,9 +174,7 @@ export async function getSummary(f: DashboardFilter) {
   for (const o of orders) {
     omzet += o.totalAmount;
     fee += feeOf(o);
-    for (const it of o.items) {
-      hpp += itemModal(it);
-    }
+    hpp += orderModal(o);
     if (o.status !== "COMPLETED") {
       prosesOrder += 1;
       prosesOmzet += o.totalAmount;
@@ -150,9 +187,23 @@ export async function getSummary(f: DashboardFilter) {
     hpp: hppBulat,
     profit: omzet - fee - hppBulat,
     jumlahOrder: orders.length,
-    // bagian yang belum Selesai (masih bisa batal) — untuk catatan kecil di UI
     prosesOrder,
     prosesOmzet,
+  };
+}
+
+export async function getSummary(f: DashboardFilter) {
+  const [orders, feeOf] = await Promise.all([loadPaidOrders(f), feeEstimator()]);
+  return summarize(orders, feeOf);
+}
+
+export async function getDashboardData(f: DashboardFilter, bestLimit = 5) {
+  const [orders, items, feeOf] = await Promise.all([loadPaidOrders(f), loadSoldItems(f), feeEstimator()]);
+  return {
+    summary: summarize(orders, feeOf),
+    trend: dailyTrend(orders, feeOf, f),
+    byMp: byMarketplace(orders, feeOf),
+    best: bestSellers(orders, items, feeOf, bestLimit),
   };
 }
 
@@ -207,25 +258,13 @@ export async function getInFlight(f: DashboardFilter) {
   };
 }
 
-// tren harian omzet & profit
-export async function getDailyTrend(f: DashboardFilter) {
-  const [orders, feeOf] = await Promise.all([
-    prisma.order.findMany({
-      where: orderWhere(f, "paid"),
-      include: { items: { include: { product: true } } },
-      orderBy: { orderDate: "asc" },
-    }),
-    feeEstimator(),
-  ]);
-
+function dailyTrend(orders: PaidOrder[], feeOf: FeeOf, f: DashboardFilter) {
   const map = new Map<string, { omzet: number; profit: number }>();
   for (const o of orders) {
     const key = dateKey(o.orderDate); // dikelompokkan per hari WIB, bukan UTC
     const cur = map.get(key) ?? { omzet: 0, profit: 0 };
-    let hpp = 0;
-    for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
-    cur.profit += o.totalAmount - feeOf(o) - hpp;
+    cur.profit += o.totalAmount - feeOf(o) - orderModal(o);
     map.set(key, cur);
   }
   // Isi hari kosong dengan 0 sepanjang rentang filter. Tanpa ini grafik mulai di
@@ -244,26 +283,18 @@ export async function getDailyTrend(f: DashboardFilter) {
     return out;
   }
 
-  return Array.from(map.entries()).map(([tanggal, v]) => ({ tanggal, ...v }));
+  return Array.from(map.entries())
+    .sort(([x], [y]) => (x < y ? -1 : 1))
+    .map(([tanggal, v]) => ({ tanggal, ...v }));
 }
 
-// performa per marketplace
-export async function getByMarketplace(f: DashboardFilter) {
-  const [orders, feeOf] = await Promise.all([
-    prisma.order.findMany({
-      where: orderWhere(f, "paid"),
-      include: { items: { include: { product: true } }, store: true },
-    }),
-    feeEstimator(),
-  ]);
+function byMarketplace(orders: PaidOrder[], feeOf: FeeOf) {
   const map = new Map<string, { omzet: number; profit: number; order: number }>();
   for (const o of orders) {
-    const key = o.store.marketplace;
+    const key = o.marketplace;
     const cur = map.get(key) ?? { omzet: 0, profit: 0, order: 0 };
-    let hpp = 0;
-    for (const it of o.items) hpp += itemModal(it);
     cur.omzet += o.totalAmount;
-    cur.profit += o.totalAmount - feeOf(o) - hpp;
+    cur.profit += o.totalAmount - feeOf(o) - orderModal(o);
     cur.order += 1;
     map.set(key, cur);
   }
@@ -286,6 +317,37 @@ export async function getByMarketplace(f: DashboardFilter) {
   return rows;
 }
 
+// item via filter relasi (subquery), bukan include IN ribuan id
+async function loadReceivedOrders(f: DashboardFilter) {
+  const where = orderWhere(f, "received") as Prisma.OrderWhereInput;
+  const [orders, items] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      select: {
+        id: true,
+        marketplaceFee: true,
+        shippingSubsidy: true,
+        orderDate: true,
+        buyerName: true,
+        store: { select: { marketplace: true, name: true } },
+        payout: { select: { payoutDate: true } },
+      },
+      orderBy: [{ orderDate: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.orderItem.findMany({
+      where: { order: where },
+      include: { product: { include: { group: true } } },
+    }),
+  ]);
+  const byOrder = new Map<string, typeof items>();
+  for (const it of items) {
+    const arr = byOrder.get(it.orderId) ?? [];
+    arr.push(it);
+    byOrder.set(it.orderId, arr);
+  }
+  return orders.map((o) => ({ ...o, items: byOrder.get(o.id) ?? [] }));
+}
+
 // id semu untuk bucket product tanpa grup
 export const NO_GROUP = "__none__";
 
@@ -304,10 +366,7 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
         orderBy: { name: "asc" },
       });
 
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f, "received"),
-    include: { items: { include: { product: true } } },
-  });
+  const orders = await loadReceivedOrders(f);
 
   // akumulasi per productId
   type Agg = { terjual: number; omzet: number; fee: number; hpp: number };
@@ -447,15 +506,7 @@ export type LedgerRow = {
 // Hanya order selesai (via orderWhere). Menghormati filter grup (brand).
 // t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
 export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): Promise<LedgerRow[]> {
-  const orders = await prisma.order.findMany({
-    where: orderWhere(f, "received"),
-    include: {
-      store: true,
-      payout: { select: { payoutDate: true } },
-      items: { include: { product: { include: { group: true } } } },
-    },
-    orderBy: [{ orderDate: "asc" }, { createdAt: "asc" }],
-  });
+  const orders = await loadReceivedOrders(f);
 
   const rows: LedgerRow[] = [];
   for (const o of orders) {
@@ -499,31 +550,42 @@ export async function getGroups() {
 }
 
 // product terlaris (top N) berdasarkan profit dalam periode filter
-export async function getBestSellers(f: DashboardFilter, limit = 5) {
-  const [orders, feeOf] = await Promise.all([
-    prisma.order.findMany({
-      where: orderWhere(f, "paid"),
-      include: { items: { include: { product: true } } },
-    }),
-    feeEstimator(),
-  ]);
+type SoldItem = {
+  orderId: string;
+  productId: string;
+  name: string;
+  sku: string;
+  subtotal: number;
+  qty: number;
+  baseQty: number;
+  modal: number;
+};
 
+async function loadSoldItems(f: DashboardFilter): Promise<SoldItem[]> {
+  return prisma.$queryRaw<SoldItem[]>`
+    SELECT oi."orderId", oi."productId", p.name, p.sku, oi.subtotal,
+      (CASE WHEN oi."baseQty" > 0 THEN oi."baseQty" ELSE oi.qty END)::int AS "baseQty",
+      oi.qty, (${MODAL_SQL})::float8 AS modal
+    FROM "OrderItem" oi
+    JOIN "Order" o ON o.id = oi."orderId"
+    JOIN "Store" s ON s.id = o."storeId"
+    JOIN "Product" p ON p.id = oi."productId"
+    WHERE ${paidFilterSql(f)}`;
+}
+
+function bestSellers(orders: PaidOrder[], items: SoldItem[], feeOf: FeeOf, limit: number) {
+  const byId = new Map(orders.map((o) => [o.id, o]));
   type Row = { productId: string; name: string; sku: string; qty: number; omzet: number; profit: number };
   const map = new Map<string, Row>();
-  for (const o of orders) {
-    const nilai = o.items.reduce((a, it) => a + it.subtotal, 0);
-    for (const it of o.items) {
-      if (!it.productId || !it.product) continue;
-      // fee & satuan mengikuti aturan yang sama dengan Pembukuan biar angkanya cocok
-      const feeItem = feeOf(o) * shareOf(it.subtotal, nilai, o.items.length);
-      const r =
-        map.get(it.productId) ??
-        { productId: it.productId, name: it.product.name, sku: it.product.sku, qty: 0, omzet: 0, profit: 0 };
-      r.qty += itemBaseQty(it);
-      r.omzet += it.subtotal;
-      r.profit += it.subtotal - feeItem - itemModal(it);
-      map.set(it.productId, r);
-    }
+  for (const it of items) {
+    const o = byId.get(it.orderId);
+    if (!o) continue;
+    const feeItem = feeOf(o) * shareOf(it.subtotal, o.nilai, o.nItems);
+    const r = map.get(it.productId) ?? { productId: it.productId, name: it.name, sku: it.sku, qty: 0, omzet: 0, profit: 0 };
+    r.qty += it.baseQty;
+    r.omzet += it.subtotal;
+    r.profit += it.subtotal - feeItem - it.modal;
+    map.set(it.productId, r);
   }
   return Array.from(map.values())
     .map((r) => ({ ...r, profit: Math.round(r.profit) }))
