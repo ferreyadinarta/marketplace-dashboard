@@ -25,6 +25,8 @@ function rowName(productId: string, name: string, t: (id: string, en: string) =>
   return productId === "__unmapped__" ? t("SKU belum dipetakan", "Unmapped SKU") : name;
 }
 
+const profitColor = (v: number) => (v < 0 ? "text-red-600" : "text-emerald-600");
+
 export default async function PembukuanPage({
   searchParams,
 }: {
@@ -80,7 +82,7 @@ export default async function PembukuanPage({
           {/* ringkas total */}
           <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <span className="text-sm text-slate-500">{t("Total profit bersih (sesuai filter)", "Total net profit (per filter)")}</span>
-            <span className="text-xl font-bold text-emerald-600">{rupiah(totalProfit)}</span>
+            <span className={`text-xl font-bold ${profitColor(totalProfit)}`}>{rupiah(totalProfit)}</span>
           </div>
 
           {groups.map((g) => {
@@ -91,7 +93,7 @@ export default async function PembukuanPage({
                 <h2 className="font-semibold text-slate-900">{label}</h2>
                 <span className="text-sm text-slate-500">
                   {t("Profit:", "Profit:")}{" "}
-                  <span className="font-semibold text-emerald-600">{rupiah(g.subtotal.profit)}</span>
+                  <span className={`font-semibold ${profitColor(g.subtotal.profit)}`}>{rupiah(g.subtotal.profit)}</span>
                 </span>
               </div>
               {/* table-fixed + lebar kolom eksplisit → semua grup sejajar & muat
@@ -127,7 +129,7 @@ export default async function PembukuanPage({
                         <td className="px-5 py-2.5 text-right text-slate-600">{rupiah(r.omzet)}</td>
                         <td className="px-5 py-2.5 text-right text-red-500">{rupiah(r.fee)}</td>
                         <td className="px-5 py-2.5 text-right text-slate-400">{rupiah(r.hpp)}</td>
-                        <td className="px-5 py-2.5 text-right font-semibold text-emerald-600">{rupiah(r.profit)}</td>
+                        <td className={`px-5 py-2.5 text-right font-semibold ${profitColor(r.profit)}`}>{rupiah(r.profit)}</td>
                       </tr>
                     ))}
                     {g.rows.length === 0 && (
@@ -146,7 +148,7 @@ export default async function PembukuanPage({
                       <td className="px-5 py-2.5 text-right">{rupiah(g.subtotal.omzet)}</td>
                       <td className="px-5 py-2.5 text-right text-red-500">{rupiah(g.subtotal.fee)}</td>
                       <td className="px-5 py-2.5"></td>
-                      <td className="px-5 py-2.5 text-right text-emerald-600">{rupiah(g.subtotal.profit)}</td>
+                      <td className={`px-5 py-2.5 text-right ${profitColor(g.subtotal.profit)}`}>{rupiah(g.subtotal.profit)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -182,7 +184,7 @@ export default async function PembukuanPage({
                       </div>
                       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
                         <span className="text-[11px] text-slate-400">Profit</span>
-                        <span className="font-semibold text-emerald-600 tabular-nums">{rupiah(r.profit)}</span>
+                        <span className={`font-semibold tabular-nums ${profitColor(r.profit)}`}>{rupiah(r.profit)}</span>
                       </div>
                     </div>
                   ))}
@@ -205,7 +207,7 @@ export default async function PembukuanPage({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] text-slate-400">Profit</span>
-                        <span className="font-semibold text-emerald-600 tabular-nums">{rupiah(g.subtotal.profit)}</span>
+                        <span className={`font-semibold tabular-nums ${profitColor(g.subtotal.profit)}`}>{rupiah(g.subtotal.profit)}</span>
                       </div>
                     </div>
                   </div>

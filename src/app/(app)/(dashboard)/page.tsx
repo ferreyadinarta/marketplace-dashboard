@@ -55,6 +55,8 @@ function QuickAction({ href, icon, label }: { href: string; icon: ReactNode; lab
   );
 }
 
+const profitColor = (v: number) => (v < 0 ? "text-red-600" : "text-emerald-600");
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -329,7 +331,7 @@ export default async function DashboardPage({
                     </td>
                     <td className="px-5 py-3 text-right text-slate-600">{m.order.toLocaleString("id-ID")}</td>
                     <td className="px-5 py-3 text-right text-slate-600">{rupiah(m.omzet)}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-emerald-600">{rupiah(m.profit)}</td>
+                    <td className={`px-5 py-3 text-right font-semibold ${profitColor(m.profit)}`}>{rupiah(m.profit)}</td>
                   </tr>
                 ))}
                 {byMp.length === 0 && (
@@ -360,7 +362,7 @@ export default async function DashboardPage({
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs text-slate-400">Profit</span>
-                    <span className="text-sm font-semibold tabular-nums text-emerald-600">{rupiah(m.profit)}</span>
+                    <span className={`text-sm font-semibold tabular-nums ${profitColor(m.profit)}`}>{rupiah(m.profit)}</span>
                   </div>
                 </div>
               </div>
@@ -396,7 +398,7 @@ export default async function DashboardPage({
                     {p.qty.toLocaleString("id-ID")} {t("terjual", "sold")}
                   </p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold text-emerald-600">{rupiah(p.profit)}</span>
+                <span className={`shrink-0 text-sm font-semibold ${profitColor(p.profit)}`}>{rupiah(p.profit)}</span>
               </div>
             ))}
             {best.length === 0 && (
