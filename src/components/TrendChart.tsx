@@ -21,9 +21,13 @@ function juta(v: number) {
   return String(v);
 }
 
-function tglPendek(iso: string, lang: Lang) {
+function tglPendek(iso: string, lang: Lang, withYear = false) {
   const d = new Date(iso);
-  return new Intl.DateTimeFormat(intlLocale(lang), { day: "numeric", month: "short" }).format(d);
+  return new Intl.DateTimeFormat(intlLocale(lang), {
+    day: "numeric",
+    month: "short",
+    ...(withYear ? { year: "numeric" } : {}),
+  }).format(d);
 }
 
 export default function TrendChart({ data }: { data: Point[] }) {
@@ -60,7 +64,7 @@ export default function TrendChart({ data }: { data: Point[] }) {
           width={44}
         />
         <Tooltip
-          labelFormatter={(l) => tglPendek(String(l), lang)}
+          labelFormatter={(l) => tglPendek(String(l), lang, true)}
           formatter={(v) =>
             new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
               Number(v)
