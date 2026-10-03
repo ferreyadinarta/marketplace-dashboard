@@ -97,6 +97,24 @@ function normalize(o: ShopeeOrderDetail): NormalizedOrder {
 }
 
 // Total fee marketplace yang dipotong Shopee dari income detail.
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+
+function breakdownFromIncome(inc: ShopeeIncome) {
+  const admin = feeFromIncome(inc);
+  const shipNet =
+    inc.final_shipping_fee != null
+      ? num(inc.final_shipping_fee)
+      : num(inc.buyer_paid_shipping_fee) + num(inc.shopee_shipping_rebate) - num(inc.actual_shipping_fee);
+  const shipping = Math.max(0, Math.round(-shipNet));
+  const tax = Math.round(
+    Math.abs(num(inc.escrow_tax)) +
+      Math.abs(num(inc.withholding_tax)) +
+      Math.abs(num(inc.final_product_vat_tax)) +
+      Math.abs(num(inc.final_shipping_vat_tax))
+  );
+  return { admin, shipping, tax, raw: inc };
+}
+
 function feeFromIncome(inc: ShopeeIncome): number {
   const f =
     (inc.commission_fee ?? 0) +
@@ -126,7 +144,7 @@ async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<v
   await Promise.all(workers);
 }
 
-export type CachedFee = { marketplaceFee: number; netAmount: number };
+export type CachedFee = { marketplaceFee: number; netAmount: number }; // hanya order yang rinciannya sudah tersimpan
 
 // Normalisasi + ambil fee escrow per order. Escrow di-skip untuk:
 //  - UNPAID (belum dibayar → escrow pasti belum ada)
@@ -157,7 +175,9 @@ async function normalizeWithFees(
 
   const apply = (idx: number, inc: ShopeeIncome) => {
     orders[idx].escrowAt = new Date();
-    orders[idx].marketplaceFee = feeFromIncome(inc);
+    const b = breakdownFromIncome(inc);
+    orders[idx].feeBreakdown = b;
+    orders[idx].marketplaceFee = b.admin + b.shipping + b.tax;
     if (inc.escrow_amount != null && Number.isFinite(inc.escrow_amount)) {
       orders[idx].netAmount = Math.round(inc.escrow_amount);
     }
@@ -256,8 +276,11 @@ export async function syncShopeeStore(
   const RECHECK_DAYS = 30;
   const recheckCutoff = Math.floor(Date.now() / 1000) - RECHECK_DAYS * 24 * 3600;
   const syncedFromSec = store.syncedFrom ? Math.floor(store.syncedFrom.getTime() / 1000) : null;
+  // order lama tanpa rincian fee → periode lamanya dipindai ulang sekali
+  const needsFeeBackfill =
+    (await prisma.order.count({ where: { storeId: store.id, escrowAt: { not: null }, feeDetailAt: null } })) > 0;
   const alreadyCovered = (ws: number, we: number) =>
-    syncedFromSec != null && we < recheckCutoff && ws >= syncedFromSec;
+    !needsFeeBackfill && syncedFromSec != null && we < recheckCutoff && ws >= syncedFromSec;
 
   const BATCH = 50; // batas get_order_detail per panggilan
   const total: SyncResult = { created: 0, updated: 0, unmapped: 0, partial: false };
@@ -319,7 +342,7 @@ export async function syncShopeeStore(
       // escrowAt, bukan fee > 0: order final yang feenya memang 0 (batal, atau
       // escrow balikin 0) jangan ikut ditarik ulang tiap putaran
       const known = await prisma.order.findMany({
-        where: { storeId: store.id, marketplaceOrderId: { in: chunk }, escrowAt: { not: null } },
+        where: { storeId: store.id, marketplaceOrderId: { in: chunk }, escrowAt: { not: null }, feeDetailAt: { not: null } },
         select: {
           marketplaceOrderId: true,
           marketplaceFee: true,

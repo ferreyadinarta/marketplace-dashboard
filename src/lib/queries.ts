@@ -326,6 +326,10 @@ async function loadReceivedOrders(f: DashboardFilter) {
       select: {
         id: true,
         marketplaceFee: true,
+        feeAdmin: true,
+        feeShipping: true,
+        feeTax: true,
+        feeDetailAt: true,
         shippingSubsidy: true,
         orderDate: true,
         buyerName: true,
@@ -494,10 +498,12 @@ export type LedgerRow = {
   groupName: string; // brand / grup pembukuan (atau "Tanpa Grup")
   sku: string; // kolom "Order" di format kakak
   productName: string;
-  qty: number; // dalam satuan saat dijual
-  unit: string; // label satuan jual (ex: box / sachet)
+  qtyLabel: string; // mis. "1 box" / "1 box + 4 sachet"
+  qtyMain: number; // dalam satuan utama (box), untuk dijumlah
   price: number;
-  fee: number; // ongkir/adm (fee proporsional per item)
+  feeAdmin: number;
+  feeShipping: number;
+  feeTax: number;
   total: number; // net per item (omzet - fee + subsidi ongkir)
   modal: number; // HPP x qty (untuk hitung laba)
 };
@@ -505,6 +511,23 @@ export type LedgerRow = {
 // Ledger per-order untuk sheet ledger per brand. Satu baris = satu item order.
 // Hanya order selesai (via orderWhere). Menghormati filter grup (brand).
 // t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
+function qtyInMainUnit(it: {
+  qty: number;
+  baseQty: number;
+  unit: string;
+  product: { unit: string; packUnit: string; packSize: number } | null;
+}): { qtyLabel: string; qtyMain: number } {
+  const p = it.product;
+  if (!p) return { qtyLabel: `${it.qty} ${it.unit}`.trim(), qtyMain: it.qty };
+  const base = itemBaseQty(it);
+  if (p.packSize < 2 || !p.packUnit) return { qtyLabel: `${base} ${p.unit}`.trim(), qtyMain: base };
+  const box = Math.floor(base / p.packSize);
+  const rest = base % p.packSize;
+  const label =
+    rest === 0 ? `${box} ${p.packUnit}` : box > 0 ? `${box} ${p.packUnit} + ${rest} ${p.unit}` : `${rest} ${p.unit}`;
+  return { qtyLabel: label, qtyMain: base / p.packSize };
+}
+
 export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): Promise<LedgerRow[]> {
   const orders = await loadReceivedOrders(f);
 
@@ -512,6 +535,10 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
   for (const o of orders) {
     // sama seperti Pembukuan: dibagi menurut nilai item, bukan rata per item
     const nilai = o.items.reduce((a, x) => a + x.subtotal, 0);
+    // belum ada rincian (order lama / manual) → seluruh fee dianggap admin
+    const fees = o.feeDetailAt
+      ? { admin: o.feeAdmin, shipping: o.feeShipping, tax: o.feeTax }
+      : { admin: o.marketplaceFee, shipping: 0, tax: 0 };
     for (const it of o.items) {
       const bagian = shareOf(it.subtotal, nilai, o.items.length);
       const feePerItem = o.marketplaceFee * bagian;
@@ -532,10 +559,11 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
         groupName: it.product?.group?.name ?? t("Tanpa Grup", "No group"),
         sku: it.product?.sku ?? it.marketplaceSku,
         productName: it.productName,
-        qty: it.qty,
-        unit: it.unit || it.product?.unit || "",
+        ...qtyInMainUnit(it),
         price: it.price,
-        fee: Math.round(feePerItem),
+        feeAdmin: Math.round(fees.admin * bagian),
+        feeShipping: Math.round(fees.shipping * bagian),
+        feeTax: Math.round(fees.tax * bagian),
         total: Math.round(it.subtotal - feePerItem + shipPerItem),
         modal: Math.round(itemModal(it)),
       });

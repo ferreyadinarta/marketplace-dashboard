@@ -100,12 +100,24 @@ export async function GET(req: NextRequest) {
   }
   sum.addRow([]);
 
+  const aggByGroup = new Map<string, { qty: number; admin: number; ship: number; tax: number }>();
+  for (const r of detailRows) {
+    const a = aggByGroup.get(r.groupName) ?? { qty: 0, admin: 0, ship: 0, tax: 0 };
+    a.qty += r.qtyMain;
+    a.admin += r.feeAdmin;
+    a.ship += r.feeShipping;
+    a.tax += r.feeTax;
+    aggByGroup.set(r.groupName, a);
+  }
+
   // tabel ringkasan per grup
   const headerRow = sum.addRow([
     t("Grup", "Group"),
-    t("Terjual", "Sold"),
+    t("Terjual (box)", "Sold (box)"),
     t("Omzet", "Revenue"),
-    "Fee",
+    "Admin",
+    t("Ongkir", "Shipping"),
+    t("Pajak", "Tax"),
     t("Modal", "COGS"),
     "Profit",
     t("Margin", "Margin"),
@@ -116,37 +128,40 @@ export async function GET(req: NextRequest) {
     c.alignment = { vertical: "middle" };
   });
 
-  const grand = { terjual: 0, omzet: 0, fee: 0, modal: 0, profit: 0 };
+  const SUM_FMT = [INT, CURRENCY, CURRENCY, CURRENCY, CURRENCY, CURRENCY, CURRENCY_NEG, PERCENT];
+  const grand = { terjual: 0, omzet: 0, admin: 0, ship: 0, tax: 0, modal: 0, profit: 0 };
   for (const g of groups) {
     const modal = g.subtotal.omzet - g.subtotal.fee - g.subtotal.profit;
     const margin = g.subtotal.omzet ? g.subtotal.profit / g.subtotal.omzet : 0;
+    const a = aggByGroup.get(g.groupName) ?? { qty: 0, admin: g.subtotal.fee, ship: 0, tax: 0 };
     const row = sum.addRow([
       tGroupLabel(g.groupId, g.groupName, t),
-      g.subtotal.terjual,
+      Math.round(a.qty),
       g.subtotal.omzet,
-      g.subtotal.fee,
+      a.admin,
+      a.ship,
+      a.tax,
       modal,
       g.subtotal.profit,
       margin,
     ]);
-    row.getCell(2).numFmt = INT;
-    row.getCell(3).numFmt = CURRENCY;
-    row.getCell(4).numFmt = CURRENCY;
-    row.getCell(5).numFmt = CURRENCY;
-    row.getCell(6).numFmt = CURRENCY_NEG;
-    row.getCell(7).numFmt = PERCENT;
-    grand.terjual += g.subtotal.terjual;
+    SUM_FMT.forEach((f, i) => (row.getCell(i + 2).numFmt = f));
+    grand.terjual += a.qty;
     grand.omzet += g.subtotal.omzet;
-    grand.fee += g.subtotal.fee;
+    grand.admin += a.admin;
+    grand.ship += a.ship;
+    grand.tax += a.tax;
     grand.modal += modal;
     grand.profit += g.subtotal.profit;
   }
   const grandMargin = grand.omzet ? grand.profit / grand.omzet : 0;
   const totalRow = sum.addRow([
     t("TOTAL", "TOTAL"),
-    grand.terjual,
+    Math.round(grand.terjual),
     grand.omzet,
-    grand.fee,
+    grand.admin,
+    grand.ship,
+    grand.tax,
     grand.modal,
     grand.profit,
     grandMargin,
@@ -156,19 +171,14 @@ export async function GET(req: NextRequest) {
     c.fill = SUBTOTAL_FILL;
     c.border = { top: { style: "thin", color: { argb: "FF94A3B8" } } };
   });
-  totalRow.getCell(2).numFmt = INT;
-  totalRow.getCell(3).numFmt = CURRENCY;
-  totalRow.getCell(4).numFmt = CURRENCY;
-  totalRow.getCell(5).numFmt = CURRENCY;
-  totalRow.getCell(6).numFmt = CURRENCY_NEG;
-  totalRow.getCell(7).numFmt = PERCENT;
+  SUM_FMT.forEach((f, i) => (totalRow.getCell(i + 2).numFmt = f));
 
   // ---------- Ringkasan PER TAHUN (data multi-tahun jadi mudah dibandingkan) ----------
   const yearAgg = new Map<number, { qty: number; total: number; modal: number }>();
   for (const r of detailRows) {
     const y = jakartaParts(r.bookDate).year;
     const a = yearAgg.get(y) ?? { qty: 0, total: 0, modal: 0 };
-    a.qty += r.qty;
+    a.qty += r.qtyMain;
     a.total += r.total;
     a.modal += r.modal;
     yearAgg.set(y, a);
@@ -179,7 +189,7 @@ export async function GET(req: NextRequest) {
     sum.addRow([t("Per Tahun", "By Year")]).getCell(1).font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
     const yHead = sum.addRow([
       t("Tahun", "Year"),
-      t("Terjual", "Sold"),
+      t("Terjual (box)", "Sold (box)"),
       t("Omzet", "Revenue"),
       "",
       t("Modal", "COGS"),
@@ -194,7 +204,7 @@ export async function GET(req: NextRequest) {
     for (const y of [...yearAgg.keys()].sort((a, b) => b - a)) {
       const a = yearAgg.get(y)!;
       const laba = a.total - a.modal;
-      const row = sum.addRow([y, a.qty, a.total, "", a.modal, laba, a.total ? laba / a.total : 0]);
+      const row = sum.addRow([y, Math.round(a.qty), a.total, "", a.modal, laba, a.total ? laba / a.total : 0]);
       row.getCell(2).numFmt = INT;
       row.getCell(3).numFmt = CURRENCY;
       row.getCell(5).numFmt = CURRENCY;
@@ -229,11 +239,13 @@ export async function GET(req: NextRequest) {
     "Order (SKU)",
     "Qty",
     t("Harga", "Price"),
-    t("Ongkir/Adm", "Shipping/Fee"),
+    "Admin",
+    t("Ongkir", "Shipping"),
+    t("Pajak", "Tax"),
     t("Total", "Total"),
   ];
-  const LEDGER_WIDTHS = [6, 13, 16, 13, 20, 7, 14, 14, 16];
-  const COLS = 9;
+  const LEDGER_WIDTHS = [6, 13, 16, 13, 20, 16, 14, 13, 12, 12, 16];
+  const COLS = LEDGER_HEADERS.length;
   const GAP = 4;
   const BLOCK = COLS + GAP; // lebar 1 tabel bulan + jarak
 
@@ -293,9 +305,11 @@ export async function GET(req: NextRequest) {
           row.buyerName,
           channel,
           row.sku,
-          row.unit ? `${row.qty} ${row.unit}` : row.qty,
+          row.qtyLabel,
           row.price,
-          row.fee,
+          row.feeAdmin,
+          row.feeShipping,
+          row.feeTax,
           row.total,
         ];
         vals.forEach((v, i) => {
@@ -303,10 +317,8 @@ export async function GET(req: NextRequest) {
           cell.value = v as string | number;
           cell.border = thin;
         });
-        ws.getCell(r, c0 + 5).numFmt = INT; // qty
-        ws.getCell(r, c0 + 6).numFmt = CURRENCY; // harga
-        ws.getCell(r, c0 + 7).numFmt = CURRENCY; // ongkir/adm
-        ws.getCell(r, c0 + 8).numFmt = CURRENCY_NEG; // total
+        for (let i = 6; i <= 9; i++) ws.getCell(r, c0 + i).numFmt = CURRENCY; // harga, admin, ongkir, pajak
+        ws.getCell(r, c0 + 10).numFmt = CURRENCY_NEG; // total
         monthTotal += row.total;
         monthModal += row.modal;
         r += 1;
@@ -318,11 +330,11 @@ export async function GET(req: NextRequest) {
         [t("LABA", "PROFIT"), monthTotal - monthModal],
       ];
       for (const [label, value] of summary) {
-        const labelCell = ws.getCell(r, c0 + 7);
+        const labelCell = ws.getCell(r, c0 + COLS - 2);
         labelCell.value = label;
         labelCell.font = { bold: true };
         labelCell.fill = SUMMARY_FILL;
-        const valueCell = ws.getCell(r, c0 + 8);
+        const valueCell = ws.getCell(r, c0 + COLS - 1);
         valueCell.value = value;
         valueCell.numFmt = CURRENCY_NEG;
         valueCell.font = { bold: true };

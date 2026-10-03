@@ -26,6 +26,7 @@ export type NormalizedOrder = {
   shippingSubsidy: number;
   netAmount: number; // yang seharusnya cair ke seller
   escrowAt?: Date; // diisi kalau fee escrow benar-benar sudah ditarik
+  feeBreakdown?: { admin: number; shipping: number; tax: number; raw: unknown };
   items: NormalizedOrderItem[];
 };
 

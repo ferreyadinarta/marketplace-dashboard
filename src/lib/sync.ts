@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { adapters } from "./adapters";
 import { effectiveHppMap } from "./bundle";
@@ -9,6 +10,19 @@ const WRITE_CHUNK = 25;
 // (storeId + marketplaceOrderId) di-update, tidak dobel.
 // SKU yang belum ter-mapping tetap disimpan (productId null) → muncul di
 // halaman Mapping SKU untuk dipetakan manual.
+// rincian fee hanya ditulis kalau baru ditarik (jangan ditimpa 0 dari cache)
+function feeFields(o: NormalizedOrder) {
+  const b = o.feeBreakdown;
+  if (!b) return {};
+  return {
+    feeAdmin: b.admin,
+    feeShipping: b.shipping,
+    feeTax: b.tax,
+    feeDetail: b.raw as Prisma.InputJsonValue,
+    feeDetailAt: new Date(),
+  };
+}
+
 export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder[]) {
   let orders = ordersInput;
   let created = 0;
@@ -102,6 +116,7 @@ export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder
             shippingSubsidy: o.shippingSubsidy,
             netAmount: o.netAmount,
             ...(o.escrowAt ? { escrowAt: o.escrowAt } : {}),
+            ...feeFields(o),
           },
         })
       );
@@ -120,6 +135,7 @@ export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder
             shippingSubsidy: o.shippingSubsidy,
             netAmount: o.netAmount,
             escrowAt: o.escrowAt ?? null,
+            ...feeFields(o),
             items: { create: items },
           },
         })

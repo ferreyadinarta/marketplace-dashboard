@@ -352,6 +352,15 @@ export type ShopeeIncome = {
   seller_transaction_fee?: number;
   credit_card_transaction_fee?: number;
   campaign_fee?: number;
+  // ongkir: final_shipping_fee = buyer_paid + rebate − actual (minus = seller nombok)
+  final_shipping_fee?: number;
+  actual_shipping_fee?: number;
+  buyer_paid_shipping_fee?: number;
+  shopee_shipping_rebate?: number;
+  escrow_tax?: number;
+  withholding_tax?: number;
+  final_product_vat_tax?: number;
+  final_shipping_vat_tax?: number;
 };
 
 // Ambil rincian escrow satu order. Balikin null kalau belum ada (mis. order
