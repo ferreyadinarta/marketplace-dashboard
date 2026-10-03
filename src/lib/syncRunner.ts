@@ -18,6 +18,8 @@ import { startSyncJob, progressWriter, finishSyncJob, type ProgressFn } from "@/
 //   • /api/cron/sync-resume — dipanggil penjadwal LUAR (cron-job.org/UptimeRobot,
 //     yang sama untuk keep-warm) atau cron harian Vercel → jalan walau tab ditutup.
 
+// "semua data" = 10 tahun ke belakang, berhenti sendiri saat riwayat habis
+export const ALL_DAYS = 3650;
 export const MAX_ROUNDS = 80; // ±1 jam kerja — pengaman dari loop tak berujung
 
 export type RoundInput = {
@@ -46,7 +48,7 @@ export function parseRoundInput(body: Record<string, unknown>): RoundInput {
   return {
     scope: body.scope === "all" ? "all" : "store",
     storeId: body.storeId ? String(body.storeId) : undefined,
-    days: Math.min(1095, Math.max(1, int(body.days, 90) || 90)),
+    days: Math.min(ALL_DAYS, Math.max(1, int(body.days, 90) || 90)),
     round: Math.max(1, int(body.round, 1) || 1),
     accCreated: int(body.accCreated),
     accUpdated: int(body.accUpdated),
@@ -108,7 +110,12 @@ export async function runSyncRound(input: RoundInput, budgetMs = 45_000): Promis
 
     const r =
       store.marketplace === "SHOPEE"
-        ? await syncShopeeStore(storeId, from, to, { onProgress, resume: round > 1, deadlineMs: budgetMs })
+        ? await syncShopeeStore(storeId, from, to, {
+            onProgress,
+            resume: round > 1,
+            deadlineMs: budgetMs,
+            untilEmpty: days >= ALL_DAYS,
+          })
         : { ...(await syncTiktokStore(storeId, from, to, { onProgress })), partial: false };
 
     const created = accCreated + r.created;

@@ -210,7 +210,13 @@ export async function syncShopeeStore(
   storeId: string,
   from: Date,
   to: Date,
-  opts: { deadlineMs?: number; onProgress?: ProgressFn; resume?: boolean; preserveCursor?: boolean } = {}
+  opts: {
+    deadlineMs?: number;
+    onProgress?: ProgressFn;
+    resume?: boolean;
+    preserveCursor?: boolean;
+    untilEmpty?: boolean; // "semua data": berhenti sendiri setelah ~6 bulan tanpa order
+  } = {}
 ): Promise<SyncResult> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
@@ -258,6 +264,10 @@ export async function syncShopeeStore(
   const progress = opts.onProgress;
   let ordersDone = 0; // order yang sudah dipindai (untuk tampilan progres)
   let ordersTotal = 0; // order yang sudah ketahuan ada; tumbuh tiap periode dilist
+  const EMPTY_STOP = 12; // 12 periode × 15 hari ≈ 6 bulan kosong = sudah lewat awal toko
+  let seenOrders = false;
+  let emptyStreak = 0;
+  const oldCutoff = Math.floor(Date.now() / 1000) - 365 * 24 * 3600;
 
   await progress?.({
     phase: "orders",
@@ -280,7 +290,22 @@ export async function syncShopeeStore(
     });
     if (alreadyCovered(ws, we)) continue; // sudah final → 0 panggilan API
     if (cursorSec != null && ws >= cursorSec) continue; // sudah dikerjakan putaran sebelumnya
-    const sns = await getOrderSnList(accessToken, shopId, ws, we);
+    let sns: string[];
+    try {
+      sns = await getOrderSnList(accessToken, shopId, ws, we);
+    } catch (e) {
+      // Shopee bisa menolak tanggal yang terlalu lama → anggap itu batas riwayat
+      if (opts.untilEmpty && ws < oldCutoff) break;
+      throw e;
+    }
+    if (opts.untilEmpty) {
+      if (sns.length > 0) {
+        seenOrders = true;
+        emptyStreak = 0;
+      } else if (seenOrders && ++emptyStreak >= EMPTY_STOP) {
+        break;
+      }
+    }
     ordersTotal += sns.length;
     await progress?.({ ordersTotal });
 

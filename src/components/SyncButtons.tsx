@@ -16,6 +16,7 @@ function rangeOptions(t: T): SelectOption[] {
     { value: "365", label: t("1 tahun", "1 year") },
     { value: "730", label: t("2 tahun", "2 years") },
     { value: "1095", label: t("3 tahun", "3 years") },
+    { value: "3650", label: t("Semua data", "All data") },
   ];
 }
 

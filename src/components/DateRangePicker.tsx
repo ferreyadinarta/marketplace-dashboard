@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useTransition, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { enGB, id as idLocale } from "date-fns/locale";
 import { format, type Locale } from "date-fns";
-import { CalendarRange, ChevronDown } from "lucide-react";
+import { CalendarRange, ChevronDown, Loader2 } from "lucide-react";
 import { useT, useLang } from "@/components/LangProvider";
 import type { T } from "@/lib/i18n";
 import "react-day-picker/style.css";
@@ -76,6 +76,9 @@ export default function DateRangePicker({
   });
   const [month, setMonth] = useState<Date>(new Date(`${toStr}T00:00:00`));
   const [days, setDays] = useState("");
+  // "Semua data" dipilih di popover tapi belum diterapkan
+  const [allPicked, setAllPicked] = useState(false);
+  const [navPending, startNav] = useTransition();
 
   // sinkronkan kalender dengan rentang aktif (ex: setelah preset diterapkan)
   useEffect(() => {
@@ -105,7 +108,7 @@ export default function DateRangePicker({
     next.delete("all");
     next.set("from", ymd(from));
     next.set("to", ymd(to));
-    router.push(`${basePath}?${next.toString()}`, { scroll: false });
+    startNav(() => router.push(`${basePath}?${next.toString()}`, { scroll: false }));
     if (close) setOpen(false);
   }
 
@@ -115,13 +118,21 @@ export default function DateRangePicker({
     next.delete("from");
     next.delete("to");
     next.set("all", "1");
-    router.push(`${basePath}?${next.toString()}`, { scroll: false });
+    startNav(() => router.push(`${basePath}?${next.toString()}`, { scroll: false }));
+    setAllPicked(false);
     setOpen(false);
+  }
+
+  function pickAll() {
+    setAllPicked(true);
+    setRange(undefined);
+    setDays("");
   }
 
   // preview: highlight rentang di kalender tanpa apply. User apply lewat
   // tombol "Terapkan" tunggal di kanan.
   function preview(from: Date, to: Date) {
+    setAllPicked(false);
     setRange({ from, to });
     setMonth(to);
   }
@@ -144,6 +155,7 @@ export default function DateRangePicker({
     });
     setMonth(new Date(`${toStr}T00:00:00`));
     setDays("");
+    setAllPicked(false);
     setOpen(false);
   }
 
@@ -167,6 +179,7 @@ export default function DateRangePicker({
       const r = ref.current.getBoundingClientRect();
       const approxW = Math.min(640, window.innerWidth * 0.95);
       setAlignRight(r.left + approxW > window.innerWidth - 8);
+      setAllPicked(isAll);
     }
     setOpen((o) => !o);
   }
@@ -179,7 +192,11 @@ export default function DateRangePicker({
         className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 sm:w-auto sm:justify-start"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <CalendarRange size={16} className="shrink-0 text-slate-400" />
+          {navPending ? (
+            <Loader2 size={16} className="shrink-0 animate-spin text-indigo-500" aria-label={t("Memuat…", "Loading…")} />
+          ) : (
+            <CalendarRange size={16} className="shrink-0 text-slate-400" />
+          )}
           <span className="truncate font-medium">{buttonLabel}</span>
         </span>
         <ChevronDown size={15} className="shrink-0 text-slate-400" />
@@ -209,8 +226,13 @@ export default function DateRangePicker({
               ))}
               <button
                 type="button"
-                onClick={clearRange}
-                className="rounded-lg px-3 py-1.5 text-left text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                onClick={pickAll}
+                aria-pressed={allPicked}
+                className={`rounded-lg px-3 py-1.5 text-left text-sm ${
+                  allPicked
+                    ? "bg-indigo-50 font-medium text-indigo-700"
+                    : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                }`}
               >
                 {t("Semua data", "All data")}
               </button>
@@ -240,7 +262,10 @@ export default function DateRangePicker({
               mode="range"
               locale={dfLocale}
               selected={range}
-              onSelect={setRange}
+              onSelect={(v) => {
+                setAllPicked(false);
+                setRange(v);
+              }}
               month={month}
               onMonthChange={setMonth}
               numberOfMonths={1}
@@ -257,9 +282,9 @@ export default function DateRangePicker({
               </button>
               <button
                 type="button"
-                disabled={!range?.from || !range?.to}
+                disabled={!allPicked && (!range?.from || !range?.to)}
                 onClick={() =>
-                  range?.from && range?.to && commit(range.from, range.to, true)
+                  allPicked ? clearRange() : range?.from && range?.to && commit(range.from, range.to, true)
                 }
                 className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
               >
