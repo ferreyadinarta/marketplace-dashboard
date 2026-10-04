@@ -315,6 +315,7 @@ export function BulkOpnamePanel({ items, action }: { items: BulkItem[]; action: 
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
       >
         <div className="flex items-center gap-3">

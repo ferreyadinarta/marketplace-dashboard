@@ -30,7 +30,7 @@ export function ConfirmModalButton({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={triggerClassName}>
+      <button type="button" onClick={() => setOpen(true)} className={triggerClassName} aria-label={title} title={title}>
         {trigger}
       </button>
 

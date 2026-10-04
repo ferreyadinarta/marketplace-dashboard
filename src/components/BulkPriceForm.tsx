@@ -224,6 +224,7 @@ export function BulkPriceForm({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="flex w-full items-center gap-3 px-5 py-4 text-left hover:bg-slate-50"
       >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">

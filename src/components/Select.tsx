@@ -85,7 +85,8 @@ export function Select({
       ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
       : options;
 
-  // tutup saat klik di luar, scroll, atau resize
+  // klik di luar → tutup; scroll halaman/resize (mis. keyboard HP) → ikut tombolnya.
+  // Scroll DI DALAM daftar diabaikan (dulu menutup dropdown saat daftarnya digulir).
   useEffect(() => {
     if (!open) return;
     function onDown(e: MouseEvent) {
@@ -93,18 +94,21 @@ export function Select({
       if (btnRef.current?.contains(t) || listRef.current?.contains(t)) return;
       setOpen(false);
     }
-    function onScrollResize() {
-      setOpen(false);
+    function onScroll(e: Event) {
+      if (listRef.current?.contains(e.target as Node)) return;
+      const r = btnRef.current?.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > window.innerHeight) return setOpen(false);
+      place();
     }
     document.addEventListener("mousedown", onDown);
-    window.addEventListener("scroll", onScrollResize, true);
-    window.addEventListener("resize", onScrollResize);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", place);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("scroll", onScrollResize, true);
-      window.removeEventListener("resize", onScrollResize);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", place);
     };
-  }, [open]);
+  }, [open, place]);
 
   function choose(v: string) {
     if (!isControlled) setInternal(v);
@@ -120,6 +124,8 @@ export function Select({
         type="button"
         disabled={disabled}
         onClick={toggle}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className={`flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50 ${className}`}
       >
         <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-slate-400"}`}>
@@ -158,14 +164,14 @@ export function Select({
                 />
               </div>
             )}
-            <ul style={{ maxHeight: pos.maxH }} className="overflow-auto p-1">
+            <ul role="listbox" style={{ maxHeight: pos.maxH }} className="overflow-auto p-1">
               {shown.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-slate-400">{t("Tidak ada hasil", "No results")}</li>
               ) : (
                 shown.map((o) => {
                   const active = o.value === current;
                   return (
-                    <li key={o.value || "__empty"}>
+                    <li key={o.value || "__empty"} role="option" aria-selected={active}>
                       <button
                         type="button"
                         onClick={() => choose(o.value)}

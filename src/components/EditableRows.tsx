@@ -89,6 +89,7 @@ export function ProductRow({
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
               open ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
             }`}

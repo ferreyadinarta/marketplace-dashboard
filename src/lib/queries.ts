@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { dateKey } from "./format";
 import { modalOf } from "./units";
+import { effectiveHppMap } from "./bundle";
 import { makeT, type T } from "./i18n";
 
 // HPP (modal) per SATUAN UTAMA: pakai snapshot yang dibekukan saat jual; kalau 0
@@ -128,7 +129,10 @@ function paidFilterSql(f: DashboardFilter) {
 }
 
 // = itemModal()
-const MODAL_SQL = Prisma.sql`(CASE WHEN oi."hppSnapshot" > 0 THEN oi."hppSnapshot" ELSE COALESCE(p.hpp, 0) END)::float8
+const MODAL_SQL = Prisma.sql`(CASE WHEN oi."hppSnapshot" > 0 THEN oi."hppSnapshot"
+    WHEN p."isBundle" THEN COALESCE((SELECT SUM(c.hpp::float8 * pc.qty / (CASE WHEN c."packSize" >= 2 THEN c."packSize" ELSE 1 END))
+      FROM "ProductComponent" pc JOIN "Product" c ON c.id = pc."componentId" WHERE pc."bundleId" = p.id), 0)
+    ELSE COALESCE(p.hpp, 0) END)::float8
   * (CASE WHEN oi."baseQty" > 0 THEN oi."baseQty" ELSE oi.qty END)
   / (CASE WHEN COALESCE(p."packSize", 0) >= 2 THEN p."packSize" ELSE 1 END)`;
 
@@ -317,6 +321,15 @@ function byMarketplace(orders: PaidOrder[], feeOf: FeeOf) {
   return rows;
 }
 
+// bundle tidak punya HPP sendiri (0) → pakai jumlah HPP isinya
+async function withBundleHpp<P extends { id: string; hpp: number; isBundle: boolean }>(products: P[]): Promise<Map<string, P>> {
+  const bundleIds = [...new Set(products.filter((p) => p.isBundle).map((p) => p.id))];
+  const eff = await effectiveHppMap(bundleIds);
+  const out = new Map<string, P>();
+  for (const p of products) out.set(p.id, p.isBundle ? { ...p, hpp: eff.get(p.id) ?? 0 } : p);
+  return out;
+}
+
 // item via filter relasi (subquery), bukan include IN ribuan id
 async function loadReceivedOrders(f: DashboardFilter) {
   const where = orderWhere(f, "received") as Prisma.OrderWhereInput;
@@ -343,6 +356,8 @@ async function loadReceivedOrders(f: DashboardFilter) {
       include: { product: { include: { group: true } } },
     }),
   ]);
+  const fixed = await withBundleHpp(items.flatMap((it) => (it.product ? [it.product] : [])));
+  for (const it of items) if (it.product) it.product = fixed.get(it.product.id) ?? it.product;
   const byOrder = new Map<string, typeof items>();
   for (const it of items) {
     const arr = byOrder.get(it.orderId) ?? [];
@@ -369,6 +384,8 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
         include: { products: true },
         orderBy: { name: "asc" },
       });
+  const fixedProducts = await withBundleHpp(groups.flatMap((g) => g.products));
+  for (const g of groups) g.products = g.products.map((p) => fixedProducts.get(p.id) ?? p);
 
   const orders = await loadReceivedOrders(f);
 

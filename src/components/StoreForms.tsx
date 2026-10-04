@@ -25,6 +25,7 @@ export function AdvancedApiSection({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left text-sm text-slate-500 hover:text-slate-700"
       >
         <span className="flex items-center gap-2">
