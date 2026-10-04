@@ -71,6 +71,8 @@ export const MARKETPLACE_LABEL: Record<string, string> = {
   SHOPEE: "Shopee",
   TIKTOK: "TikTok Shop",
   TOKOPEDIA: "Tokopedia",
+  BLIBLI: "Blibli",
+  AKULAKU: "Akulaku",
   KONSINYASI: "Grosir / Reseller", // dulu "konsinyasi", sebenarnya jual putus
   WA: "WhatsApp / Offline",
 };

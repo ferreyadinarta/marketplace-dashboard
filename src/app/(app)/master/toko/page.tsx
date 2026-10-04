@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { Store as StoreIcon, CheckCircle2, AlertCircle, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { waktu, marketplaceLabel } from "@/lib/format";
 import { getT } from "@/lib/i18n-server";
-import { createStore, updateStoreCredentials, deleteStore } from "./actions";
+import { createStore, updateStoreCredentials, saveBlibliCredentials, deleteStore } from "./actions";
 import {
   Card,
   CardHeader,
@@ -25,10 +24,12 @@ export const dynamic = "force-dynamic";
 // Default Vercel Hobby cuma ~10 detik → naikkan ke batas maksimum 60 detik.
 export const maxDuration = 60;
 
-const mpColor: Record<string, "amber" | "slate" | "green"> = {
+const mpColor: Record<string, "amber" | "slate" | "green" | "blue" | "red"> = {
   SHOPEE: "amber",
   TIKTOK: "slate",
   TOKOPEDIA: "green",
+  BLIBLI: "blue",
+  AKULAKU: "red",
 };
 
 export default async function MasterTokoPage({
@@ -41,6 +42,8 @@ export default async function MasterTokoPage({
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const tiktokStatus = one(sp.tiktok);
   const shopeeStatus = one(sp.shopee);
+  const blibliStatus = one(sp.blibli);
+  const akulakuStatus = one(sp.akulaku);
   const reason = one(sp.reason);
   // Halaman ini khusus toko MARKETPLACE. Channel manual (Grosir/Reseller &
   // WA/Offline) dikelola di halamannya masing-masing, jadi tidak ikut dilist.
@@ -49,7 +52,7 @@ export default async function MasterTokoPage({
     orderBy: { name: "asc" },
   });
   const hasConnected = stores.some(
-    (s) => (s.marketplace === "TIKTOK" || s.marketplace === "SHOPEE") && !!s.accessToken
+    (s) => ["TIKTOK", "SHOPEE", "BLIBLI", "AKULAKU"].includes(s.marketplace) && !!s.accessToken
   );
 
   return (
@@ -99,6 +102,52 @@ export default async function MasterTokoPage({
           {reason ?? "unknown"}
         </div>
       )}
+      {blibliStatus === "connected" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          {t("Blibli terhubung. Klik ", "Blibli connected. Click ")}
+          <strong>{t("Sync sekarang", "Sync now")}</strong>
+          {t(" di toko-nya untuk tarik order.", " on the store to pull orders.")}
+        </div>
+      )}
+      {blibliStatus === "error" && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
+          <span>
+            {t(
+              "Kredensial tersimpan, tapi tes koneksi Blibli gagal: ",
+              "Credentials saved, but the Blibli connection test failed: "
+            )}
+            {reason ?? "unknown"}
+          </span>
+        </div>
+      )}
+      {akulakuStatus === "connected" && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+          <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+          {t("Akulaku terhubung. Klik ", "Akulaku connected. Click ")}
+          <strong>{t("Sync sekarang", "Sync now")}</strong>
+          {t(" di toko-nya untuk tarik order.", " on the store to pull orders.")}
+        </div>
+      )}
+      {akulakuStatus === "error" && (
+        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+          <XCircle size={18} className="mt-0.5 shrink-0 text-red-500" />
+          <span>
+            {t("Gagal menghubungkan Akulaku: ", "Failed to connect Akulaku: ")}
+            {reason ?? "unknown"}
+          </span>
+        </div>
+      )}
+      {akulakuStatus === "notconfigured" && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+          <AlertCircle size={18} className="shrink-0 text-amber-500" />
+          {t(
+            "Kredensial Akulaku belum di-set (AKULAKU_APP_ID / CLIENT_ID / CLIENT_SECRET / PRIVATE_KEY).",
+            "Akulaku credentials aren't set yet (AKULAKU_APP_ID / CLIENT_ID / CLIENT_SECRET / PRIVATE_KEY)."
+          )}
+        </div>
+      )}
       {shopeeStatus === "notconfigured" && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
           <AlertCircle size={18} className="shrink-0 text-amber-500" />
@@ -124,20 +173,32 @@ export default async function MasterTokoPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link
+            <a
               href="/api/tiktok/authorize"
               className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
             >
               {t("Hubungkan TikTok Shop", "Connect TikTok Shop")}
-            </Link>
-            <Link
+            </a>
+            <a
               href="/api/shopee/authorize"
               className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
             >
               {t("Hubungkan Shopee", "Connect Shopee")}
-            </Link>
+            </a>
+            <a
+              href="/api/akulaku/authorize"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              {t("Hubungkan Akulaku", "Connect Akulaku")}
+            </a>
           </div>
         </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {t(
+            "Blibli: tambah toko dengan marketplace Blibli di bawah, lalu isi Pengaturan API di kartu tokonya.",
+            "Blibli: add a store with marketplace Blibli below, then fill in the API Settings on its store card."
+          )}
+        </p>
         {hasConnected && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <p className="text-xs text-slate-500">
@@ -176,10 +237,14 @@ export default async function MasterTokoPage({
             const isKonsinyasi = s.marketplace === "KONSINYASI" || s.marketplace === "WA";
             const isTiktok = s.marketplace === "TIKTOK";
             const isShopee = s.marketplace === "SHOPEE";
-            const isOauth = isTiktok || isShopee;
+            const isBlibli = s.marketplace === "BLIBLI";
+            const isAkulaku = s.marketplace === "AKULAKU";
+            const isOauth = isTiktok || isShopee || isAkulaku;
             const connected = isOauth
               ? !!s.accessToken
-              : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
+              : isBlibli
+                ? !!s.apiKey && !!s.apiSecret && !!s.accessToken && !!s.shopIdApi && !!s.apiUsername && !!s.tokenExpiresAt
+                : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
               <Card key={s.id} className="p-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -228,7 +293,9 @@ export default async function MasterTokoPage({
                           <AlertCircle size={13} /> {t("Belum terhubung", "Not connected")}
                         </Badge>
                       ))}
-                    {isOauth && connected && <StoreSyncButton storeId={s.id} isShopee={isShopee} />}
+                    {(isOauth || isBlibli) && connected && (
+                      <StoreSyncButton storeId={s.id} maxDays={isShopee ? 3650 : isBlibli || isAkulaku ? 365 : undefined} />
+                    )}
                     <ConfirmModalButton
                       action={deleteStore}
                       id={s.id}
@@ -248,9 +315,78 @@ export default async function MasterTokoPage({
                   </div>
                 </div>
 
-                {/* TikTok & Shopee pakai OAuth (bukan API key manual) → tidak perlu section API.
+                {/* TikTok, Shopee & Akulaku pakai OAuth (bukan API key manual) → tidak perlu section API.
                     Konsinyasi = manual, juga tanpa API. */}
-                {!isKonsinyasi && !isOauth && (
+                {isBlibli && (
+                  <AdvancedApiSection connected={connected}>
+                    <BlibliSteps t={t} />
+                    <form action={saveBlibliCredentials} className="grid gap-3 sm:grid-cols-2">
+                      <input type="hidden" name="id" value={s.id} />
+                      <Field
+                        label="Store Code"
+                        hint={t("Seller Center → Store Info, ex: TOQ-15126", "Seller Center → Store Info, e.g. TOQ-15126")}
+                      >
+                        <input name="storeCode" defaultValue={s.shopIdApi ?? ""} placeholder="TOQ-15126" className={inputClass} />
+                      </Field>
+                      <Field label={t("Email login Seller Center", "Seller Center login email")}>
+                        <input name="username" type="email" defaultValue={s.apiUsername ?? ""} className={inputClass} />
+                      </Field>
+                      <Field label="API Client ID">
+                        <input name="clientId" defaultValue={s.apiKey ?? ""} placeholder="mta-api-…" className={inputClass} />
+                      </Field>
+                      <Field label="API Client Key">
+                        <input
+                          name="clientKey"
+                          type="password"
+                          autoComplete="off"
+                          placeholder={s.apiSecret ? t("tersimpan, kosongkan kalau tidak diganti", "saved, leave blank to keep") : ""}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field label="API Seller Key">
+                        <input
+                          name="sellerKey"
+                          type="password"
+                          autoComplete="off"
+                          placeholder={s.accessToken ? t("tersimpan, kosongkan kalau tidak diganti", "saved, leave blank to keep") : ""}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <Field
+                        label={t("Signature Key (opsional)", "Signature Key (optional)")}
+                        hint={t(
+                          "Hanya kalau Signature diaktifkan di Seller API Manager.",
+                          "Only if Signature is enabled in Seller API Manager."
+                        )}
+                      >
+                        <input
+                          name="signatureKey"
+                          type="password"
+                          autoComplete="off"
+                          placeholder={s.apiSignatureKey ? t("tersimpan, kosongkan kalau tidak diganti", "saved, leave blank to keep") : ""}
+                          className={inputClass}
+                        />
+                      </Field>
+                      <div className="flex flex-col gap-2">
+                        <Checkbox
+                          name="isActive"
+                          defaultChecked={s.isActive}
+                          label={t("Toko aktif (ikut sync)", "Store active (included in sync)")}
+                        />
+                        {s.apiSignatureKey && (
+                          <Checkbox name="clearSignature" label={t("Hapus Signature Key", "Remove Signature Key")} />
+                        )}
+                      </div>
+                      <div className="sm:flex sm:items-end sm:justify-end">
+                        <SubmitButton variant="primary" pendingText={t("Menyimpan & mengetes…", "Saving & testing…")}>
+                          {t("Simpan & Tes Koneksi", "Save & Test Connection")}
+                        </SubmitButton>
+                      </div>
+                    </form>
+                  </AdvancedApiSection>
+                )}
+
+                {!isKonsinyasi && !isOauth && !isBlibli && (
                   <div>
                     <AdvancedApiSection connected={connected}>
                       <form action={updateStoreCredentials} className="grid gap-3 sm:grid-cols-3">
@@ -304,5 +440,43 @@ export default async function MasterTokoPage({
         </div>
       )}
     </div>
+  );
+}
+
+// Langkah singkat dapat kredensial Blibli
+function BlibliSteps({ t }: { t: (id: string, en: string) => string }) {
+  return (
+    <ol className="mb-4 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-slate-500">
+      <li>
+        {t("Daftar sebagai ", "Register as a ")}
+        <strong>Seller</strong>
+        {t(" di ", " at ")}
+        <a
+          href="https://seller-api.blibli.com/account/register"
+          target="_blank"
+          rel="noreferrer"
+          className="text-indigo-600 underline"
+        >
+          seller-api.blibli.com
+        </a>
+        {t(
+          " pakai Store Code & email toko. Tunggu disetujui (±2 hari kerja).",
+          " using the Store Code & store email. Wait for approval (about 2 working days)."
+        )}
+      </li>
+      <li>
+        {t(
+          "Setelah disetujui, ambil API Client ID & Client Key di Developer Console.",
+          "Once approved, get the API Client ID & Client Key from the Developer Console."
+        )}
+      </li>
+      <li>
+        {t(
+          "Di Seller Center → Profil → Seller API Manager: Generate API Seller Key, lalu Bind ke Client ID tadi.",
+          "In Seller Center → Profile → Seller API Manager: Generate the API Seller Key, then Bind it to that Client ID."
+        )}
+      </li>
+      <li>{t("Isi semua di bawah, lalu klik Simpan & Tes Koneksi.", "Fill everything in below, then click Save & Test Connection.")}</li>
+    </ol>
   );
 }

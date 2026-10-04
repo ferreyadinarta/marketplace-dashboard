@@ -93,6 +93,7 @@ export async function ingestOrders(storeId: string, ordersInput: NormalizedOrder
       return {
         productId: m?.productId ?? null,
         marketplaceSku: it.marketplaceSku,
+        marketplaceItemId: it.marketplaceItemId ?? null,
         productName: it.productName,
         qty: it.qty,
         baseQty: it.qty * factor,

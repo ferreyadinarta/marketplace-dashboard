@@ -71,8 +71,8 @@ export default async function RekonsiliasiPage() {
             icon={<Wallet size={40} />}
             title={t("Belum ada toko", "No stores yet")}
             description={t(
-              "Rekonsiliasi muncul setelah ada toko Shopee terhubung dan data pencairannya ditarik.",
-              "Reconciliation appears once a Shopee store is connected and its payout data has been pulled."
+              "Rekonsiliasi muncul setelah ada toko Shopee/Blibli/Akulaku terhubung dan data pencairannya ditarik.",
+              "Reconciliation appears once a Shopee/Blibli/Akulaku store is connected and its payout data has been pulled."
             )}
           />
         </Card>
@@ -81,8 +81,8 @@ export default async function RekonsiliasiPage() {
           <CardHeader
             title={t("Per toko", "Per store")}
             subtitle={t(
-              "Uang cair dari Shopee diambil otomatis. Toko lain: catat pembayarannya manual.",
-              "Money paid out from Shopee is pulled automatically. Other stores: record payments manually."
+              "Uang cair dari Shopee, Blibli & Akulaku diambil otomatis. Toko lain: catat pembayarannya manual.",
+              "Money paid out from Shopee, Blibli & Akulaku is pulled automatically. Other stores: record payments manually."
             )}
             action={<SyncPayoutsButton action={syncPayouts} />}
           />

@@ -72,6 +72,8 @@ export default function PembukuanFilter({
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
+            { value: "BLIBLI", label: "Blibli" },
+            { value: "AKULAKU", label: "Akulaku" },
             { value: "WA", label: t("WhatsApp / Offline", "WhatsApp / Offline") },
             { value: "KONSINYASI", label: t("Grosir / Reseller", "Wholesale / Reseller") },
           ]}

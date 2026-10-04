@@ -38,7 +38,7 @@ function shareOf(subtotal: number, nilai: number, jumlahItem: number): number {
 export type DashboardFilter = {
   from?: Date;
   to?: Date;
-  marketplace?: string; // SHOPEE | TIKTOK | TOKOPEDIA
+  marketplace?: string; // SHOPEE | TIKTOK | TOKOPEDIA | BLIBLI | AKULAKU
   storeId?: string;
   groupId?: string; // filter grup pembukuan (khusus halaman Pembukuan)
 };
@@ -86,6 +86,9 @@ async function feeEstimator() {
       : Math.round(o.totalAmount * (rate.get(o.storeId) ?? 0));
 }
 
+// marketplace yang pencairannya ditarik via API → masuk buku saat dana cair
+const PAYOUT_MARKETPLACES = ["SHOPEE", "BLIBLI", "AKULAKU"];
+
 function receivedWhere(f: DashboardFilter) {
   const range =
     f.from || f.to ? { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } : undefined;
@@ -98,13 +101,13 @@ function receivedWhere(f: DashboardFilter) {
       {
         OR: [
           {
-            store: { marketplace: "SHOPEE" },
+            store: { marketplace: { in: PAYOUT_MARKETPLACES } },
             payoutId: { not: null },
             status: { notIn: ["UNPAID", "CANCELLED", "RETURNED"] },
             ...(range ? { payout: { payoutDate: range } } : {}),
           },
           {
-            store: { marketplace: { not: "SHOPEE" } },
+            store: { marketplace: { notIn: PAYOUT_MARKETPLACES } },
             status: "COMPLETED",
             ...(range ? { orderDate: range } : {}),
           },

@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncShopeePayouts } from "@/lib/shopee/sync";
+import { syncBlibliPayouts } from "@/lib/blibli/sync";
 import { eventDateFromInput } from "@/lib/format";
 import { getT } from "@/lib/i18n-server";
 
-// Tarik data PENCAIRAN dari Shopee (escrow yang sudah rilis) untuk semua toko
-// Shopee yang terhubung. Order yang dananya sudah cair ditandai ke payout-nya,
+// Tarik data PENCAIRAN dari Shopee (escrow) & Blibli (settlement) untuk semua toko
+// yang terhubung. Order yang dananya sudah cair ditandai ke payout-nya,
 // jadi kolom "Dana Cair" & "Selisih" di halaman ini terisi sendiri.
 //
 // Tidak redirect: dipanggil lewat fetch dari tombol di klien, biar halaman tidak
@@ -15,7 +16,7 @@ import { getT } from "@/lib/i18n-server";
 export async function syncPayouts(days = 90) {
   const { t } = await getT();
   const stores = await prisma.store.findMany({
-    where: { marketplace: "SHOPEE", isActive: true, accessToken: { not: null } },
+    where: { marketplace: { in: ["SHOPEE", "BLIBLI"] }, isActive: true, accessToken: { not: null } },
   });
 
   const to = new Date();
@@ -36,7 +37,8 @@ export async function syncPayouts(days = 90) {
     const left = budgetMs - (Date.now() - started);
     if (left <= 2_000) break;
     try {
-      const r = await syncShopeePayouts(s.id, from, to, {
+      const pull = s.marketplace === "BLIBLI" ? syncBlibliPayouts : syncShopeePayouts;
+      const r = await pull(s.id, from, to, {
         deadlineMs: Math.max(5_000, Math.floor(left / Math.max(1, stores.length - i))),
       });
       payouts += r.payouts;

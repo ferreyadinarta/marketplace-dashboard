@@ -12,7 +12,7 @@ datasource db {
 model Store {
   id          String   @id @default(cuid())
   name        String
-  marketplace String // SHOPEE | TIKTOK | TOKOPEDIA | KONSINYASI
+  marketplace String // SHOPEE | TIKTOK | TOKOPEDIA | BLIBLI | AKULAKU | KONSINYASI
   apiKey      String?
   apiSecret   String?
   shopIdApi   String? // id toko di sisi marketplace (shop_id)
@@ -28,6 +28,8 @@ model Store {
   refreshToken   String?
   tokenExpiresAt DateTime?
   shopCipher     String? // TikTok: dibutuhkan untuk panggil API per shop
+  apiUsername     String? // Blibli: email login Seller Center
+  apiSignatureKey String? // Blibli: Signature Key (opsional)
 
   mappings ProductMapping[]
   orders   Order[]
@@ -185,6 +187,9 @@ model OrderItem {
   price          Int // harga per satuan-jual
   subtotal       Int
   hppSnapshot    Int @default(0) // HPP (modal) per SATUAN DASAR, dibekukan saat jual; 0 → fallback ke product.hpp
+  marketplaceItemId String? // Blibli: orderItemNo, untuk mencocokkan settlement
+
+  @@index([marketplaceItemId])
 }
 
 // ===== STOK / INVENTORY =====

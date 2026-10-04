@@ -9,6 +9,7 @@
 
 export type NormalizedOrderItem = {
   marketplaceSku: string;
+  marketplaceItemId?: string; // Blibli orderItemNo
   productName: string;
   qty: number;
   price: number; // harga satuan, rupiah bulat

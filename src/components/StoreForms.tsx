@@ -104,6 +104,8 @@ export function AddStoreForm({ action }: { action: Action }) {
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
+            { value: "BLIBLI", label: "Blibli" },
+            { value: "AKULAKU", label: "Akulaku" },
           ]}
         />
       </Field>

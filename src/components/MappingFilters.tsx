@@ -88,6 +88,8 @@ export function MappingFilters({ stores }: { stores: Store[] }) {
             { value: "SHOPEE", label: "Shopee" },
             { value: "TIKTOK", label: "TikTok Shop" },
             { value: "TOKOPEDIA", label: "Tokopedia" },
+            { value: "BLIBLI", label: "Blibli" },
+            { value: "AKULAKU", label: "Akulaku" },
           ]}
         />
       </div>

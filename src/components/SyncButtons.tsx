@@ -149,21 +149,21 @@ export function SyncAllButton() {
   );
 }
 
-// Tombol sync satu toko (+ pilihan rentang untuk Shopee)
-export function StoreSyncButton({ storeId, isShopee }: { storeId: string; isShopee: boolean }) {
+// Tombol sync satu toko (+ pilihan rentang sampai maxDays; tanpa maxDays = tanpa pilihan)
+export function StoreSyncButton({ storeId, maxDays }: { storeId: string; maxDays?: number }) {
   const { run, running, round, pause } = useSyncRunner();
   const t = useT();
   const [days, setDays] = useState("90");
 
   return (
     <div className="flex items-center gap-1.5">
-      {isShopee && (
+      {maxDays && (
         <Select
           value={days}
           onValueChange={setDays}
           disabled={running}
           className="w-28"
-          options={rangeOptions(t)}
+          options={rangeOptions(t).filter((o) => Number(o.value) <= maxDays)}
         />
       )}
       <button

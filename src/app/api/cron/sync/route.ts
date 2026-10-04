@@ -4,6 +4,7 @@ import { notifyLowStock } from "@/lib/lowStock";
 import { findPendingRound, runSyncRound } from "@/lib/syncRunner";
 import { prisma } from "@/lib/prisma";
 import { syncShopeePayouts } from "@/lib/shopee/sync";
+import { syncBlibliPayouts } from "@/lib/blibli/sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // beri waktu lebih untuk beberapa toko sekaligus
@@ -55,10 +56,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Tarik pencairan Shopee semua toko terhubung, dibatasi waktu.
+// Tarik pencairan Shopee & Blibli semua toko terhubung, dibatasi waktu.
 async function syncRecentPayouts(days: number, budgetMs: number) {
   const stores = await prisma.store.findMany({
-    where: { marketplace: "SHOPEE", isActive: true, accessToken: { not: null } },
+    where: { marketplace: { in: ["SHOPEE", "BLIBLI"] }, isActive: true, accessToken: { not: null } },
   });
   const to = new Date();
   const from = new Date(to.getTime() - days * 24 * 3600 * 1000);
@@ -68,7 +69,8 @@ async function syncRecentPayouts(days: number, budgetMs: number) {
     const left = budgetMs - (Date.now() - started);
     if (left <= 2_000) break;
     try {
-      const r = await syncShopeePayouts(s.id, from, to, {
+      const pull = s.marketplace === "BLIBLI" ? syncBlibliPayouts : syncShopeePayouts;
+      const r = await pull(s.id, from, to, {
         deadlineMs: Math.max(3_000, Math.floor(left / Math.max(1, stores.length - i))),
       });
       out.payouts += r.payouts;

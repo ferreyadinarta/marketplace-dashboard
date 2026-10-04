@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { syncTiktokStore } from "@/lib/tiktok/sync";
 import { syncShopeeStore } from "@/lib/shopee/sync";
+import { syncBlibliStore } from "@/lib/blibli/sync";
+import { syncAkulakuStore } from "@/lib/akulaku/sync";
 import { startSyncJob, progressWriter, finishSyncJob } from "@/lib/syncProgress";
 
 export type SyncAllResult = {
@@ -35,7 +37,7 @@ export async function syncAllStores(
     where: {
       isActive: true,
       accessToken: { not: null },
-      marketplace: { in: ["TIKTOK", "SHOPEE"] },
+      marketplace: { in: ["TIKTOK", "SHOPEE", "BLIBLI", "AKULAKU"] },
     },
   });
 
@@ -79,6 +81,17 @@ export async function syncAllStores(
     try {
       if (s.marketplace === "SHOPEE") {
         const r = await syncShopeeStore(s.id, from, to, {
+          deadlineMs: share,
+          onProgress,
+          preserveCursor: opts.daily,
+          resume: opts.resume,
+        });
+        res.created += r.created;
+        res.updated += r.updated;
+        if (r.partial) res.partial = true;
+      } else if (s.marketplace === "BLIBLI" || s.marketplace === "AKULAKU") {
+        const run = s.marketplace === "BLIBLI" ? syncBlibliStore : syncAkulakuStore;
+        const r = await run(s.id, from, to, {
           deadlineMs: share,
           onProgress,
           preserveCursor: opts.daily,

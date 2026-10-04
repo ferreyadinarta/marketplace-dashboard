@@ -2,6 +2,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { syncAllStores } from "@/lib/syncAll";
 import { syncShopeeStore } from "@/lib/shopee/sync";
+import { syncBlibliStore, syncBlibliPayouts } from "@/lib/blibli/sync";
+import { syncAkulakuStore } from "@/lib/akulaku/sync";
 import { syncTiktokStore } from "@/lib/tiktok/sync";
 import { startSyncJob, progressWriter, finishSyncJob, type ProgressFn } from "@/lib/syncProgress";
 
@@ -116,7 +118,17 @@ export async function runSyncRound(input: RoundInput, budgetMs = 45_000): Promis
             deadlineMs: budgetMs,
             untilEmpty: days >= ALL_DAYS,
           })
-        : { ...(await syncTiktokStore(storeId, from, to, { onProgress })), partial: false };
+        : store.marketplace === "BLIBLI"
+          ? await syncBlibliStore(storeId, from, to, { onProgress, resume: round > 1, deadlineMs: budgetMs })
+          : store.marketplace === "AKULAKU"
+            ? await syncAkulakuStore(storeId, from, to, { onProgress, resume: round > 1, deadlineMs: budgetMs })
+            : { ...(await syncTiktokStore(storeId, from, to, { onProgress })), partial: false };
+
+    // Blibli: fee baru ada di settlement → tarik sekalian
+    if (store.marketplace === "BLIBLI" && !r.partial) {
+      await progress({ message: "Menarik pencairan (settlement)…" });
+      await syncBlibliPayouts(storeId, from, to, { deadlineMs: Math.max(5_000, budgetMs - 15_000) });
+    }
 
     const created = accCreated + r.created;
     const updated = accUpdated + r.updated;
