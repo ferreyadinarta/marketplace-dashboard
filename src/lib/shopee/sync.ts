@@ -453,20 +453,22 @@ export async function syncShopeePayouts(
   from: Date,
   to: Date,
   opts: { deadlineMs?: number } = {}
-): Promise<{ payouts: number; orders: number; amount: number; unmatched: number }> {
+): Promise<{ payouts: number; orders: number; amount: number; unmatched: number; resumeTo: Date | null }> {
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store) throw new Error("Toko tidak ditemukan");
   const accessToken = await ensureFreshToken(store);
   const shopId = store.shopIdApi!;
 
-  const list = await getEscrowList(
+  const { list, resumeTo: resumeSec } = await getEscrowList(
     accessToken,
     shopId,
     Math.floor(from.getTime() / 1000),
     Math.floor(to.getTime() / 1000),
     { deadlineMs: opts.deadlineMs }
   );
-  if (list.length === 0) return { payouts: 0, orders: 0, amount: 0, unmatched: 0 };
+  // belum selesai → putaran berikutnya lanjut dari tanggal ini ke belakang
+  const resumeTo = resumeSec != null ? new Date(resumeSec * 1000) : null;
+  if (list.length === 0) return { payouts: 0, orders: 0, amount: 0, unmatched: 0, resumeTo };
 
   // kelompokkan per TANGGAL RILIS (WIB) — itu yang dilihat user di mutasi bank
   const byDate = new Map<string, { amount: number; orderSns: string[] }>();
@@ -508,5 +510,5 @@ export async function syncShopeePayouts(
     amount += g.amount;
   }
 
-  return { payouts: byDate.size, orders, amount, unmatched };
+  return { payouts: byDate.size, orders, amount, unmatched, resumeTo };
 }

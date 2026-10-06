@@ -1,24 +1,22 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Plus, Settings2, ChevronDown } from "lucide-react";
-import { Field, inputClass, inputErrorClass, Select } from "@/components/ui";
-import { SubmitButton } from "@/components/SubmitButton";
+import { useState, type ReactNode } from "react";
+import { Settings2, ChevronDown } from "lucide-react";
 import { Collapse } from "@/components/Collapse";
 import { useT } from "@/components/LangProvider";
-
-type Action = (formData: FormData) => void | Promise<void>;
 
 // Bagian pengaturan API yang bisa dilipat. Default tertutup supaya tidak
 // membingungkan user yang cuma perlu atur nama & marketplace.
 export function AdvancedApiSection({
   connected,
+  defaultOpen = false,
   children,
 }: {
   connected: boolean;
+  defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const t = useT();
   return (
     <div className="mt-4 border-t border-slate-100 pt-3">
@@ -54,68 +52,5 @@ export function AdvancedApiSection({
         </div>
       </Collapse>
     </div>
-  );
-}
-
-export function AddStoreForm({ action }: { action: Action }) {
-  const [error, setError] = useState<string | undefined>();
-  const t = useT();
-
-  function validate(e: FormEvent<HTMLFormElement>) {
-    const fd = new FormData(e.currentTarget);
-    const name = String(fd.get("name") ?? "").trim();
-    if (!name) {
-      e.preventDefault();
-      setError(t("Nama toko wajib diisi.", "Store name is required."));
-    } else {
-      setError(undefined);
-    }
-  }
-
-  return (
-    <form
-      action={action}
-      onSubmit={validate}
-      noValidate
-      className="flex flex-wrap items-end gap-4 px-5 pb-9 pt-5"
-    >
-      <Field label={t("Nama toko", "Store name")}>
-        {/* error diposisikan absolute supaya munculnya tidak menggeser baris (input & tombol tetap sejajar) */}
-        <div className="relative w-full sm:w-80">
-          <input
-            name="name"
-            onInput={() => error && setError(undefined)}
-            placeholder={t("ex: Luxe Supplement Store, Shopee", "e.g. Luxe Supplement Store, Shopee")}
-            className={`${inputClass} w-full ${error ? inputErrorClass : ""}`}
-          />
-          {error && (
-            <span className="absolute left-0 top-full mt-1 block text-xs font-medium text-red-500">
-              {error}
-            </span>
-          )}
-        </div>
-      </Field>
-      <Field label="Marketplace">
-        <Select
-          name="marketplace"
-          defaultValue="SHOPEE"
-          className="min-w-44"
-          options={[
-            { value: "SHOPEE", label: "Shopee" },
-            { value: "TIKTOK", label: "TikTok Shop" },
-            { value: "TOKOPEDIA", label: "Tokopedia" },
-            { value: "BLIBLI", label: "Blibli" },
-            { value: "AKULAKU", label: "Akulaku" },
-          ]}
-        />
-      </Field>
-      <SubmitButton
-        variant="primary"
-        icon={<Plus size={16} />}
-        pendingText={t("Menyimpan…", "Saving…")}
-      >
-        {t("Tambah Toko", "Add Store")}
-      </SubmitButton>
-    </form>
   );
 }

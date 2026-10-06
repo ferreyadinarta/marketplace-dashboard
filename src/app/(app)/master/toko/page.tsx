@@ -2,10 +2,9 @@ import { Store as StoreIcon, CheckCircle2, AlertCircle, CheckCircle, XCircle, Tr
 import { prisma } from "@/lib/prisma";
 import { waktu, marketplaceLabel } from "@/lib/format";
 import { getT } from "@/lib/i18n-server";
-import { createStore, updateStoreCredentials, saveBlibliCredentials, deleteStore } from "./actions";
+import { startBlibli, updateStoreCredentials, saveBlibliCredentials, deleteStore } from "./actions";
 import {
   Card,
-  CardHeader,
   PageHeader,
   Field,
   inputClass,
@@ -13,7 +12,7 @@ import {
   Badge,
   EmptyState,
 } from "@/components/ui";
-import { AddStoreForm, AdvancedApiSection } from "@/components/StoreForms";
+import { AdvancedApiSection } from "@/components/StoreForms";
 import { ConfirmModalButton } from "@/components/ConfirmModalButton";
 import { SubmitButton } from "@/components/SubmitButton";
 import { SyncProgressPanel } from "@/components/SyncProgressPanel";
@@ -60,8 +59,8 @@ export default async function MasterTokoPage({
       <PageHeader
         title={t("Toko", "Stores")}
         description={t(
-          "Daftarkan tiap toko: cukup isi nama & pilih marketplace-nya. Pengaturan API (opsional) ada di bagian lanjutan tiap toko.",
-          "Register each store: just fill in the name & pick its marketplace. API settings (optional) are in the advanced section of each store."
+          "Hubungkan toko marketplace supaya order, fee, dan dana cair masuk otomatis.",
+          "Connect your marketplace stores so orders, fees, and payouts come in automatically."
         )}
       />
 
@@ -191,14 +190,16 @@ export default async function MasterTokoPage({
             >
               {t("Hubungkan Akulaku", "Connect Akulaku")}
             </a>
+            <form action={startBlibli}>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                {t("Hubungkan Blibli", "Connect Blibli")}
+              </button>
+            </form>
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
-          {t(
-            "Blibli: tambah toko dengan marketplace Blibli di bawah, lalu isi Pengaturan API di kartu tokonya.",
-            "Blibli: add a store with marketplace Blibli below, then fill in the API Settings on its store card."
-          )}
-        </p>
         {hasConnected && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
             <p className="text-xs text-slate-500">
@@ -212,23 +213,12 @@ export default async function MasterTokoPage({
         )}
       </Card>
 
-      <Card>
-        <CardHeader
-          title={t("Tambah Toko Manual", "Add Store Manually")}
-          subtitle={t(
-            "Untuk toko marketplace yang datanya diinput manual (belum/tidak lewat API). Toko grosir/reseller diatur di halaman Grosir / Reseller.",
-            "For marketplace stores whose data is entered manually (not via API). Wholesale/reseller stores are managed on the Wholesale / Reseller page."
-          )}
-        />
-        <AddStoreForm action={createStore} />
-      </Card>
-
       {stores.length === 0 ? (
         <Card>
           <EmptyState
             icon={<StoreIcon size={40} />}
             title={t("Belum ada toko", "No stores yet")}
-            description={t("Tambahkan toko pertama lewat form di atas.", "Add your first store using the form above.")}
+            description={t("Hubungkan toko pertama lewat tombol di atas.", "Connect your first store using the buttons above.")}
           />
         </Card>
       ) : (
@@ -246,7 +236,7 @@ export default async function MasterTokoPage({
                 ? !!s.apiKey && !!s.apiSecret && !!s.accessToken && !!s.shopIdApi && !!s.apiUsername && !!s.tokenExpiresAt
                 : !!s.apiKey && !!s.apiSecret && !!s.shopIdApi;
             return (
-              <Card key={s.id} className="p-5">
+              <Card key={s.id} id={`store-${s.id}`} className="scroll-mt-20 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
                     {s.logoUrl ? (
@@ -318,7 +308,7 @@ export default async function MasterTokoPage({
                 {/* TikTok, Shopee & Akulaku pakai OAuth (bukan API key manual) → tidak perlu section API.
                     Konsinyasi = manual, juga tanpa API. */}
                 {isBlibli && (
-                  <AdvancedApiSection connected={connected}>
+                  <AdvancedApiSection connected={connected} defaultOpen={one(sp.setup) === s.id}>
                     <BlibliSteps t={t} />
                     <form action={saveBlibliCredentials} className="grid gap-3 sm:grid-cols-2">
                       <input type="hidden" name="id" value={s.id} />

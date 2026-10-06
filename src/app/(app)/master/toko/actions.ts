@@ -6,12 +6,12 @@ import { redirect } from "next/navigation";
 import { testConnection } from "@/lib/blibli/client";
 import { blibliCreds } from "@/lib/blibli/sync";
 
-export async function createStore(formData: FormData) {
-  const name = String(formData.get("name") ?? "").trim();
-  const marketplace = String(formData.get("marketplace") ?? "");
-  if (!name || !marketplace) return;
-  await prisma.store.create({ data: { name, marketplace } });
-  revalidatePath("/master/toko");
+// Blibli tanpa login popup: siapkan kartu tokonya lalu buka form API-nya
+export async function startBlibli() {
+  const store =
+    (await prisma.store.findFirst({ where: { marketplace: "BLIBLI" }, orderBy: { createdAt: "asc" } })) ??
+    (await prisma.store.create({ data: { name: "Blibli", marketplace: "BLIBLI" } }));
+  redirect(`/master/toko?setup=${store.id}#store-${store.id}`);
 }
 
 export async function updateStoreCredentials(formData: FormData) {

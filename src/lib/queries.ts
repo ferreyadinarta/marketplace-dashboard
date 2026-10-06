@@ -86,15 +86,17 @@ async function feeEstimator() {
       : Math.round(o.totalAmount * (rate.get(o.storeId) ?? 0));
 }
 
-// marketplace yang pencairannya ditarik via API → masuk buku saat dana cair
+// marketplace yang pencairannya ditarik via API → baru masuk buku setelah dana cair
 const PAYOUT_MARKETPLACES = ["SHOPEE", "BLIBLI", "AKULAKU"];
 
 function receivedWhere(f: DashboardFilter) {
   const range =
     f.from || f.to ? { ...(f.from ? { gte: f.from } : {}), ...(f.to ? { lte: f.to } : {}) } : undefined;
+  // rentang tanggal selalu tanggal order; syaratnya tetap uang sudah cair
   const base: Record<string, unknown> = {};
   if (f.storeId) base.storeId = f.storeId;
   if (f.marketplace) base.store = { marketplace: f.marketplace };
+  if (range) base.orderDate = range;
   return {
     AND: [
       base,
@@ -104,22 +106,15 @@ function receivedWhere(f: DashboardFilter) {
             store: { marketplace: { in: PAYOUT_MARKETPLACES } },
             payoutId: { not: null },
             status: { notIn: ["UNPAID", "CANCELLED", "RETURNED"] },
-            ...(range ? { payout: { payoutDate: range } } : {}),
           },
           {
             store: { marketplace: { notIn: PAYOUT_MARKETPLACES } },
             status: "COMPLETED",
-            ...(range ? { orderDate: range } : {}),
           },
         ],
       },
     ],
   };
-}
-
-// tanggal masuk buku: tanggal cair (Shopee) atau tanggal order (lainnya)
-function bookDateOf(o: { orderDate: Date; payout?: { payoutDate: Date } | null }): Date {
-  return o.payout?.payoutDate ?? o.orderDate;
 }
 
 // JOIN di DB, bukan include (IN ribuan id bikin Neon out of memory)
@@ -333,14 +328,21 @@ async function withBundleHpp<P extends { id: string; hpp: number; isBundle: bool
   return out;
 }
 
+// received: uang sudah cair · paid: semua yang tidak batal (export = kondisi saat diklik)
+type LedgerBasis = "received" | "paid";
+
 // item via filter relasi (subquery), bukan include IN ribuan id
-async function loadReceivedOrders(f: DashboardFilter) {
-  const where = orderWhere(f, "received") as Prisma.OrderWhereInput;
-  const [orders, items] = await Promise.all([
+async function loadReceivedOrders(f: DashboardFilter, basis: LedgerBasis = "received") {
+  const where = orderWhere(f, basis) as Prisma.OrderWhereInput;
+  const [rawOrders, items, est] = await Promise.all([
     prisma.order.findMany({
       where,
       select: {
         id: true,
+        storeId: true,
+        status: true,
+        payoutId: true,
+        totalAmount: true,
         marketplaceFee: true,
         feeAdmin: true,
         feeShipping: true,
@@ -350,7 +352,6 @@ async function loadReceivedOrders(f: DashboardFilter) {
         orderDate: true,
         buyerName: true,
         store: { select: { marketplace: true, name: true } },
-        payout: { select: { payoutDate: true } },
       },
       orderBy: [{ orderDate: "asc" }, { createdAt: "asc" }],
     }),
@@ -358,7 +359,15 @@ async function loadReceivedOrders(f: DashboardFilter) {
       where: { order: where },
       include: { product: { include: { group: true } } },
     }),
+    basis === "paid" ? feeEstimator() : null,
   ]);
+  // fee order yang belum final diperkirakan (rata-rata toko), dicatat sebagai admin
+  const orders = rawOrders.map((o) => {
+    const fee = est ? est(o) : o.marketplaceFee;
+    return fee === o.marketplaceFee
+      ? { ...o, feeEstimated: false }
+      : { ...o, marketplaceFee: fee, feeAdmin: fee, feeShipping: 0, feeTax: 0, feeDetailAt: new Date(), feeEstimated: true };
+  });
   const fixed = await withBundleHpp(items.flatMap((it) => (it.product ? [it.product] : [])));
   for (const it of items) if (it.product) it.product = fixed.get(it.product.id) ?? it.product;
   const byOrder = new Map<string, typeof items>();
@@ -378,7 +387,12 @@ type ProdLite = { id: string; name: string; sku: string; hpp: number };
 // pembukuan dikelompokkan per grup, tiap baris = product.
 // Product tanpa grup dikumpulkan di bucket "Tanpa Grup".
 // t opsional (default id) — pemanggil di luar scope agent ini belum lewatkan bahasa.
-export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")) {
+export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id"), basis: LedgerBasis = "received") {
+  return (await getPembukuan(f, t, basis)).groups;
+}
+
+// groups + penjualan bersih yang sudah cair vs masih proses (untuk halaman Pembukuan)
+export async function getPembukuan(f: DashboardFilter, t: T = makeT("id"), basis: LedgerBasis = "received") {
   const onlyNone = f.groupId === NO_GROUP;
   const groups = onlyNone
     ? []
@@ -390,27 +404,31 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
   const fixedProducts = await withBundleHpp(groups.flatMap((g) => g.products));
   for (const g of groups) g.products = g.products.map((p) => fixedProducts.get(p.id) ?? p);
 
-  const orders = await loadReceivedOrders(f);
+  const orders = await loadReceivedOrders(f, basis);
 
   // akumulasi per productId
-  type Agg = { terjual: number; omzet: number; fee: number; hpp: number };
+  type Agg = { terjual: number; omzet: number; fee: number; hpp: number; cair: number; proses: number };
   const perProduct = new Map<string, Agg>();
   // Item yang SKU-nya belum dipetakan tidak punya product → tidak bisa masuk
   // baris grup, tapi omzet & feenya tetap dihitung supaya total pembukuan sama
   // dengan dashboard.
-  const unmapped = { terjual: 0, omzet: 0, fee: 0, hpp: 0 };
+  const unmapped: Agg = { terjual: 0, omzet: 0, fee: 0, hpp: 0, cair: 0, proses: 0 };
   for (const o of orders) {
     // fee dibagi menurut NILAI item, bukan rata per item: 1 order isi barang
     // Rp 500rb + Rp 20rb tidak menanggung potongan yang sama
     const nilai = o.items.reduce((a, it) => a + it.subtotal, 0);
+    const st = ledgerStatus(o);
+    const settled = st === "CAIR" || st === "SELESAI";
     for (const it of o.items) {
-      const feeItem = o.marketplaceFee * shareOf(it.subtotal, nilai, o.items.length);
+      const bagian = shareOf(it.subtotal, nilai, o.items.length);
+      const feeItem = o.marketplaceFee * bagian;
       const target = it.productId
-        ? perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0 }
+        ? perProduct.get(it.productId) ?? { terjual: 0, omzet: 0, fee: 0, hpp: 0, cair: 0, proses: 0 }
         : unmapped;
       target.terjual += itemBaseQty(it); // satuan dasar (konsisten walau campur box/sachet)
       target.omzet += it.subtotal;
       target.fee += feeItem;
+      target[settled ? "cair" : "proses"] += it.subtotal - feeItem;
       target.hpp += itemModal(it);
       if (it.productId) perProduct.set(it.productId, target);
     }
@@ -456,11 +474,13 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
 
   // Sisa pembulatan per baris ditempel ke baris terbesar supaya jumlah semua
   // grup persis sama dengan total di Dashboard (jangan beda 1-2 rupiah).
+  // hanya product yang tampil (hormati filter grup); dulu semua grup ikut dijumlah
+  const shownAgg = () =>
+    result.flatMap((g) => g.rows.map((r) => (r.productId === "__unmapped__" ? unmapped : perProduct.get(r.productId))));
   const rapikan = () => {
-    const exactFee = [...perProduct.values()].reduce((a, v) => a + v.fee, 0) + unmapped.fee;
-    const exactProfit =
-      [...perProduct.values()].reduce((a, v) => a + (v.omzet - v.fee - v.hpp), 0) +
-      (unmapped.omzet - unmapped.fee - unmapped.hpp);
+    const shown = shownAgg();
+    const exactFee = shown.reduce((a, v) => a + (v?.fee ?? 0), 0);
+    const exactProfit = shown.reduce((a, v) => a + (v ? v.omzet - v.fee - v.hpp : 0), 0);
     const rows = result.flatMap((g) => g.rows);
     if (!rows.length) return;
     const sisaFee = Math.round(exactFee) - rows.reduce((a, x) => a + x.fee, 0);
@@ -502,7 +522,13 @@ export async function getPembukuanByGroup(f: DashboardFilter, t: T = makeT("id")
   }
 
   rapikan();
-  return result;
+
+  const shown = shownAgg();
+  const split = {
+    cair: Math.round(shown.reduce((a, v) => a + (v?.cair ?? 0), 0)),
+    proses: Math.round(shown.reduce((a, v) => a + (v?.proses ?? 0), 0)),
+  };
+  return { groups: result, split };
 }
 
 export async function getStores() {
@@ -511,7 +537,7 @@ export async function getStores() {
 
 export type LedgerRow = {
   orderDate: Date;
-  bookDate: Date; // tanggal uang masuk (tanggal cair Shopee / tanggal order lainnya)
+  bookDate: Date; // tanggal order
   buyerName: string;
   marketplace: string;
   storeName: string;
@@ -526,7 +552,18 @@ export type LedgerRow = {
   feeTax: number;
   total: number; // net per item (omzet - fee + subsidi ongkir)
   modal: number; // HPP x qty (untuk hitung laba)
+  status: LedgerStatus; // kondisi order saat export
+  feeEstimated: boolean;
 };
+
+export type LedgerStatus = "CAIR" | "SELESAI" | "BELUM_CAIR" | "DIKIRIM" | "DIPROSES";
+
+function ledgerStatus(o: { status: string; payoutId: string | null; store: { marketplace: string } }): LedgerStatus {
+  const viaPayout = PAYOUT_MARKETPLACES.includes(o.store.marketplace);
+  if (viaPayout && o.payoutId) return "CAIR";
+  if (o.status === "COMPLETED") return viaPayout ? "BELUM_CAIR" : "SELESAI";
+  return o.status === "SHIPPED" ? "DIKIRIM" : "DIPROSES";
+}
 
 // Ledger per-order untuk sheet ledger per brand. Satu baris = satu item order.
 // Hanya order selesai (via orderWhere). Menghormati filter grup (brand).
@@ -548,8 +585,12 @@ function qtyInMainUnit(it: {
   return { qtyLabel: label, qtyMain: base / p.packSize };
 }
 
-export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): Promise<LedgerRow[]> {
-  const orders = await loadReceivedOrders(f);
+export async function getOrdersDetail(
+  f: DashboardFilter,
+  t: T = makeT("id"),
+  basis: LedgerBasis = "received"
+): Promise<LedgerRow[]> {
+  const orders = await loadReceivedOrders(f, basis);
 
   const rows: LedgerRow[] = [];
   for (const o of orders) {
@@ -572,7 +613,7 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
       }
       rows.push({
         orderDate: o.orderDate,
-        bookDate: bookDateOf(o),
+        bookDate: o.orderDate,
         buyerName: o.buyerName ?? "-",
         marketplace: o.store.marketplace,
         storeName: o.store.name,
@@ -586,10 +627,12 @@ export async function getOrdersDetail(f: DashboardFilter, t: T = makeT("id")): P
         feeTax: Math.round(fees.tax * bagian),
         total: Math.round(it.subtotal - feePerItem + shipPerItem),
         modal: Math.round(itemModal(it)),
+        status: ledgerStatus(o),
+        feeEstimated: o.feeEstimated,
       });
     }
   }
-  // urut per tanggal uang masuk (sort stabil → urutan order tetap di hari yang sama)
+  // urut per tanggal order (sort stabil → urutan tetap di hari yang sama)
   return rows.sort((a, b) => a.bookDate.getTime() - b.bookDate.getTime());
 }
 

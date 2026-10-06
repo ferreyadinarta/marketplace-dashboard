@@ -1,5 +1,5 @@
 import { Boxes } from "lucide-react";
-import { getPembukuanByGroup, getStores, getGroups, NO_GROUP } from "@/lib/queries";
+import { getPembukuan, getStores, getGroups, NO_GROUP } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { rupiah, currentMonthRange } from "@/lib/format";
 import { Suspense } from "react";
@@ -39,8 +39,9 @@ export default async function PembukuanPage({
   const period = resolvePeriod(sp, true);
   const def = currentMonthRange();
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
-  const [groups, stores, groupList] = await Promise.all([
-    getPembukuanByGroup(filter),
+  // sama persis dengan isi Excel: semua order periode ini kecuali batal/retur
+  const [{ groups, split }, stores, groupList] = await Promise.all([
+    getPembukuan(filter, undefined, "paid"),
     getStores(),
     getGroups(),
   ]);
@@ -56,8 +57,8 @@ export default async function PembukuanPage({
       <PageHeader
         title={t("Pembukuan", "Bookkeeping")}
         description={t(
-          "Penjualan tiap product per grup, dihitung saat uangnya sudah masuk ke saldo penjual (Shopee: tanggal dana cair). Dashboard menghitung lebih awal, sejak pembeli membayar.",
-          "Sales for each product per group, counted once the money reaches the seller balance (Shopee: payout date). The dashboard counts earlier, from when the buyer pays."
+          "Penjualan tiap product per grup menurut tanggal order. Order yang batal atau diretur tidak dihitung; yang masih diproses ikut dihitung (sama dengan isi Excel).",
+          "Sales for each product per group by order date. Cancelled or returned orders aren't counted; orders still in progress are (same as the Excel)."
         )}
       />
 
@@ -80,9 +81,26 @@ export default async function PembukuanPage({
       ) : (
         <>
           {/* ringkas total */}
-          <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-            <span className="text-sm text-slate-500">{t("Total profit bersih (sesuai filter)", "Total net profit (per filter)")}</span>
-            <span className={`text-xl font-bold ${profitColor(totalProfit)}`}>{rupiah(totalProfit)}</span>
+          <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">{t("Total profit bersih (sesuai filter)", "Total net profit (per filter)")}</span>
+              <span className={`text-xl font-bold ${profitColor(totalProfit)}`}>{rupiah(totalProfit)}</span>
+            </div>
+            {split.proses > 0 && (
+              <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
+                {t("Penjualan bersih: ", "Net sales: ")}
+                <span className="font-semibold text-emerald-600">{rupiah(split.cair)}</span>
+                {t(" sudah cair · ", " paid out · ")}
+                <span className="font-semibold text-amber-600">{rupiah(split.proses)}</span>
+                {t(" masih proses", " still in progress")}
+                <HelpHint
+                  text={t(
+                    "Yang masih proses bisa berubah kalau order dibatalkan atau diretur. Fee-nya juga masih perkiraan sampai dana cair.",
+                    "The in-progress part can change if an order is cancelled or returned. Its fees are also estimates until paid out."
+                  )}
+                />
+              </p>
+            )}
           </div>
 
           {groups.map((g) => {

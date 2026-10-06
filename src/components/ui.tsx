@@ -22,12 +22,14 @@ export function Logo({ size = 40 }: { size?: number }) {
 export function Card({
   children,
   className = "",
+  id,
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div id={id} className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>
       {children}
     </div>
   );

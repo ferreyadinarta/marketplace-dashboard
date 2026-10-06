@@ -164,22 +164,26 @@ export async function getEscrowList(
   fromSec: number,
   toSec: number,
   opts: { deadlineMs?: number } = {}
-): Promise<ShopeeEscrowRelease[]> {
+): Promise<{ list: ShopeeEscrowRelease[]; resumeTo: number | null }> {
   const started = Date.now();
   const deadline = opts.deadlineMs ?? 30_000;
   const out: ShopeeEscrowRelease[] = [];
 
-  // maks 15 hari per panggilan; terbaru dulu supaya yang terpotong periode lama
+  // maks 15 hari per panggilan; batas jendela di tengah malam WIB supaya satu
+  // hari pencairan tidak pernah terbelah antar putaran. Terbaru dulu.
   const WINDOW = 15 * 24 * 3600;
+  const WIB = 7 * 3600;
+  const startAligned = Math.floor((fromSec + WIB) / 86400) * 86400 - WIB;
   const windows: [number, number][] = [];
-  for (let start = fromSec; start < toSec; start += WINDOW) {
+  for (let start = startAligned; start < toSec; start += WINDOW) {
     windows.push([start, Math.min(start + WINDOW, toSec)]);
   }
   windows.reverse();
   for (const [start, end] of windows) {
-
+    const got: ShopeeEscrowRelease[] = [];
     for (let page = 1; page <= 100; page++) {
-      if (Date.now() - started > deadline) return out; // berhenti rapi, bukan 504
+      // waktu habis → buang jendela setengah jadi, lanjut dari sini putaran berikutnya
+      if (Date.now() - started > deadline) return { list: out, resumeTo: end };
       const r = await shopGet<{ escrow_list?: ShopeeEscrowRelease[]; more?: boolean }>(
         "/api/v2/payment/get_escrow_list",
         accessToken,
@@ -192,12 +196,13 @@ export async function getEscrowList(
         }
       );
       for (const e of r.escrow_list ?? []) {
-        if (e?.order_sn) out.push(e);
+        if (e?.order_sn) got.push(e);
       }
       if (!r.more) break;
     }
+    out.push(...got);
   }
-  return out;
+  return { list: out, resumeTo: null };
 }
 
 // ---------- Katalog product (untuk import ke Master Product) ----------

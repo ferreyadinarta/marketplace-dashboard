@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
-import { getPembukuanByGroup, getOrdersDetail, NO_GROUP } from "@/lib/queries";
+import { getPembukuanByGroup, getOrdersDetail, NO_GROUP, type LedgerStatus } from "@/lib/queries";
 import { parseFilter, resolvePeriod } from "@/lib/parseFilter";
 import { prisma } from "@/lib/prisma";
 import { tanggal, jakartaParts, TZ, marketplaceLabel } from "@/lib/format";
@@ -18,6 +18,7 @@ const HEADER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: 
 const SUBTOTAL_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
 // oranye ala sheet kakak untuk baris TOTAL / LABA
 const SUMMARY_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8A87C" } };
+const PENDING_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF3C7" } };
 const thin: Partial<ExcelJS.Borders> = {
   top: { style: "thin", color: { argb: "FFE2E8F0" } },
   bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
@@ -52,8 +53,16 @@ export async function GET(req: NextRequest) {
   // & nama filenya beda dengan yang dilihat user di layar.
   const period = resolvePeriod(sp, true);
   const filter = parseFilter({ ...sp, from: period.from, to: period.to });
-  const groups = await getPembukuanByGroup(filter);
-  const detailRows = await getOrdersDetail(filter);
+  // kondisi saat tombol diklik: semua order periode ini kecuali yang batal/retur/belum dibayar
+  const groups = await getPembukuanByGroup(filter, undefined, "paid");
+  const detailRows = await getOrdersDetail(filter, undefined, "paid");
+  const statusLabel: Record<LedgerStatus, string> = {
+    CAIR: t("Dana cair", "Paid out"),
+    SELESAI: t("Selesai", "Completed"),
+    BELUM_CAIR: t("Selesai, dana belum cair", "Completed, not paid out yet"),
+    DIKIRIM: t("Dikirim", "Shipped"),
+    DIPROSES: t("Diproses", "Processing"),
+  };
 
   const semua = t("Semua", "All");
   // label filter untuk sheet ringkasan
@@ -73,13 +82,8 @@ export async function GET(req: NextRequest) {
 
   // ---------- Sheet Ringkasan ----------
   const sum = wb.addWorksheet(t("Ringkasan", "Summary"), { views: [{ showGridLines: false }] });
-  sum.getColumn(1).width = 22;
-  sum.getColumn(2).width = 16;
-  sum.getColumn(3).width = 16;
-  sum.getColumn(4).width = 16;
-  sum.getColumn(5).width = 16;
-  sum.getColumn(6).width = 16;
-  sum.getColumn(7).width = 12;
+  // Grup, Terjual, Omzet, Admin, Ongkir, Pajak, Modal, Profit, Margin — cukup untuk "Rp 1.234.567.890" tebal
+  [22, 16, 20, 18, 16, 16, 20, 20, 10].forEach((w, i) => (sum.getColumn(i + 1).width = w));
 
   const title = sum.addRow([t("Pembukuan Marketplace", "Marketplace Bookkeeping")]);
   title.getCell(1).font = { bold: true, size: 16, color: { argb: "FF0F172A" } };
@@ -233,7 +237,7 @@ export async function GET(req: NextRequest) {
 
   const LEDGER_HEADERS = [
     "No",
-    t("Tgl uang masuk", "Date received"),
+    t("Tgl order", "Order date"),
     t("Pembeli", "Buyer"),
     "Marketplace",
     "Order (SKU)",
@@ -243,8 +247,10 @@ export async function GET(req: NextRequest) {
     t("Ongkir", "Shipping"),
     t("Pajak", "Tax"),
     t("Total", "Total"),
+    "Status",
   ];
-  const LEDGER_WIDTHS = [6, 13, 16, 13, 20, 16, 14, 13, 12, 12, 16];
+  const LEDGER_WIDTHS = [6, 13, 18, 18, 20, 16, 14, 13, 12, 12, 16, 24];
+  const TOTAL_COL = 10; // index kolom Total (0-based)
   const COLS = LEDGER_HEADERS.length;
   const GAP = 4;
   const BLOCK = COLS + GAP; // lebar 1 tabel bulan + jarak
@@ -311,6 +317,7 @@ export async function GET(req: NextRequest) {
           row.feeShipping,
           row.feeTax,
           row.total,
+          statusLabel[row.status] + (row.feeEstimated ? t(" (fee perkiraan)", " (estimated fee)") : ""),
         ];
         vals.forEach((v, i) => {
           const cell = ws.getCell(r, c0 + i);
@@ -318,7 +325,11 @@ export async function GET(req: NextRequest) {
           cell.border = thin;
         });
         for (let i = 6; i <= 9; i++) ws.getCell(r, c0 + i).numFmt = CURRENCY; // harga, admin, ongkir, pajak
-        ws.getCell(r, c0 + 10).numFmt = CURRENCY_NEG; // total
+        ws.getCell(r, c0 + TOTAL_COL).numFmt = CURRENCY_NEG; // total
+        // belum final → kuning, supaya mudah dicek & dihapus manual kalau ternyata batal
+        if (row.status !== "CAIR" && row.status !== "SELESAI") {
+          ws.getCell(r, c0 + TOTAL_COL + 1).fill = PENDING_FILL;
+        }
         monthTotal += row.total;
         monthModal += row.modal;
         r += 1;
@@ -330,11 +341,11 @@ export async function GET(req: NextRequest) {
         [t("LABA", "PROFIT"), monthTotal - monthModal],
       ];
       for (const [label, value] of summary) {
-        const labelCell = ws.getCell(r, c0 + COLS - 2);
+        const labelCell = ws.getCell(r, c0 + TOTAL_COL - 1);
         labelCell.value = label;
         labelCell.font = { bold: true };
         labelCell.fill = SUMMARY_FILL;
-        const valueCell = ws.getCell(r, c0 + COLS - 1);
+        const valueCell = ws.getCell(r, c0 + TOTAL_COL);
         valueCell.value = value;
         valueCell.numFmt = CURRENCY_NEG;
         valueCell.font = { bold: true };
@@ -365,8 +376,8 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0) {
       const ws = wb.addWorksheet(uniqueName(safeSheetName(label)));
       ws.getCell(1, 1).value = t(
-        "Belum ada penjualan (selesai) untuk filter ini.",
-        "No (completed) sales for this filter yet."
+        "Belum ada penjualan untuk filter ini.",
+        "No sales for this filter yet."
       );
       continue;
     }
