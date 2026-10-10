@@ -48,7 +48,7 @@ export function ManualPayoutForm({
     <button
       type="button"
       onClick={() => setOpen(true)}
-      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+      className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
     >
       <Plus size={13} /> {t("Catat pembayaran", "Record payment")}
     </button>

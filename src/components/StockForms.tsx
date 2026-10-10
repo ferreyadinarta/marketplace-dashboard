@@ -241,7 +241,7 @@ export function RestockForm({
                   type="button"
                   onClick={() => removeRow(i)}
                   disabled={items.length === 1}
-                  className="text-xs font-medium text-red-500 hover:underline disabled:opacity-30 sm:hidden"
+                  className="-my-2 -mr-2 px-2 py-2 text-xs font-medium text-red-500 hover:underline disabled:opacity-30 sm:hidden"
                 >
                   {t("Hapus", "Delete")}
                 </button>

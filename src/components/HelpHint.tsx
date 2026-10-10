@@ -8,11 +8,8 @@ import { createPortal } from "react-dom";
 export function HelpHint({ text }: { text: string }) {
   const [show, setShow] = useState(false);
   const [pinned, setPinned] = useState(false); // dibuka lewat tap/klik
-  const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number; above: boolean }>();
   const ref = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => setMounted(true), []);
 
   function open() {
     const el = ref.current;
@@ -61,13 +58,12 @@ export function HelpHint({ text }: { text: string }) {
           setPinned(true);
         }
       }}
-      className="ml-1 inline-flex cursor-help rounded-full align-middle focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+      className="relative ml-1 inline-flex cursor-help rounded-full align-middle before:absolute before:-inset-2.5 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
     >
       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-500">
         ?
       </span>
-      {mounted &&
-        show &&
+      {show &&
         pos &&
         createPortal(
           <span

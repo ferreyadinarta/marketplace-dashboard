@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { enGB, id as idLocale } from "date-fns/locale";
 import { format, type Locale } from "date-fns";
-import { CalendarRange, ChevronDown, Loader2 } from "lucide-react";
+import { CalendarRange, ChevronDown, Loader2, X } from "lucide-react";
 import { useT, useLang } from "@/components/LangProvider";
 import type { T } from "@/lib/i18n";
 import "react-day-picker/style.css";
@@ -88,6 +88,17 @@ export default function DateRangePicker({
     });
     setMonth(new Date(`${toStr}T00:00:00`));
   }, [fromStr, toStr]);
+
+  // HP: tampil sebagai bottom sheet → kunci scroll halaman selama terbuka
+  useEffect(() => {
+    if (!open || !window.matchMedia("(max-width: 639px)").matches) return;
+    const html = document.documentElement;
+    const prev = html.style.overflow;
+    html.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prev;
+    };
+  }, [open]);
 
   // tutup saat klik di luar
   useEffect(() => {
@@ -180,6 +191,7 @@ export default function DateRangePicker({
       const approxW = Math.min(640, window.innerWidth * 0.95);
       setAlignRight(r.left + approxW > window.innerWidth - 8);
       setAllPicked(isAll);
+      if (isAll) setRange(undefined); // "semua data" aktif → kalender tanpa sorotan rentang lama
     }
     setOpen((o) => !o);
   }
@@ -204,10 +216,35 @@ export default function DateRangePicker({
 
       {open && (
         <div
-          className={`animate-pop absolute top-full z-50 mt-2 flex w-auto max-w-[95vw] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:flex-row ${
-            alignRight ? "right-0" : "left-0"
+          className="animate-fade fixed inset-0 z-[90] bg-slate-900/40 sm:hidden"
+          onClick={(e) => {
+            e.preventDefault(); // di dalam <label>: tanpa ini klik diteruskan ke tombol pemicu → terbuka lagi
+            cancel();
+          }}
+          aria-hidden
+        />
+      )}
+      {open && (
+        <div
+          role="dialog"
+          aria-label={t("Rentang tanggal", "Date range")}
+          // area kosong/judul di dalam <label> jangan diteruskan ke tombol pemicu
+          onClick={(e) => !(e.target as HTMLElement).closest("button, input, a") && e.preventDefault()}
+          className={`animate-sheet fixed inset-x-0 bottom-0 z-[95] flex max-h-[88dvh] flex-col overflow-y-auto overscroll-contain rounded-t-2xl bg-white shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:z-50 sm:mt-2 sm:max-h-none sm:w-auto sm:max-w-[95vw] sm:flex-row sm:overflow-hidden sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-xl ${
+            alignRight ? "sm:right-0" : "sm:left-0"
           }`}
         >
+          <div className="flex items-center justify-between px-5 pb-1 pt-4 sm:hidden">
+            <span className="text-sm font-semibold text-slate-900">{t("Rentang tanggal", "Date range")}</span>
+            <button
+              type="button"
+              onClick={cancel}
+              aria-label={t("Tutup", "Close")}
+              className="-mr-2 flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+            >
+              <X size={18} />
+            </button>
+          </div>
           {/* preset + N hari */}
           <div className="flex flex-col border-b border-slate-100 p-3 sm:w-48 sm:border-b-0 sm:border-r">
             <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -219,7 +256,7 @@ export default function DateRangePicker({
                   key={p.key}
                   type="button"
                   onClick={() => preview(p.from, p.to)}
-                  className="rounded-lg px-3 py-1.5 text-left text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+                  className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 sm:py-1.5"
                 >
                   {p.label}
                 </button>
@@ -228,7 +265,7 @@ export default function DateRangePicker({
                 type="button"
                 onClick={pickAll}
                 aria-pressed={allPicked}
-                className={`rounded-lg px-3 py-1.5 text-left text-sm ${
+                className={`rounded-lg px-3 py-2.5 text-left text-sm sm:py-1.5 ${
                   allPicked
                     ? "bg-indigo-50 font-medium text-indigo-700"
                     : "text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
@@ -257,7 +294,7 @@ export default function DateRangePicker({
           </div>
 
           {/* kalender custom */}
-          <div className="flex flex-col p-3">
+          <div className="flex flex-col items-center p-3 sm:items-stretch">
             <DayPicker
               mode="range"
               locale={dfLocale}
@@ -272,11 +309,12 @@ export default function DateRangePicker({
               style={rdpStyle}
               className="text-sm"
             />
-            <div className="mt-auto flex justify-end gap-2 border-t border-slate-100 pt-3">
+            {/* HP: tombol tetap terlihat di bawah walau isi sheet digulir */}
+            <div className="sticky bottom-0 mt-auto flex w-full justify-end gap-2 border-t border-slate-100 bg-white pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:pb-0">
               <button
                 type="button"
                 onClick={cancel}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-100 sm:px-3 sm:py-1.5"
               >
                 {t("Batal", "Cancel")}
               </button>
@@ -286,7 +324,7 @@ export default function DateRangePicker({
                 onClick={() =>
                   allPicked ? clearRange() : range?.from && range?.to && commit(range.from, range.to, true)
                 }
-                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
+                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-40 sm:flex-none sm:py-1.5"
               >
                 {t("Terapkan", "Apply")}
               </button>

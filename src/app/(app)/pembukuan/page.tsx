@@ -82,23 +82,28 @@ export default async function PembukuanPage({
         <>
           {/* ringkas total */}
           <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm text-slate-500">{t("Total profit bersih (sesuai filter)", "Total net profit (per filter)")}</span>
               <span className={`text-xl font-bold ${profitColor(totalProfit)}`}>{rupiah(totalProfit)}</span>
             </div>
             {split.proses > 0 && (
-              <p className="mt-2 border-t border-slate-100 pt-2 text-xs text-slate-500">
-                {t("Penjualan bersih: ", "Net sales: ")}
-                <span className="font-semibold text-emerald-600">{rupiah(split.cair)}</span>
-                {t(" sudah cair · ", " paid out · ")}
-                <span className="font-semibold text-amber-600">{rupiah(split.proses)}</span>
-                {t(" masih proses", " still in progress")}
-                <HelpHint
-                  text={t(
-                    "Yang masih proses bisa berubah kalau order dibatalkan atau diretur. Fee-nya juga masih perkiraan sampai dana cair.",
-                    "The in-progress part can change if an order is cancelled or returned. Its fees are also estimates until paid out."
-                  )}
-                />
+              <p className="mt-2 flex flex-col gap-0.5 border-t border-slate-100 pt-2 text-xs text-slate-500 sm:block">
+                <span>
+                  {t("Penjualan bersih: ", "Net sales: ")}
+                  <span className="font-semibold text-emerald-600">{rupiah(split.cair)}</span>
+                  {t(" sudah cair", " paid out")}
+                </span>
+                <span>
+                  <span className="hidden sm:inline"> · </span>
+                  <span className="font-semibold text-amber-600">{rupiah(split.proses)}</span>
+                  {t(" masih proses", " still in progress")}
+                  <HelpHint
+                    text={t(
+                      "Yang masih proses bisa berubah kalau order dibatalkan atau diretur. Fee-nya juga masih perkiraan sampai dana cair.",
+                      "The in-progress part can change if an order is cancelled or returned. Its fees are also estimates until paid out."
+                    )}
+                  />
+                </span>
               </p>
             )}
           </div>

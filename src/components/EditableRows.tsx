@@ -90,7 +90,7 @@ export function ProductRow({
             type="button"
             onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+            className={`inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium ${
               open ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
             }`}
           >
@@ -102,7 +102,7 @@ export function ProductRow({
               type="submit"
               title={t("Duplikat product", "Duplicate product")}
               aria-label={t(`Duplikat ${name}`, `Duplicate ${name}`)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
               <Copy size={15} />
             </button>

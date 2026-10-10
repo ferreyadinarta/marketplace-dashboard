@@ -73,7 +73,7 @@ export function StoreChip({
         action={deleteAction}
         id={store.id}
         trigger={<X size={12} />}
-        triggerClassName="shrink-0 rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
+        triggerClassName="relative shrink-0 rounded-full p-0.5 text-slate-400 before:absolute before:-inset-2.5 before:content-[''] hover:bg-slate-200 hover:text-red-600"
         title={t("Hapus toko ini?", "Delete this store?")}
         message={
           <>

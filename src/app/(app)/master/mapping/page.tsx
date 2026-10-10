@@ -269,7 +269,7 @@ export default async function MappingPage({
                     </td>
                     <td className="px-5 py-3 align-top">
                       <p className="text-slate-700">{m.marketplaceProductName}</p>
-                      <p className="mt-0.5 truncate font-mono text-[10px] text-slate-300" title={m.marketplaceSku}>
+                      <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400" title={m.marketplaceSku}>
                         {m.marketplaceSku}
                       </p>
                     </td>
@@ -301,7 +301,7 @@ export default async function MappingPage({
               >
                 {/* nama product yang dipentingkan, bukan kode SKU marketplace */}
                 <p className="text-sm font-semibold text-slate-900">{m.marketplaceProductName}</p>
-                <p className="mt-0.5 truncate font-mono text-[10px] text-slate-300">{m.marketplaceSku}</p>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">{m.marketplaceSku}</p>
                 <div className="mt-3 space-y-3">
                   <div className="flex flex-col">
                     <span className="text-[11px] text-slate-400">{t("Toko", "Store")}</span>

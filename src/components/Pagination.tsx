@@ -14,7 +14,7 @@ export async function PaginationControls({
 }) {
   if (totalPages <= 1) return null;
   const { t } = await getT();
-  const btn = "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-sm font-medium";
+  const btn = "inline-flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-2.5 text-sm font-medium";
   const on = `${btn} border-slate-300 text-slate-700 hover:bg-slate-50`;
   const off = `${btn} border-slate-200 text-slate-300`;
   return (

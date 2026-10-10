@@ -99,7 +99,7 @@ export function BulkDeleteProducts({ products, action }: { products: CleanupRow[
               type="button"
               onClick={toggleAllShown}
               disabled={shown.length === 0}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
             >
               {allShownPicked ? t("Batal pilih semua", "Deselect all") : t(`Pilih semua (${shown.length})`, `Select all (${shown.length})`)}
             </button>

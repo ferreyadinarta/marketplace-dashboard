@@ -171,29 +171,29 @@ export default async function MasterTokoPage({
               )}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <a
               href="/api/tiktok/authorize"
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+              className="inline-flex items-center justify-center gap-2 rounded-lg text-center bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
             >
               {t("Hubungkan TikTok Shop", "Connect TikTok Shop")}
             </a>
             <a
               href="/api/shopee/authorize"
-              className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+              className="inline-flex items-center justify-center gap-2 rounded-lg text-center bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
             >
               {t("Hubungkan Shopee", "Connect Shopee")}
             </a>
             <a
               href="/api/akulaku/authorize"
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              className="inline-flex items-center justify-center gap-2 rounded-lg text-center bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               {t("Hubungkan Akulaku", "Connect Akulaku")}
             </a>
-            <form action={startBlibli}>
+            <form action={startBlibli} className="contents">
               <button
                 type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                className="inline-flex items-center justify-center gap-2 rounded-lg text-center bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
               >
                 {t("Hubungkan Blibli", "Connect Blibli")}
               </button>

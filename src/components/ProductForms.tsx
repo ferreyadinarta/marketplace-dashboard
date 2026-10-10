@@ -351,7 +351,7 @@ function GroupChip({ group, deleteAction }: { group: Group; deleteAction: Action
           type="button"
           onClick={toggle}
           aria-label={t(`Hapus grup ${group.name}`, `Delete group ${group.name}`)}
-          className="shrink-0 rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-red-600"
+          className="relative shrink-0 rounded-full p-0.5 text-indigo-400 before:absolute before:-inset-2.5 before:content-[''] hover:bg-indigo-100 hover:text-red-600"
         >
           <X size={12} />
         </button>
