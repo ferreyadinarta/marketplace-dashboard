@@ -1,5 +1,6 @@
 "use client";
 
+import { blockedByDemo } from "@/lib/demo";
 import { useCallback, useEffect, useState } from "react";
 import { Bell, BellRing, BellOff, Share, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { subscribeUser, unsubscribeUser, sendTestNotification, checkNow } from "@/app/(app)/stok/push-actions";
@@ -78,6 +79,7 @@ export function NotificationToggle() {
   }, [refresh]);
 
   async function subscribe() {
+    if (blockedByDemo()) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -103,6 +105,7 @@ export function NotificationToggle() {
   }
 
   async function unsubscribe() {
+    if (blockedByDemo()) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -124,6 +127,7 @@ export function NotificationToggle() {
   }
 
   async function test() {
+    if (blockedByDemo()) return;
     setBusy(true);
     setMsg(null);
     try {

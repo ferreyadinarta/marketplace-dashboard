@@ -1,5 +1,6 @@
 "use client";
 
+import { blockedByDemo } from "@/lib/demo";
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Loader2, Pause } from "lucide-react";
@@ -53,6 +54,7 @@ function useSyncRunner() {
 
   const run = useCallback(
     async (body: RunBody) => {
+      if (blockedByDemo()) return;
       setRunning(true);
       stop.current = false;
       // panel menurunkan irama polling saat idle — kabari biar langsung cepat lagi

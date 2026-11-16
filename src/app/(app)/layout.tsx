@@ -1,13 +1,14 @@
 import Sidebar from "@/components/Sidebar";
 import { Toaster } from "@/components/Toaster";
-import { APP_ENV } from "@/lib/config";
+import { APP_ENV, IS_DEMO } from "@/lib/config";
+import { DemoGuard } from "@/components/DemoGuard";
 
 export default function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <>
-      <Sidebar env={APP_ENV} />
+      <Sidebar env={APP_ENV} demo={IS_DEMO} />
       <div className="lg:pl-64">
         {/* pt: tinggi header mobile + safe-area notch; pb: + safe-area home indicator.
             pl/pr: safe-area landscape. Desktop kembali normal. */}
@@ -16,6 +17,7 @@ export default function AppLayout({
         </main>
       </div>
       <Toaster />
+      {IS_DEMO && <DemoGuard />}
     </>
   );
 }

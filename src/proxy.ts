@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySession, SESSION_COOKIE } from "@/lib/auth";
+import { IS_DEMO } from "@/lib/config";
+
+const DEMO_API = ["/api/health", "/api/sync/progress", "/api/export"];
 
 // Endpoint publik (server-to-server / redirect luar) yang TIDAK boleh kena gate
 // sesi login. Masing-masing punya auth sendiri:
@@ -27,6 +30,23 @@ const PUBLIC_PATHS = [
 // Lindungi seluruh route kecuali /login & aset statis.
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (IS_DEMO) {
+    if (pathname.startsWith("/api/")) {
+      const readable = req.method === "GET" && DEMO_API.some((p) => pathname.startsWith(p));
+      return readable
+        ? NextResponse.next()
+        : NextResponse.json({ error: "Read-only demo: changes are turned off." }, { status: 403 });
+    }
+    if (pathname === "/login") {
+      const home = req.nextUrl.clone();
+      home.pathname = "/";
+      home.search = "";
+      return NextResponse.redirect(home);
+    }
+    return NextResponse.next();
+  }
+
   if (pathname === "/login" || PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { getLang } from "@/lib/i18n-server";
 import { LangProvider } from "@/components/LangProvider";
+import { IS_DEMO } from "@/lib/config";
 
 // judul tab ikut bahasa pilihan
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,7 +44,7 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const lang = await getLang();
   return (
-    <html lang={lang}>
+    <html lang={lang} data-demo={IS_DEMO ? "1" : undefined}>
       <body>
         <LangProvider lang={lang}>{children}</LangProvider>
       </body>

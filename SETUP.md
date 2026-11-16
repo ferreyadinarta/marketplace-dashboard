@@ -65,3 +65,27 @@ Testing tidak pernah menyentuh toko/dana asli.
 | `npm run db:seed` | isi data contoh |
 | `npm run db:reset` | hapus semua + isi ulang data contoh |
 | `npm run db:studio` | buka GUI database |
+
+## Demo publik (hanya-baca, tanpa login)
+
+Untuk dipajang di portfolio. Aktif hanya kalau `DEMO_MODE=1` DAN `MARKETPLACE_ENV` bukan `production`.
+
+Yang berubah saat demo aktif:
+
+- Tidak perlu login; `/login` diarahkan ke dashboard.
+- Semua penulisan database ditolak di `src/lib/prisma.ts` (termasuk raw SQL).
+- Kredensial toko (API key, secret, token) selalu dikosongkan saat dibaca.
+- Semua `/api/*` ditolak (403) kecuali baca: health, progres sync, export.
+- Form & tombol simpan menampilkan pesan "Demo hanya-baca".
+- Bahasa bawaan Inggris.
+
+Cara deploy (terpisah dari production):
+
+1. Neon: buat branch baru `demo`. Jangan pakai branch `production` atau `sandbox` yang berisi token.
+2. Lokal, sekali: arahkan `DATABASE_URL` ke branch `demo`, lalu `npx prisma migrate deploy` dan `npm run db:seed`.
+3. Vercel: buat project BARU dari repo yang sama, dengan Environment Variables:
+   - `DEMO_MODE = 1`
+   - `MARKETPLACE_ENV = sandbox`
+   - `DATABASE_URL = <connection string branch demo>`
+   - Jangan isi `APP_PASSWORD`, kredensial TikTok/Shopee, atau VAPID.
+4. Tanggal data contoh relatif terhadap hari seed dijalankan. Jalankan `npm run db:seed` lagi sesekali supaya dashboard bulan berjalan tidak kosong.

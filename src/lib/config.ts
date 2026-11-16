@@ -33,3 +33,5 @@ export function baseUrl(marketplace: string): string {
 }
 
 export const IS_SANDBOX = APP_ENV === "sandbox";
+
+export const IS_DEMO = process.env.DEMO_MODE === "1" && APP_ENV !== "production";

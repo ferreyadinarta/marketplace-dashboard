@@ -1,5 +1,6 @@
 "use client";
 
+import { blockedByDemo } from "@/lib/demo";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { ChevronLeft, Minus, Plus, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -147,6 +148,7 @@ export function StockCounter({
   };
 
   const save = () => {
+    if (blockedByDemo()) return;
     const fd = new FormData();
     fd.set("productId", it.productId);
     fd.set("countedQty", String(total));

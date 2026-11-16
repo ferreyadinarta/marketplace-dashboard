@@ -1,5 +1,6 @@
 "use client";
 
+import { blockedByDemo } from "@/lib/demo";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Loader2 } from "lucide-react";
@@ -36,6 +37,7 @@ export function SyncPayoutsButton({
   const [, startTransition] = useTransition();
 
   const run = async () => {
+    if (blockedByDemo()) return;
     setBusy(true);
     try {
       let state: Record<string, string> = {};
